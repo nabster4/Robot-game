@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrapforge</title>
+<meta name="description" content="Top-down robot shooter: destroy machines, salvage their parts, and craft a squad of companion robots.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="scanlines"></div>
+
+<!-- ═══════ Main menu ═══════ -->
+<div id="menu" class="overlay show">
+  <div class="menu-inner">
+    <div class="logo">
+      <span class="logo-top">SCRAP</span><span class="logo-bot">FORGE</span>
+    </div>
+    <div class="tagline">Destroy the machines. Salvage their parts. Build an army of your own.</div>
+    <div class="menu-buttons">
+      <button class="btn primary big" id="btn-start">Start Campaign</button>
+      <button class="btn" id="btn-howto">How to Play</button>
+    </div>
+    <div class="howto hidden" id="howto">
+      <div class="howto-grid">
+        <div><kbd>W A S D</kbd><span>Move</span></div>
+        <div><kbd>Mouse</kbd><span>Aim · hold left-click to fire</span></div>
+        <div><kbd>Space</kbd><span>Dash — brief invulnerability</span></div>
+        <div><kbd>Right-click / E</kbd><span>Plasma bomb (clears bullets)</span></div>
+        <div><kbd>Q</kbd><span>Use repair kit</span></div>
+        <div><kbd>Tab / I</kbd><span>Workshop — inventory &amp; crafting</span></div>
+        <div><kbd>Esc / P</kbd><span>Pause</span></div>
+        <div><kbd>M</kbd><span>Mute</span></div>
+      </div>
+      <p>Every robot you destroy drops <b>parts</b>. Open the <b>Workshop</b> any time to turn them into
+        <b>companion robots</b> that fight beside you, or into <b>upgrades</b> for your own mech.
+        Clear each sector's waves, then defeat its boss. Six sectors stand between you and the Nexus.</p>
+    </div>
+    <div class="menu-foot">6 sectors · 7 enemy classes · 6 bosses · 6 companion builds</div>
+  </div>
+</div>
+
+<!-- ═══════ Pause ═══════ -->
+<div id="pause" class="overlay">
+  <div class="panel small">
+    <h2>PAUSED</h2>
+    <button class="btn primary" id="btn-resume">Resume</button>
+    <button class="btn" id="btn-p-workshop">Workshop</button>
+    <button class="btn" id="btn-restart">Restart Sector</button>
+    <button class="btn" id="btn-mute">Sound: On</button>
+    <button class="btn ghost" id="btn-quit">Quit to Menu</button>
+  </div>
+</div>
+
+<!-- ═══════ Workshop ═══════ -->
+<div id="workshop" class="overlay">
+  <div class="ws">
+    <header class="ws-head">
+      <div class="ws-titles">
+        <h1 id="ws-title">WORKSHOP</h1>
+        <div class="ws-sub" id="ws-sub"></div>
+      </div>
+      <div class="ws-stats" id="ws-stats"></div>
+      <button class="btn primary" id="ws-continue">Resume ▸</button>
+    </header>
+    <div class="ws-body">
+      <section class="ws-col">
+        <h3>Salvage Inventory</h3>
+        <div id="ws-inv" class="inv-list"></div>
+        <h3>Supplies</h3>
+        <div id="ws-items" class="inv-list"></div>
+      </section>
+      <section class="ws-col craft">
+        <div class="tabs">
+          <button class="tab active" data-tab="companion">Companions</button>
+          <button class="tab" data-tab="upgrade">Upgrades</button>
+          <button class="tab" data-tab="item">Supplies</button>
+        </div>
+        <div id="ws-recipes" class="recipes"></div>
+      </section>
+      <section class="ws-col">
+        <h3>Squad <span id="ws-slots" class="muted"></span></h3>
+        <div id="ws-squad" class="inv-list"></div>
+        <h3>Pilot Systems</h3>
+        <div id="ws-player" class="pilot"></div>
+      </section>
+    </div>
+    <div class="ws-toast" id="ws-toast"></div>
+  </div>
+</div>
+
+<!-- ═══════ Game over ═══════ -->
+<div id="gameover" class="overlay">
+  <div class="panel">
+    <h2 class="danger">SYSTEM FAILURE</h2>
+    <div class="muted" id="go-sector"></div>
+    <div class="stats" id="go-stats"></div>
+    <p class="muted small-text">Retrying restores your parts, upgrades and squad from the start of this sector.</p>
+    <div class="row">
+      <button class="btn primary" id="btn-retry">Retry Sector</button>
+      <button class="btn ghost" id="btn-go-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Victory ═══════ -->
+<div id="victory" class="overlay">
+  <div class="panel">
+    <h2 class="win">NEXUS DESTROYED</h2>
+    <div class="muted">The machine uprising is over. Your scrap-built army stands victorious.</div>
+    <div class="stats" id="v-stats"></div>
+    <div class="row">
+      <button class="btn primary" id="btn-again">Play Again</button>
+      <button class="btn ghost" id="btn-v-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/art.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
