@@ -704,8 +704,8 @@ function drawBanner() {
 // ═════════════════════════ Main loop ═════════════════════════
 let lastT = performance.now();
 function frame(now) {
-  let dt = Math.min(0.033, (now - lastT) / 1000);
-  lastT = now;
+  let dt = clamp((now - lastT) / 1000, 0, 0.033);
+  lastT = Math.max(lastT, now);
 
   if (G.state === 'playing') {
     if (Input.hit('Tab') || Input.hit('KeyI')) { UI.openWorkshop('field'); }

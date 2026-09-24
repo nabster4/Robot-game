@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scrapforge: Outlands</title>
+<meta name="description" content="First-person 3D robot salvage adventure: explore alien zones, destroy machines, salvage their parts and craft a robot squad.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- ═══════ HUD ═══════ -->
+<div id="hud">
+  <div id="objective" class="glass">
+    <div id="obj-zone"></div>
+    <div id="obj-text"></div>
+    <div id="obj-prog"><i id="obj-prog-fill"></i></div>
+    <div id="obj-kills"></div>
+  </div>
+
+  <div id="compass-wrap"><canvas id="compass" width="560" height="46"></canvas></div>
+
+  <div id="bossbar"><div id="boss-name"></div><div class="boss-track"><i id="boss-fill"></i></div></div>
+
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="dmgdir"></div>
+  <div id="prompt"></div>
+  <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+  <div id="hint"></div>
+  <div id="feed"></div>
+
+  <div id="vitals" class="glass">
+    <div class="vrow"><span class="lbl">HULL</span><span id="val-hull" class="val"></span></div>
+    <div class="track big"><i id="bar-hull"></i></div>
+    <div class="vrow small"><span class="lbl plasma">PLASMA</span><div class="track"><i id="bar-plasma" class="plasma"></i></div><span id="val-plasma" class="val plasma"></span></div>
+    <div class="vrow small"><span class="lbl">DASH</span><div class="track"><i id="bar-dash"></i></div><span id="val-repair" class="val green"></span></div>
+  </div>
+
+  <div id="bottom-center">
+    <div id="hud-squad"></div>
+    <div id="hud-parts" class="glass"></div>
+  </div>
+
+  <canvas id="radar" width="180" height="180"></canvas>
+  <div id="keys-hint">TAB workshop · E interact · Q dash · RMB grenade</div>
+</div>
+
+<!-- ═══════ Main menu ═══════ -->
+<div id="menu" class="overlay show">
+  <div class="menu-inner">
+    <div class="logo">
+      <span class="logo-top">SCRAP</span><span class="logo-bot">FORGE</span>
+      <span class="logo-sub">O U T L A N D S</span>
+    </div>
+    <div class="tagline">Explore six hostile zones. Salvage the machines. Build a robot army of your own.</div>
+    <div class="menu-buttons">
+      <button class="btn primary big" id="btn-start">Begin Expedition</button>
+      <button class="btn" id="btn-howto">How to Play</button>
+    </div>
+    <div class="howto hidden" id="howto">
+      <div class="howto-grid">
+        <div><kbd>W A S D</kbd><span>Move · <b>Shift</b> sprint</span></div>
+        <div><kbd>Mouse</kbd><span>Look · left-click to fire</span></div>
+        <div><kbd>Space</kbd><span>Jump (over shockwaves &amp; lasers)</span></div>
+        <div><kbd>Q</kbd><span>Dash — brief invulnerability</span></div>
+        <div><kbd>Right-click / G</kbd><span>Plasma grenade</span></div>
+        <div><kbd>E</kbd><span>Open caches · activate beacons</span></div>
+        <div><kbd>R</kbd><span>Use repair kit</span></div>
+        <div><kbd>Tab / I</kbd><span>Workshop — inventory &amp; crafting</span></div>
+        <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
+        <div><kbd>M</kbd><span>Mute</span></div>
+      </div>
+      <p>Each zone hides <b>signal beacons</b> — follow their light pillars. Activate one and hold its uplink ring
+        while the machines counter-attack. Bring every beacon online to open the <b>Core Gate</b> and face the
+        zone's boss. Destroyed robots and hidden <b>salvage caches</b> drop parts — craft them into
+        <b>companion robots</b> and <b>upgrades</b> at the Workshop, any time.</p>
+    </div>
+    <div class="menu-foot">6 zones · 7 enemy classes · 6 bosses · 6 companion builds</div>
+    <a class="menu-link" href="../index.html">Play the original top-down Scrapforge ▸</a>
+  </div>
+</div>
+
+<!-- ═══════ Pause ═══════ -->
+<div id="pause" class="overlay">
+  <div class="panel small">
+    <h2>PAUSED</h2>
+    <button class="btn primary" id="btn-resume">Resume</button>
+    <button class="btn" id="btn-p-workshop">Workshop</button>
+    <div class="settings">
+      <label>Mouse sensitivity <b id="opt-sens-val">1.0</b><input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1"></label>
+      <label class="check"><input type="checkbox" id="opt-invert"> Invert mouse Y</label>
+      <label class="check"><input type="checkbox" id="opt-quality"> Performance mode (no shadows, lower resolution)</label>
+    </div>
+    <button class="btn" id="btn-restart">Restart Zone</button>
+    <button class="btn" id="btn-mute">Sound: On</button>
+    <button class="btn ghost" id="btn-quit">Quit to Menu</button>
+  </div>
+</div>
+
+<!-- ═══════ Workshop ═══════ -->
+<div id="workshop" class="overlay">
+  <div class="ws">
+    <header class="ws-head">
+      <div class="ws-titles">
+        <h1 id="ws-title">WORKSHOP</h1>
+        <div class="ws-sub" id="ws-sub"></div>
+      </div>
+      <div class="ws-stats" id="ws-stats"></div>
+      <button class="btn primary" id="ws-continue">Resume ▸</button>
+    </header>
+    <div class="ws-body">
+      <section class="ws-col">
+        <h3>Salvage Inventory</h3>
+        <div id="ws-inv" class="inv-list"></div>
+        <h3>Supplies</h3>
+        <div id="ws-items" class="inv-list"></div>
+      </section>
+      <section class="ws-col craft">
+        <div class="tabs">
+          <button class="tab active" data-tab="companion">Companions</button>
+          <button class="tab" data-tab="upgrade">Upgrades</button>
+          <button class="tab" data-tab="item">Supplies</button>
+        </div>
+        <div id="ws-recipes" class="recipes"></div>
+      </section>
+      <section class="ws-col">
+        <h3>Squad <span id="ws-slots" class="muted"></span></h3>
+        <div id="ws-squad" class="inv-list"></div>
+        <h3>Pilot Systems</h3>
+        <div id="ws-player" class="pilot"></div>
+      </section>
+    </div>
+    <div class="ws-toast" id="ws-toast"></div>
+  </div>
+</div>
+
+<!-- ═══════ Game over ═══════ -->
+<div id="gameover" class="overlay">
+  <div class="panel">
+    <h2 class="danger">SYSTEM FAILURE</h2>
+    <div class="muted" id="go-sector"></div>
+    <div class="stats" id="go-stats"></div>
+    <p class="muted small-text">Retrying restores your parts, upgrades and squad from the start of this zone.</p>
+    <div class="row">
+      <button class="btn primary" id="btn-retry">Retry Zone</button>
+      <button class="btn ghost" id="btn-go-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ Victory ═══════ -->
+<div id="victory" class="overlay">
+  <div class="panel">
+    <h2 class="win">NEXUS DESTROYED</h2>
+    <div class="muted">The machine uprising is over. Your scrap-built army stands victorious.</div>
+    <div class="stats" id="v-stats"></div>
+    <div class="row">
+      <button class="btn primary" id="btn-again">New Expedition</button>
+      <button class="btn ghost" id="btn-v-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/post.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/models.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

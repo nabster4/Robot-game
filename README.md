@@ -1,5 +1,49 @@
 # SCRAPFORGE
 
+Two games in one repo:
+
+- **[Scrapforge](index.html)**: the original neon top-down (twin-stick) shooter.
+- **[Scrapforge: Outlands](explorer/index.html)**: a **3D first-person adventure** version where you explore open zones.
+
+Both use the same concept: destroy robots, salvage their parts, and craft companion robots and upgrades.
+
+---
+
+## Scrapforge: Outlands (3D first-person)
+
+Explore six open alien zones on foot. Each zone has a sky, fog, weather, and a hazard (oil slicks,
+lava, corrupted data, freezing water, acid, plasma).
+
+**Each zone plays out like this**
+1. **Explore.** Find the zone's **signal beacons** by following their light pillars, using the compass and radar. Open hidden **salvage caches** (one per zone is golden and holds Quantum Chips).
+2. **Uplink.** Activate a beacon and stay inside its ring for 22 seconds while machines warp in to stop you.
+3. **Core Gate.** When every beacon is online, the force-field dome over the central arena drops.
+4. **Boss.** Step in to face the zone's boss. Attacks include ground-hugging bullet rings, spirals, aimed fans, charges, summons, **rotating lasers and shockwave slams you have to jump over**, and an enraged Overdrive phase.
+5. **Extract.** Walk into the portal to reach the Workshop, then deploy to the next zone.
+
+**Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump · `Q` dash ·
+right-click or `G` plasma grenade · `E` interact · `R` repair kit · `Tab` workshop · `Esc` pause and settings
+(mouse sensitivity, invert Y, performance mode) · `M` mute.
+
+**Tech:** Three.js r158 (vendored in `explorer/vendor/`, MIT) with a custom HDR bloom and ACES tone-mapping
+pipeline, procedural terrain and props, GPU particles, instanced debris, dynamic flash lights, shadows, and
+music that gets more intense when machines are hunting you. Everything is procedural. There are no model,
+texture or audio files, and it still runs from `file://` without a build step.
+
+```
+explorer/js/world.js     terrain, sky, hazards, props, beacons, caches, arena dome, portal
+explorer/js/models.js    low-poly robot, boss, companion, weapon and pickup models
+explorer/js/entities.js  Player controller, Enemy AI, Boss patterns, Companions
+explorer/js/post.js      bloom and tone-mapping post-processing
+explorer/js/fx.js        particles, debris, lights, lightning, weather
+explorer/js/game.js      zone flow, projectiles, collisions, camera, main loop
+explorer/js/ui.js        HUD (compass, radar, objectives, feed) and workshop
+```
+
+---
+
+## Scrapforge (top-down original)
+
 A neon top-down robot shooter. Destroy enemy machines, salvage their parts, and craft a squad of
 companion robots that fight at your side. Six sectors, six bosses, one machine uprising to end.
 
@@ -7,7 +51,7 @@ companion robots that fight at your side. Six sectors, six bosses, one machine u
 
 ## Play
 
-No build step and no dependencies. Open `index.html` in a modern desktop browser, or serve the folder:
+No build step. Open `index.html` (top-down) or `explorer/index.html` (3D) in a modern desktop browser, or serve the folder:
 
 ```bash
 npx http-server .     # or: python3 -m http.server
