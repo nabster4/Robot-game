@@ -9,7 +9,7 @@ const UI = {
 
   // ═════════════════════════ Setup ═════════════════════════
   init() {
-    $('btn-start').onclick = () => { Sound.init(); Sound.play('click'); newRun(); Input.lock(canvas); };
+    $('btn-start').onclick = () => { Sound.init(); Sound.play('click'); Touch.goFullscreen(); newRun(); Input.lock(canvas); };
     $('btn-howto').onclick = () => { Sound.init(); Sound.play('click'); $('howto').classList.toggle('hidden'); };
     $('btn-resume').onclick = () => this.closeOverlay();
     $('btn-p-workshop').onclick = () => this.openWorkshop('field');
@@ -33,6 +33,9 @@ const UI = {
       t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); };
     });
     const sens = $('opt-sens');
+    sens.value = G.settings.sens; $('opt-sens-val').textContent = G.settings.sens.toFixed(1);
+    $('opt-quality').checked = G.settings.quality === 'low';
+    if (Touch.enabled) $('opt-sens-label').textContent = 'Look sensitivity';
     sens.oninput = () => { G.settings.sens = +sens.value; $('opt-sens-val').textContent = (+sens.value).toFixed(1); };
     $('opt-invert').onchange = (e) => { G.settings.invert = e.target.checked; };
     $('opt-quality').onchange = (e) => { G.settings.quality = e.target.checked ? 'low' : 'high'; renderer.shadowMap.enabled = !e.target.checked; resize(); scene.traverse((o) => { if (o.material && o.material.needsUpdate !== undefined) o.material.needsUpdate = true; }); };
@@ -48,6 +51,7 @@ const UI = {
     $('hud').classList.toggle('show', G.state === 'playing');
   },
   show(id) {
+    Touch.reset();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
     $(id).classList.add('show');
     $('hud').classList.toggle('show', id === 'workshop' || id === 'pause');
@@ -214,7 +218,7 @@ const UI = {
         <div class="inv-count">${G.inv[k]}</div>
       </div>`).join('');
     $('ws-items').innerHTML = `
-      <div class="inv-item" style="--c:#6bff9e"><img src="${upgIconURL('repair', '#6bff9e')}" alt=""><div class="inv-info"><div class="inv-name">Repair Kit</div><div class="inv-desc">R — restore 40 hull</div></div><div class="inv-count">${G.repairKits}</div></div>
+      <div class="inv-item" style="--c:#6bff9e"><img src="${upgIconURL('repair', '#6bff9e')}" alt=""><div class="inv-info"><div class="inv-name">Repair Kit</div><div class="inv-desc">${Touch.enabled ? 'Repair button' : 'R'} — restore 40 hull</div></div><div class="inv-count">${G.repairKits}</div></div>
       <div class="inv-item" style="--c:#b98cff"><img src="${upgIconURL('cell', '#b98cff')}" alt=""><div class="inv-info"><div class="inv-name">Plasma Cell</div><div class="inv-desc">Refills grenade charge</div></div><div class="inv-count">${G.cells}</div></div>`;
 
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === this.tab));
@@ -338,7 +342,7 @@ const UI = {
     $('bar-plasma').style.width = p.energy + '%';
     $('val-plasma').textContent = p.energy >= 100 ? 'READY' : G.cells ? `+${G.cells} CELL` : '';
     $('bar-dash').style.width = (100 * (1 - Math.max(0, p.dashCd) / p.dashMax)) + '%';
-    $('val-repair').textContent = `[R] REPAIR ×${G.repairKits}`;
+    $('val-repair').textContent = Touch.enabled ? `REPAIR ×${G.repairKits}` : `[R] REPAIR ×${G.repairKits}`;
     $('vitals').classList.toggle('low', hk < 0.3);
 
     for (const k of PART_ORDER) {
@@ -398,7 +402,8 @@ const UI = {
     const it = G.state === 'playing' && !p.dead ? nextInteractable() : null;
     const pr = $('prompt');
     if (it) {
-      pr.innerHTML = it.kind === 'cache' ? `<kbd>E</kbd> Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache` : '<kbd>E</kbd> Start beacon uplink';
+      const key = Touch.enabled ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
+      pr.innerHTML = it.kind === 'cache' ? `${key} Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache` : `${key} Start beacon uplink`;
       pr.classList.add('show');
     } else pr.classList.remove('show');
 

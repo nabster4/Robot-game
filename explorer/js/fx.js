@@ -267,7 +267,7 @@ const Weather = {
   init(scene, type, hex) {
     if (this.points) { scene.remove(this.points); this.points.geometry.dispose(); }
     this.type = type;
-    const n = type === 'data' ? 300 : 700;
+    const n = Math.round((type === 'data' ? 300 : 700) * (G.settings.quality === 'low' ? 0.45 : 1));
     this.n = n; this.box = 60;
     const pos = new Float32Array(n * 3);
     this.vel = new Float32Array(n);

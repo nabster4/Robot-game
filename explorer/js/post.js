@@ -7,7 +7,13 @@ class PostFX {
   constructor(renderer) {
     this.r = renderer;
     const isGL2 = renderer.capabilities.isWebGL2;
-    const opts = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+    // Some mobile GPUs cannot render into half-float targets; fall back to 8-bit (bloom still works, just LDR).
+    const ext = renderer.extensions;
+    const canHalf = isGL2 ? (ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'))
+      : (ext.has('OES_texture_half_float') && ext.has('EXT_color_buffer_half_float'));
+    this.hdr = canHalf;
+    this.isGL2 = isGL2;
+    const opts = { type: canHalf ? THREE.HalfFloatType : THREE.UnsignedByteType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
     this.rtScene = new THREE.WebGLRenderTarget(4, 4, Object.assign({ samples: isGL2 ? 4 : 0 }, opts));
     this.levels = [];
     for (let i = 0; i < 4; i++) {
@@ -67,6 +73,11 @@ class PostFX {
           gl_FragColor = vec4(col, 1.0); }`,
       depthTest: false, depthWrite: false,
     });
+  }
+
+  setSamples(n) {
+    n = this.isGL2 ? n : 0;
+    if (this.rtScene.samples !== n) { this.rtScene.samples = n; this.rtScene.dispose(); }
   }
 
   setSize(w, h, dpr) {

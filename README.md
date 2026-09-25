@@ -25,6 +25,18 @@ lava, corrupted data, freezing water, acid, plasma).
 right-click or `G` plasma grenade · `E` interact · `R` repair kit · `Tab` workshop · `Esc` pause and settings
 (mouse sensitivity, invert Y, performance mode) · `M` mute.
 
+**On a phone or tablet** (landscape): touch controls turn on automatically.
+- Left thumb: floating move stick (push to the rim to sprint). Right side: drag to look.
+- **FIRE**: hold to shoot, and drag it to aim at the same time. **JUMP**, **DASH** and **BOMB** show cooldown rings.
+- **USE** lights up next to caches and beacons. **FIX** uses a repair kit, **CRAFT** opens the workshop, and **❚❚** pauses.
+- Light aim assist is on, and performance mode is on by default (no shadows, lower resolution, no MSAA).
+- The game asks you to rotate to landscape, goes fullscreen where the browser allows it, and pauses when you switch apps.
+- Add `?touch=1` or `?touch=0` to the URL to force touch controls on or off.
+
+To play on a phone, the files need to be served over the web, for example with GitHub Pages
+(repo Settings → Pages → deploy from this branch) and then opening `…/explorer/`.
+On iOS, "Add to Home Screen" gives a fullscreen, app-like launch.
+
 **Tech:** Three.js r158 (vendored in `explorer/vendor/`, MIT) with a custom HDR bloom and ACES tone-mapping
 pipeline, procedural terrain and props, GPU particles, instanced debris, dynamic flash lights, shadows, and
 music that gets more intense when machines are hunting you. Everything is procedural. There are no model,

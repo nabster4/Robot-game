@@ -15,7 +15,9 @@ Fx.init(scene);
 let W = 0, H = 0, DPR = 1;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
-  DPR = Math.min(window.devicePixelRatio || 1, G.settings.quality === 'low' ? 0.75 : 1.25);
+  const low = G.settings.quality === 'low';
+  DPR = Math.min(window.devicePixelRatio || 1, low ? (Touch.enabled ? 0.9 : 0.75) : 1.25);
+  post.setSamples(low ? 0 : 4);
   renderer.setPixelRatio(DPR);
   renderer.setSize(W, H, false);
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -742,6 +744,8 @@ function frame(now) {
     if (Input.hit('Escape') || ((Input.hit('Tab') || Input.hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
   }
   if (Input.hit('KeyM')) UI.toggleMute();
+  document.body.classList.toggle('playing', G.state === 'playing');
+  Touch.refresh();
 
   World.update(dt, G.time, camera);
   Weather.update(dt, camera.position, G.time);
@@ -770,6 +774,13 @@ window.addEventListener('resize', resize);
 Input.init(canvas);
 Input.onLockChange = (locked) => { if (!locked && G.state === 'playing' && !Input.fallback) UI.pause(); };
 canvas.addEventListener('click', () => { if (G.state === 'playing' && !Input.locked) Input.lock(canvas); });
+Touch.init();
+if (Touch.enabled) {
+  // phones: performance mode by default (no shadows, reduced resolution, no MSAA)
+  G.settings.quality = 'low';
+  renderer.shadowMap.enabled = false;
+  G.settings.sens = 1.1;
+}
 UI.init();
 resize();
 initMenuScene();

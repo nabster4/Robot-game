@@ -159,6 +159,6 @@ const RECIPES = [
   { id: 'firmware',  kind: 'upgrade', name: 'Squad Firmware',      desc: '+30% companion damage and hull.', max: 3, cost: { circuit: 4, quantum: 1 } },
   { id: 'slot',      kind: 'upgrade', name: 'Command Uplink',      desc: '+1 companion slot.', max: 2, cost: { circuit: 3, core: 2, quantum: 1 } },
 
-  { id: 'repair', kind: 'item', name: 'Repair Kit',  desc: 'Press R in the field to restore 40 hull.', cost: { scrap: 3, wire: 2 } },
+  { id: 'repair', kind: 'item', name: 'Repair Kit',  desc: 'Use in the field to restore 40 hull.', cost: { scrap: 3, wire: 2 } },
   { id: 'cell',   kind: 'item', name: 'Plasma Cell', desc: 'Instantly recharges your plasma grenade when it is empty.', cost: { core: 1, wire: 1 } },
 ];

@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05060a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Scrapforge: Outlands</title>
 <meta name="description" content="First-person 3D robot salvage adventure: explore alien zones, destroy machines, salvage their parts and craft a robot squad.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,6 +55,41 @@
   <div id="keys-hint">TAB workshop · E interact · Q dash · RMB grenade</div>
 </div>
 
+
+<!-- ═══════ Touch controls (phones / tablets) ═══════ -->
+<div id="touch">
+  <div id="t-stick"><div id="t-knob"></div></div>
+  <div class="tbtn small" data-tbtn="workshop" id="tb-workshop" role="button" aria-label="Workshop">
+    <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8 6.2 21l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>CRAFT</span>
+  </div>
+  <div class="tbtn small" data-tbtn="pause" id="tb-pause" role="button" aria-label="Pause">
+    <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
+  </div>
+  <div class="tbtn fire" data-tbtn="fire" id="tb-fire" role="button" aria-label="Fire">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span>FIRE</span>
+  </div>
+  <div class="tbtn jump" data-tbtn="jump" id="tb-jump" role="button" aria-label="Jump">
+    <svg viewBox="0 0 24 24"><path d="M5 14l7-7 7 7M5 20l7-7 7 7"/></svg><span>JUMP</span>
+  </div>
+  <div class="tbtn ring dash" data-tbtn="dash" id="tb-dash" role="button" aria-label="Dash">
+    <svg viewBox="0 0 24 24"><path d="M4 7l6 5-6 5M12 7l6 5-6 5"/></svg><span>DASH</span>
+  </div>
+  <div class="tbtn ring grenade" data-tbtn="grenade" id="tb-grenade" role="button" aria-label="Plasma grenade">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="14" r="6"/><path d="M12 8V4M9 4h6"/></svg><span>BOMB</span>
+  </div>
+  <div class="tbtn use" data-tbtn="use" id="tb-use" role="button" aria-label="Use">
+    <svg viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V3.5a1.5 1.5 0 0 1 3 0V11M14 11V5a1.5 1.5 0 0 1 3 0v8c0 4-2.5 7-6 7-2.5 0-4-1.5-5.5-4L4 12.5a1.5 1.5 0 0 1 2.5-1.5L8 13"/></svg><span>USE</span>
+  </div>
+  <div class="tbtn repair" data-tbtn="repair" id="tb-repair" role="button" aria-label="Repair kit" data-n="0">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>FIX</span>
+  </div>
+</div>
+
+<div id="rotate">
+  <svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="44" rx="4"/><path d="M50 40a18 18 0 0 1-18 16M46 58l-6-2 2-6"/></svg>
+  <div>Rotate your phone to landscape</div>
+</div>
+
 <!-- ═══════ Main menu ═══════ -->
 <div id="menu" class="overlay show">
   <div class="menu-inner">
@@ -62,7 +103,17 @@
       <button class="btn" id="btn-howto">How to Play</button>
     </div>
     <div class="howto hidden" id="howto">
-      <div class="howto-grid">
+      <div class="howto-grid touch-only">
+        <div><kbd>Left thumb</kbd><span>Move · push to the rim to sprint</span></div>
+        <div><kbd>Right side</kbd><span>Drag anywhere to look around</span></div>
+        <div><kbd>FIRE</kbd><span>Hold to shoot · drag it to aim</span></div>
+        <div><kbd>JUMP</kbd><span>Hop over shockwaves &amp; lasers</span></div>
+        <div><kbd>DASH</kbd><span>Burst with brief invulnerability</span></div>
+        <div><kbd>BOMB</kbd><span>Plasma grenade</span></div>
+        <div><kbd>USE</kbd><span>Open caches · start uplinks</span></div>
+        <div><kbd>CRAFT</kbd><span>Workshop — inventory &amp; crafting</span></div>
+      </div>
+      <div class="howto-grid desk-only">
         <div><kbd>W A S D</kbd><span>Move · <b>Shift</b> sprint</span></div>
         <div><kbd>Mouse</kbd><span>Look · left-click to fire</span></div>
         <div><kbd>Space</kbd><span>Jump (over shockwaves &amp; lasers)</span></div>
@@ -91,7 +142,7 @@
     <button class="btn primary" id="btn-resume">Resume</button>
     <button class="btn" id="btn-p-workshop">Workshop</button>
     <div class="settings">
-      <label>Mouse sensitivity <b id="opt-sens-val">1.0</b><input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1"></label>
+      <label><span id="opt-sens-label">Mouse sensitivity</span> <b id="opt-sens-val">1.0</b><input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1"></label>
       <label class="check"><input type="checkbox" id="opt-invert"> Invert mouse Y</label>
       <label class="check"><input type="checkbox" id="opt-quality"> Performance mode (no shadows, lower resolution)</label>
     </div>
@@ -175,6 +226,7 @@
 <script src="js/models.js"></script>
 <script src="js/world.js"></script>
 <script src="js/entities.js"></script>
+<script src="js/touch.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 </body>

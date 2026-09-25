@@ -121,6 +121,7 @@ const Input = {
     });
   },
   lock(canvas) {
+    if (this.touchMode) return;
     try {
       const p = canvas.requestPointerLock();
       if (p && p.catch) p.catch(() => { this.fallback = true; });

@@ -54,10 +54,12 @@ class Player {
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     let mf = (I.key('KeyW') || I.key('ArrowUp') ? 1 : 0) - (I.key('KeyS') || I.key('ArrowDown') ? 1 : 0);
     let mr = (I.key('KeyD') || I.key('ArrowRight') ? 1 : 0) - (I.key('KeyA') || I.key('ArrowLeft') ? 1 : 0);
+    if (I.touch) { mf -= I.touch.my; mr += I.touch.mx; }
     let wx = fx * mf + rx * mr, wz = fz * mf + rz * mr;
     const wl = Math.hypot(wx, wz);
-    if (wl) { wx /= wl; wz /= wl; }
-    const sprint = (I.key('ShiftLeft') || I.key('ShiftRight')) && mf > 0;
+    if (wl > 1) { wx /= wl; wz /= wl; } // analog stick keeps partial deflection as walking speed
+    const sprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint)) && mf > 0;
+    if (I.touchMode) touchAimAssist(this, dt);
     let spd = this.speed * (sprint ? 1.6 : 1);
     const inHaz = this.grounded && World.inHazard(this.pos.x, this.pos.z);
     if (inHaz) spd *= World.zone.hazard.slow;
@@ -65,7 +67,7 @@ class Player {
     // dash
     this.dashCd -= dt;
     if (I.hit('KeyQ') && this.dashCd <= 0) {
-      if (wl) this.dashDir.set(wx, 0, wz); else this.dashDir.set(fx, 0, fz);
+      if (wl > 0.1) this.dashDir.set(wx, 0, wz).normalize(); else this.dashDir.set(fx, 0, fz);
       this.dashT = 0.18; this.dashCd = this.dashMax;
       this.invuln = Math.max(this.invuln, 0.3);
       Sound.play('dash');
