@@ -358,52 +358,92 @@ function buildGliderModel(scale = 1) {
   return g;
 }
 
+// Articulated player mech. Joint chain (all THREE.Groups, model faces +Z, feet at y=0):
+//   root ─ pelvis ─┬─ hip ─ knee ─ ankle ─ toe            (×2)
+//                  └─ spine ─ chest ─┬─ neck ─ head
+//                                    └─ shoulder ─ elbow ─ wrist (×2, gun in right hand)
 function buildAvatarModel() {
   const g = new THREE.Group();
   const shell = Mat.std('#3a7c98', { metal: 0.55, rough: 0.4, emissive: '#0e3a4c', ei: 0.5 });
   const dark = Mat.std('#1a3242', { metal: 0.5, rough: 0.5, emissive: '#081a24', ei: 0.5 });
+  const joint = Mat.std('#0e1a22', { metal: 0.85, rough: 0.25, flat: false });
   const cyan = Mat.glow('#3cf2ff', 4);
-  const legs = [];
+  const node = (parent, x, y, z) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
+  const J = {};
+  J.root = node(g, 0, 0, 0);
+  J.pelvis = node(J.root, 0, 0.95, 0);
+  mesh(Geo.box(0.34, 0.15, 0.22), dark, 0, 0, 0, J.pelvis);
+  mesh(Geo.box(0.2, 0.1, 0.05), shell, 0, -0.02, 0.12, J.pelvis);
+
+  J.legs = [];
   for (const s of [-1, 1]) {
-    const hip = new THREE.Group(); hip.position.set(s * 0.2, 0.9, 0); g.add(hip);
-    mesh(Geo.box(0.2, 0.5, 0.24), shell, 0, -0.22, 0, hip);
-    const knee = new THREE.Group(); knee.position.y = -0.46; hip.add(knee);
-    mesh(Geo.box(0.17, 0.46, 0.2), dark, 0, -0.22, 0, knee);
-    mesh(Geo.box(0.24, 0.1, 0.36), dark, 0, -0.44, 0.06, knee);
-    mesh(Geo.box(0.04, 0.2, 0.02), cyan, s * 0.1, -0.2, 0.1, knee);
-    legs.push({ hip, knee });
+    const hip = node(J.pelvis, s * 0.13, -0.05, 0);
+    mesh(Geo.sphere(0.075, 1), joint, 0, 0, 0, hip);
+    mesh(Geo.box(0.15, 0.34, 0.18), shell, 0, -0.21, 0.01, hip);             // thigh
+    mesh(Geo.box(0.02, 0.2, 0.02), cyan, s * 0.078, -0.2, 0.06, hip);
+    const knee = node(hip, 0, -0.43, 0);
+    mesh(Geo.sphere(0.068, 1), joint, 0, 0, 0, knee);
+    mesh(Geo.box(0.15, 0.1, 0.07), shell, 0, 0.02, 0.085, knee);             // knee cap
+    mesh(Geo.box(0.12, 0.34, 0.13), dark, 0, -0.2, 0, knee);                  // shin
+    mesh(Geo.box(0.13, 0.17, 0.05), shell, 0, -0.16, 0.08, knee);             // shin guard
+    const ankle = node(knee, 0, -0.41, 0);
+    mesh(Geo.sphere(0.05, 1), joint, 0, 0, 0, ankle);
+    mesh(Geo.box(0.14, 0.08, 0.2), dark, 0, -0.045, 0.03, ankle);             // foot
+    mesh(Geo.box(0.13, 0.05, 0.06), shell, 0, -0.02, -0.08, ankle);           // heel
+    const toe = node(ankle, 0, -0.06, 0.13);
+    mesh(Geo.box(0.13, 0.05, 0.1), shell, 0, 0, 0.045, toe);
+    J.legs.push({ hip, knee, ankle, toe, side: s });
   }
-  const torso = new THREE.Group(); torso.position.y = 1.2; g.add(torso);
-  mesh(Geo.box(0.62, 0.55, 0.4), shell, 0, 0, 0, torso);
-  mesh(Geo.box(0.3, 0.12, 0.03), cyan, 0, 0.08, 0.21, torso);
-  mesh(Geo.box(0.46, 0.5, 0.25), dark, 0, 0.02, -0.3, torso);   // backpack
-  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.36, 0.02), cyan, s * 0.15, 0.04, -0.43, torso);
-  mesh(Geo.box(0.3, 0.04, 0.02), cyan, 0, 0.22, -0.43, torso);
+
+  J.spine = node(J.pelvis, 0, 0.09, 0);
+  mesh(Geo.box(0.26, 0.2, 0.18), joint, 0, 0.08, 0, J.spine);               // abdomen
+  mesh(Geo.box(0.2, 0.04, 0.04), cyan, 0, 0.08, 0.1, J.spine);
+  J.chest = node(J.spine, 0, 0.19, 0);
+  mesh(Geo.box(0.5, 0.34, 0.3), shell, 0, 0.15, 0, J.chest);
+  mesh(Geo.box(0.3, 0.1, 0.03), cyan, 0, 0.2, 0.16, J.chest);
+  mesh(Geo.box(0.44, 0.46, 0.22), dark, 0, 0.14, -0.26, J.chest);           // backpack
+  for (const s of [-1, 1]) mesh(Geo.box(0.04, 0.34, 0.02), cyan, s * 0.14, 0.14, -0.38, J.chest);
   const thrusters = [];
   for (const s of [-1, 1]) {
-    mesh(Geo.cyl(0.07, 0.09, 0.2, 8), dark, s * 0.14, -0.28, -0.36, torso);
-    const t = glowSprite('#3cf2ff', 0.5, 2); t.position.set(s * 0.14, -0.42, -0.36); torso.add(t); thrusters.push(t);
+    mesh(Geo.cyl(0.07, 0.09, 0.18, 8), dark, s * 0.13, -0.14, -0.3, J.chest);
+    const t = glowSprite('#3cf2ff', 0.5, 2); t.position.set(s * 0.13, -0.27, -0.3); J.chest.add(t); thrusters.push(t);
   }
-  const head = new THREE.Group(); head.position.y = 0.45; torso.add(head);
-  mesh(Geo.box(0.32, 0.26, 0.3), shell, 0, 0.08, 0, head);
-  mesh(Geo.box(0.26, 0.07, 0.04), cyan, 0, 0.1, 0.16, head);
-  mesh(Geo.cyl(0.01, 0.01, 0.3, 4), dark, 0.12, 0.3, -0.08, head);
-  const arms = [];
+  J.neck = node(J.chest, 0, 0.33, 0);
+  mesh(Geo.cyl(0.05, 0.065, 0.1, 8), joint, 0, 0.04, 0, J.neck);
+  J.head = node(J.neck, 0, 0.09, 0);
+  mesh(Geo.box(0.28, 0.23, 0.28), shell, 0, 0.11, 0, J.head);
+  mesh(Geo.box(0.24, 0.06, 0.04), cyan, 0, 0.13, 0.145, J.head);             // visor
+  mesh(Geo.box(0.3, 0.05, 0.3), dark, 0, 0.23, 0, J.head);
+  mesh(Geo.cyl(0.008, 0.008, 0.26, 4), joint, 0.1, 0.36, -0.08, J.head);    // antenna
+  mesh(Geo.sphere(0.02, 0), cyan, 0.1, 0.49, -0.08, J.head);
+
+  J.arms = [];
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group(); sh.position.set(s * 0.42, 0.18, 0); torso.add(sh);
-    mesh(Geo.box(0.22, 0.2, 0.26), shell, 0, 0, 0, sh);
-    mesh(Geo.box(0.14, 0.45, 0.16), dark, 0, -0.28, 0, sh);
-    arms.push(sh);
+    const sh = node(J.chest, s * 0.31, 0.24, 0);
+    mesh(Geo.sphere(0.07, 1), joint, 0, 0, 0, sh);
+    mesh(Geo.box(0.2, 0.13, 0.24), shell, s * 0.03, 0.05, 0, sh);            // pauldron
+    mesh(Geo.box(0.1, 0.24, 0.11), dark, 0, -0.15, 0, sh);                    // upper arm
+    const elbow = node(sh, 0, -0.29, 0);
+    mesh(Geo.sphere(0.055, 1), joint, 0, 0, 0, elbow);
+    mesh(Geo.box(0.11, 0.24, 0.12), shell, 0, -0.13, 0, elbow);               // forearm
+    mesh(Geo.box(0.02, 0.14, 0.02), cyan, s * 0.058, -0.13, 0.03, elbow);
+    const wrist = node(elbow, 0, -0.27, 0);
+    mesh(Geo.box(0.09, 0.1, 0.08), dark, 0, -0.05, 0, wrist);                 // hand
+    mesh(Geo.box(0.03, 0.06, 0.03), dark, -s * 0.05, -0.04, 0.04, wrist);     // thumb
+    J.arms.push({ sh, elbow, wrist, side: s });
   }
-  // blaster held forward in the right hand
-  const gun = new THREE.Group(); gun.position.set(0, -0.45, 0.15); arms[1].add(gun);
-  mesh(Geo.box(0.12, 0.14, 0.55), shell, 0, 0, 0.18, gun);
-  mesh(Geo.box(0.125, 0.03, 0.34), cyan, 0, 0.05, 0.18, gun);
-  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.5; gun.add(muzzle);
-  const flash = glowSprite('#3cf2ff', 0.7, 4); flash.position.z = 0.52; flash.visible = false; gun.add(flash);
-  const glider = buildGliderModel(0.9); glider.position.set(0, 2.35, -0.05); glider.visible = false; g.add(glider);
+  // blaster held in the right hand, barrel along the forearm
+  const gun = node(J.arms[1].wrist, 0, -0.07, 0.04);
+  gun.rotation.x = Math.PI / 2;
+  mesh(Geo.box(0.1, 0.12, 0.5), shell, 0, 0, 0.14, gun);
+  mesh(Geo.box(0.105, 0.03, 0.3), cyan, 0, 0.05, 0.14, gun);
+  mesh(Geo.cyl(0.03, 0.035, 0.18, 8), dark, 0, 0, 0.45, gun).rotation.x = Math.PI / 2;
+  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.56; gun.add(muzzle);
+  const flash = glowSprite('#3cf2ff', 0.7, 4); flash.position.z = 0.58; flash.visible = false; gun.add(flash);
+
+  const glider = buildGliderModel(0.9); glider.position.set(0, 2.3, -0.05); glider.visible = false; J.root.add(glider);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.userData = { legs, torso, head, arms, gun, muzzle, flash, flashT: 0, glider, thrusters };
+  g.userData = { J, muzzle, flash, flashT: 0, glider, thrusters, phase: 0, bodyYaw: 0, aimT: 0, lastStep: 0 };
   return g;
 }
 

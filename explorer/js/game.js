@@ -248,8 +248,8 @@ function restoreSnapshot() {
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
 }
 
-// A camp: a group of robots hanging out around a scrap brazier. They leave you alone
-// until you attack one of them (or start an uplink nearby).
+// A camp: a group of robots hanging out around a scrap brazier. They spot you when you
+// come close (an alarm meter fills), or instantly if you attack or start an uplink nearby.
 function spawnCamp(x, z, n, aggro = false) {
   const pool = ZONES[G.level].pool;
   const camp = World.buildBrazier(x, z);
@@ -310,7 +310,7 @@ function startZone(i) {
   UI.hideAll();
   UI.banner(`ZONE ${i + 1} · ${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
   setTimeout(() => { if (G.level === i && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
-  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robot camps leave you alone unless you attack them'); }, 11000);
+  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 11000);
   UI.refreshHUD(true);
 }
 
@@ -789,38 +789,182 @@ G.avatar.visible = false;
 scene.add(G.avatar);
 let swayX = 0, swayY = 0, camDist = 4.2;
 
+// ─────────── Procedural animation for the articulated mech ───────────
+// Each frame we build a target pose for every joint from the movement state, then ease the
+// joints toward it (critically-damped style), so gait changes and state switches blend smoothly.
+const AV = { k: 14 };
+function ease(obj, key, target, k, dt) { obj[key] += (target - obj[key]) * (1 - Math.exp(-k * dt)); }
+function rot(o, x, y, z, k, dt) { ease(o.rotation, 'x', x, k, dt); ease(o.rotation, 'y', y, k, dt); ease(o.rotation, 'z', z, k, dt); }
+
 function updateAvatar(dt) {
-  const p = G.player, a = G.avatar, U = a.userData;
+  const p = G.player, a = G.avatar, U = a.userData, J = U.J;
+  const riding = G.riding && G.vehicle;
+  const climbing = !!p.climbing, gliding = p.gliding;
+  const air = !p.grounded && !climbing && !riding && !gliding;
+  const vx = p.vel.x, vz = p.vel.z, spd = riding ? 0 : Math.hypot(vx, vz);
+  const t = G.time;
+
+  // ── gait phase (also drives footsteps in first person)
+  const sprinting = spd > p.speed * 1.25;
+  const stride = sprinting ? 1.7 : 1.1;               // metres per step
+  const fwdSpd = vx * Math.sin(U.bodyYaw) + vz * Math.cos(U.bodyYaw);
+  const dir = fwdSpd < -0.4 ? -1 : 1;                   // backpedal plays the cycle in reverse
+  const prevPhase = U.phase;
+  if (p.grounded && !climbing) U.phase += dir * (spd * dt / stride) * Math.PI;
+  else if (climbing) U.phase += Math.abs(p.vel.y) * dt * 2.2;
+  if (p.grounded && spd > 1 && Math.floor(prevPhase / Math.PI) !== Math.floor(U.phase / Math.PI)) {
+    Sound.play('step', sprinting, 0.6);
+    const side = Math.floor(U.phase / Math.PI) % 2 ? 1 : -1;
+    const rx = Math.cos(U.bodyYaw), rz = -Math.sin(U.bodyYaw);
+    Fx.smoke(p.pos.x + rx * side * 0.14, p.pos.y + 0.05, p.pos.z + rz * side * 0.14, 0.35, 0.6, rand(-0.3, 0.3), 0.4, rand(-0.3, 0.3), '#6a5a50');
+  }
+
   const show = G.thirdPerson && !p.dead && G.state !== 'menu';
   a.visible = show;
   if (!show) return;
-  const riding = G.riding && G.vehicle;
+
+  // ── facing: toward travel direction; snap to the aim direction while shooting
+  if (Input.mouse.down) U.aimT = 1.4; else U.aimT = Math.max(0, U.aimT - dt);
+  const aiming = U.aimT > 0 && !gliding && !climbing;
+  let targetYaw = U.bodyYaw;
+  if (riding || aiming) targetYaw = p.yaw + Math.PI;
+  else if (climbing) targetYaw = Math.atan2(p.climbing.x - p.pos.x, p.climbing.z - p.pos.z);
+  else if (spd > 0.6) targetYaw = Math.atan2(vx, vz);
+  const prevYaw = U.bodyYaw;
+  U.bodyYaw += angDiff(U.bodyYaw, targetYaw) * (1 - Math.exp(-(aiming ? 18 : 9) * dt));
+  const turnRate = angDiff(prevYaw, U.bodyYaw) / Math.max(dt, 1e-4);
+
   if (riding) a.position.set(G.vehicle.pos.x, G.vehicle.pos.y - 0.55, G.vehicle.pos.z);
   else a.position.copy(p.pos);
-  a.rotation.set(riding ? -p.pitch * 0.6 : 0, p.yaw + Math.PI, riding ? G.vehicle.bank : 0, 'YXZ');
-  const sw = Math.sin(p.walk * 2.2) * 0.7 * p.bobAmt;
-  const air = !p.grounded && !riding;
-  U.legs.forEach((l, i) => {
-    const s = i ? 1 : -1;
-    if (riding) { l.hip.rotation.x = -1.3; l.knee.rotation.x = 1.4; }
-    else if (p.climbing) { l.hip.rotation.x = -0.5 + Math.sin(p.walk * 3 + i * Math.PI) * 0.4; l.knee.rotation.x = 0.8; }
-    else if (p.gliding) { l.hip.rotation.x = 0.35 + Math.sin(G.time * 3 + i) * 0.08; l.knee.rotation.x = 0.3; }
-    else if (air) { l.hip.rotation.x = -0.5 * (i ? 1 : 0.4); l.knee.rotation.x = 0.9; }
-    else { l.hip.rotation.x = sw * s; l.knee.rotation.x = Math.max(0, -sw * s) * 0.9; }
-  });
-  const [la, ra] = U.arms;
-  if (p.gliding || p.climbing) {
-    const c = p.climbing ? Math.sin(p.walk * 3) * 0.3 : 0;
-    la.rotation.set(-Math.PI + 0.15 + c, 0, 0.1); ra.rotation.set(-Math.PI + 0.15 - c, 0, -0.1);
-  } else {
-    ra.rotation.set(-Math.PI / 2 - p.pitch, 0, 0);            // aiming arm follows the view
-    la.rotation.set(riding ? -1.2 : -sw * 0.6, 0, 0.1);
+  a.rotation.set(riding ? -p.pitch * 0.6 : 0, U.bodyYaw, riding ? G.vehicle.bank : 0, 'YXZ');
+
+  // ── gait weights
+  const w = clamp(spd / 6, 0, 1);                       // walking amount
+  const run = clamp((spd - 8) / 4, 0, 1);               // sprint amount
+  const ph = U.phase, s1 = Math.sin(ph), c1 = Math.cos(ph);
+  const accel = (fwdSpd - (U.prevFwd || 0)) / Math.max(dt, 1e-4);
+  U.prevFwd = fwdSpd;
+  U.lean = lerp(U.lean || 0, clamp(accel * 0.012, -0.15, 0.2), 1 - Math.exp(-5 * dt));
+  const land = p.land;
+  const breathe = Math.sin(t * 1.9);
+
+  // pose targets
+  const P = {
+    pelvisY: 0.95 - w * (0.035 + 0.045 * run) * s1 * s1 - (1 - w) * 0.02 - land * 0.2,
+    pelvis: [0, w * 0.13 * s1 * (1 + run * 0.6), w * 0.05 * s1 + (1 - w) * 0.025 * Math.sin(t * 0.7)],
+    spine: [0.04 + w * (0.05 + 0.2 * run) + U.lean + land * 0.25, 0, 0],
+    chest: [0.02 * breathe * (1 - w), -w * 0.2 * s1 * (1 + run * 0.5), 0],
+    legs: [], arms: [],
+  };
+  const A = w * lerp(0.42, 0.85, run);
+  for (let i = 0; i < 2; i++) {
+    const pi = ph + (i ? Math.PI : 0), si = Math.sin(pi), ci = Math.cos(pi);
+    const thigh = -A * si - land * 0.55 - (1 - w) * 0.06;
+    const knee = w * (0.12 + lerp(0.75, 1.55, run) * Math.pow(Math.max(0, ci), 1.4)) + (1 - w) * 0.12 + land * 1.0;
+    const ankle = -(thigh + knee) * 0.85 + w * 0.4 * Math.max(0, -si) * Math.max(0, -ci);
+    const toe = w * 0.6 * Math.max(0, -si) * Math.max(0, -ci);
+    P.legs.push({ hip: [thigh, 0, (i ? 1 : -1) * 0.03], knee, ankle, toe });
   }
-  U.torso.rotation.x = p.gliding ? 0.25 : 0;
-  U.head.rotation.x = -p.pitch * 0.5;
-  U.glider.visible = p.gliding;
-  const thrust = air || p.dashT > 0 ? 1.4 : 0.5;
-  for (const t of U.thrusters) t.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
+  const armA = w * lerp(0.4, 0.95, run);
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? -1 : 1;                               // left arm follows the right leg
+    const swing = armA * s1 * sgn;
+    P.arms.push({
+      sh: [swing + (1 - w) * 0.04 * breathe, 0, (i ? 1 : -1) * (0.13 + 0.08 * run)],
+      elbow: -(0.22 + w * lerp(0.2, 1.3, run) + Math.max(0, -swing) * 0.4),
+      wrist: 0,
+    });
+  }
+
+  // ── state overrides
+  if (air) {
+    const up = clamp(p.vel.y / 8, -1, 1);
+    const tuck = Math.max(0, up);
+    P.pelvisY = 0.95;
+    P.spine = [0.1 - 0.15 * tuck, 0, 0];
+    P.legs[0] = { hip: [-0.25 - 0.6 * tuck, 0, -0.08], knee: 0.35 + 0.9 * tuck, ankle: 0.2, toe: 0 };
+    P.legs[1] = { hip: [0.05 - 0.2 * tuck, 0, 0.08], knee: 0.25 + 0.5 * tuck, ankle: 0.3, toe: 0 };
+    const flail = Math.max(0, -up) * 0.25 * Math.sin(t * 9);
+    P.arms[0] = { sh: [-0.35 - 0.5 * tuck, 0, -0.55 - 0.35 * Math.max(0, -up) + flail], elbow: -0.5, wrist: 0 };
+    P.arms[1] = { sh: [-0.35 - 0.5 * tuck, 0, 0.55 + 0.35 * Math.max(0, -up) - flail], elbow: -0.5, wrist: 0 };
+  }
+  if (p.dashT > 0) {
+    P.spine = [0.45, 0, 0];
+    P.legs[0] = { hip: [-0.55, 0, -0.05], knee: 0.5, ankle: 0.1, toe: 0 };
+    P.legs[1] = { hip: [0.55, 0, 0.05], knee: 0.35, ankle: 0.3, toe: 0.2 };
+    P.arms[0] = { sh: [0.75, 0, -0.25], elbow: -0.35, wrist: 0 };
+    P.arms[1] = { sh: [0.75, 0, 0.25], elbow: -0.35, wrist: 0 };
+  }
+  if (gliding) {
+    const sway = Math.sin(t * 2.1);
+    P.pelvisY = 0.95;
+    P.pelvis = [0, 0, sway * 0.05];
+    P.spine = [0.12, 0, 0];
+    P.chest = [0.05, 0, 0];
+    P.legs[0] = { hip: [0.18 + sway * 0.12, 0, -0.06], knee: 0.3 + sway * 0.1, ankle: 0.35, toe: 0.2 };
+    P.legs[1] = { hip: [0.18 - sway * 0.12, 0, 0.06], knee: 0.3 - sway * 0.1, ankle: 0.35, toe: 0.2 };
+    P.arms[0] = { sh: [-Math.PI + 0.12, 0, -0.32], elbow: -0.15, wrist: 0 };
+    P.arms[1] = { sh: [-Math.PI + 0.12, 0, 0.32], elbow: -0.15, wrist: 0 };
+  }
+  if (climbing) {
+    const cp = U.phase, cs = Math.sin(cp);
+    P.pelvisY = 0.92;
+    P.spine = [0.18, 0, 0];
+    P.chest = [0.05, 0, 0];
+    P.legs[0] = { hip: [-0.75 - 0.35 * cs, 0, -0.12], knee: 1.25 + 0.3 * cs, ankle: -0.4, toe: 0 };
+    P.legs[1] = { hip: [-0.75 + 0.35 * cs, 0, 0.12], knee: 1.25 - 0.3 * cs, ankle: -0.4, toe: 0 };
+    P.arms[0] = { sh: [-Math.PI + 0.35 + 0.45 * cs, 0, -0.15], elbow: -0.5 - 0.35 * Math.max(0, cs), wrist: 0 };
+    P.arms[1] = { sh: [-Math.PI + 0.35 - 0.45 * cs, 0, 0.15], elbow: -0.5 - 0.35 * Math.max(0, -cs), wrist: 0 };
+  }
+  if (riding) {
+    P.pelvisY = 0.6; P.pelvis = [0, 0, 0]; P.spine = [0.25, 0, 0]; P.chest = [0, 0, 0];
+    P.legs[0] = { hip: [-1.45, 0, -0.12], knee: 1.55, ankle: -0.15, toe: 0 };
+    P.legs[1] = { hip: [-1.45, 0, 0.12], knee: 1.55, ankle: -0.15, toe: 0 };
+    P.arms[0] = { sh: [-1.05, 0.25, -0.1], elbow: -0.7, wrist: 0 };
+    P.arms[1] = { sh: [-1.05, -0.25, 0.1], elbow: -0.7, wrist: 0 };
+  }
+  // aiming: right arm points the blaster along the view, left hand braces it
+  if (aiming && !riding) {
+    const lookPitch = p.pitch;
+    const spineX = P.spine[0];
+    P.arms[1] = { sh: [-Math.PI / 2 - lookPitch - spineX, 0.12, 0.05], elbow: -0.12, wrist: 0.1 };
+    P.arms[0] = { sh: [-1.3 - lookPitch * 0.85 - spineX, -0.55, -0.1], elbow: -1.05, wrist: 0 };
+    P.chest[1] *= 0.3;
+  }
+
+  // ── head: stabilise against the torso and look where the camera looks
+  const look = clamp(angDiff(U.bodyYaw, p.yaw + Math.PI), -1.1, 1.1);
+  const neckX = -(P.spine[0] + P.chest[0]) * 0.8 - p.pitch * 0.45;
+  const neckY = -(P.pelvis[1] + P.chest[1]) + look * 0.7;
+
+  // ── apply with smoothing (faster for arms while aiming, snappier on landing)
+  const k = AV.k, kf = aiming ? 22 : k;
+  ease(J.pelvis.position, 'y', P.pelvisY, land > 0.05 ? 30 : k, dt);
+  rot(J.pelvis, P.pelvis[0], P.pelvis[1], P.pelvis[2], k, dt);
+  rot(J.spine, P.spine[0], P.spine[1], P.spine[2], k, dt);
+  rot(J.chest, P.chest[0], P.chest[1], P.chest[2], k, dt);
+  rot(J.neck, neckX * 0.5, neckY * 0.5, 0, k, dt);
+  rot(J.head, neckX * 0.5, neckY * 0.5, 0, k, dt);
+  P.legs.forEach((L, i) => {
+    const leg = J.legs[i];
+    rot(leg.hip, L.hip[0], L.hip[1], L.hip[2], k, dt);
+    ease(leg.knee.rotation, 'x', L.knee, k, dt);
+    ease(leg.ankle.rotation, 'x', L.ankle, k, dt);
+    ease(leg.toe.rotation, 'x', L.toe, k, dt);
+  });
+  P.arms.forEach((A2, i) => {
+    const arm = J.arms[i];
+    rot(arm.sh, A2.sh[0], A2.sh[1], A2.sh[2], kf, dt);
+    ease(arm.elbow.rotation, 'x', A2.elbow, kf, dt);
+    ease(arm.wrist.rotation, 'x', A2.wrist, kf, dt);
+  });
+  // whole-body lean into turns and speed
+  const bank = clamp(-turnRate * 0.045 * w, -0.3, 0.3);
+  rot(J.root, 0, 0, riding ? 0 : bank, 8, dt);
+
+  U.glider.visible = gliding;
+  const thrust = air || p.dashT > 0 || gliding ? 1.4 : 0.5;
+  for (const tr of U.thrusters) tr.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
   if (U.flashT > 0) { U.flashT -= dt; U.flash.visible = U.flashT > 0; } else U.flash.visible = false;
 }
 

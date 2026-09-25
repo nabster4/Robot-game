@@ -367,12 +367,54 @@ class Enemy {
     if (this.camp && !this.camp.alerted) { this.camp.alerted = true; Sound.play('alarm', null, G.vol(this.pos)); }
   }
 
+  // Zelda-style detection: an alarm meter fills while the player is in range (faster up close);
+  // when it fills, this robot and its whole camp attack.
+  detect(dt, p) {
+    if (this.aggro || p.dead) { this.notice = 0; this.showAlarm(0); return; }
+    const R = this.ai === 'sniper' ? 55 : this.ai === 'carrier' ? 42 : this.ai === 'swarm' ? 24 : 32;
+    const d = Math.hypot(p.pos.x - this.pos.x, p.pos.y - this.pos.y, p.pos.z - this.pos.z);
+    if (d < R) {
+      const near = 1 - d / R;
+      const rate = 0.35 + 1.9 * Math.pow(near, 1.4) + (G.riding ? 0.4 : 0);   // ~3 s at the edge, ~0.6 s point-blank
+      this.notice = Math.min(1, (this.notice || 0) + rate * dt);
+      if (!this.noticeSfx) { this.noticeSfx = true; Sound.play('chirp', null, G.vol(this.pos)); }
+      // turn toward the disturbance while deciding
+      this.facing += clamp(angDiff(this.facing, Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z)), -3 * dt, 3 * dt);
+      if (this.notice >= 1) {
+        this.notice = 0;
+        this.showAlarm(0);
+        this.alert();
+        return;
+      }
+    } else {
+      this.notice = Math.max(0, (this.notice || 0) - 0.35 * dt);
+      if (this.notice === 0) this.noticeSfx = false;
+    }
+    this.showAlarm(this.notice);
+  }
+
+  // the "?" meter above a robot's head: yellow while it's noticing you
+  showAlarm(k) {
+    if (!this.alarm) {
+      if (k <= 0) return;
+      this.alarm = glowSprite('#ffd23f', 1, 2.5);
+      G.scene.add(this.alarm);
+    }
+    this.alarm.visible = k > 0.02;
+    if (!this.alarm.visible) return;
+    const top = this.cy + this.r + 1.2 + (this.d.hitY ? 0.6 : 0);
+    this.alarm.position.set(this.pos.x, top, this.pos.z);
+    const pulse = 0.8 + 0.2 * Math.sin(G.time * (6 + k * 14));
+    this.alarm.scale.setScalar((0.5 + k * 0.9) * pulse);
+    this.alarm.material.color.set(k > 0.7 ? '#ff6a3d' : '#ffd23f').multiplyScalar(2 + k * 2);
+  }
+
   // lose interest once the player has been far away for a while (not while an uplink is running)
   calmDown(dt, dd) {
     if (!this.aggro || this.hunter) return;
     if (dd > 95) this.calmT += dt; else this.calmT = 0;
     if (this.calmT > 8) {
-      this.aggro = false; this.calmT = 0;
+      this.aggro = false; this.calmT = 0; this.notice = -0.5;
       if (this.camp) this.camp.alerted = false;
       this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.5);
     }
@@ -391,6 +433,7 @@ class Enemy {
     let tx = 0, tz = 0;
     const S = this.speed;
     this.calmDown(dt, dd);
+    this.detect(dt, p);
 
     if (!this.aggro || p.dead) {
       // hang out: mill around the camp brazier, face the group, pause to "chat"
@@ -560,6 +603,7 @@ class Enemy {
   destroy() {
     G.scene.remove(this.model);
     if (this.laser) G.scene.remove(this.laser);
+    if (this.alarm) G.scene.remove(this.alarm);
   }
 }
 

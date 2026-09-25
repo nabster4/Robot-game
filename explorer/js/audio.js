@@ -5,7 +5,7 @@ const Sound = (() => {
   let muted = false;
   let volMul = 1;
   const last = {};
-  const gaps = { chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
+  const gaps = { step: 110, chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
 
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -79,6 +79,7 @@ const Sound = (() => {
     uplink(t) { tone(t, 200, 1.2, 'sawtooth', 0.05, 800); tone(t + 0.2, 400, 1.0, 'triangle', 0.06, 1200); },
     beaconDone(t) { [392, 523, 659, 784].forEach((f, i) => tone(t + i * 0.12, f, 0.6, 'triangle', 0.1)); },
     portal(t) { tone(t, 100, 1.6, 'sine', 0.2, 900); noise(t, 1.2, 0.2, 400, 'bandpass', 4000); },
+    step(t, run) { noise(t, 0.07, run ? 0.09 : 0.06, run ? 900 : 650, 'lowpass', 180); tone(t, run ? 90 : 75, 0.07, 'sine', run ? 0.06 : 0.04, 45); },
     glide(t) { noise(t, 0.4, 0.14, 900, 'bandpass', 2400); tone(t, 520, 0.18, 'triangle', 0.04, 780); },
     launch(t) { noise(t, 1.4, 0.35, 300, 'bandpass', 5000); tone(t, 110, 1.3, 'sawtooth', 0.12, 880); [523, 784, 1046].forEach((f, i) => tone(t + 0.3 + i * 0.1, f, 0.4, 'triangle', 0.06)); },
     sprite(t) { [1046, 1318, 1568, 2093].forEach((f, i) => tone(t + i * 0.08, f, 0.22, 'sine', 0.07)); tone(t + 0.4, 784, 0.1, 'square', 0.03, 1568); tone(t + 0.52, 1568, 0.14, 'square', 0.03, 784); },

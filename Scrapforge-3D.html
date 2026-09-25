@@ -724,7 +724,8 @@ body.touch #stamina { left: calc(50% + 36px); width: 36px; height: 36px; top: ca
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>M</kbd><span>Mute</span></div>
       </div>
-      <p>Robots hang out in camps and leave you alone <b>until you attack them</b> or start an uplink.
+      <p>Robots hang out in camps. Get too close and an alarm meter fills over their heads — when it
+        tops out, <b>the whole camp attacks</b> (so does shooting one, or starting an uplink).
         Climb anything, glide from high places, launch skyward from activated beacons to reach
         <b>sky islands</b>, and hunt for hidden <b>Scrap Sprites</b> (every 3 grows your stamina).</p>
       <p>Each zone hides <b>signal beacons</b> — follow their light pillars. Activate one and hold its uplink ring
@@ -1141,7 +1142,7 @@ const Sound = (() => {
   let muted = false;
   let volMul = 1;
   const last = {};
-  const gaps = { chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
+  const gaps = { step: 110, chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
 
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -1215,6 +1216,7 @@ const Sound = (() => {
     uplink(t) { tone(t, 200, 1.2, 'sawtooth', 0.05, 800); tone(t + 0.2, 400, 1.0, 'triangle', 0.06, 1200); },
     beaconDone(t) { [392, 523, 659, 784].forEach((f, i) => tone(t + i * 0.12, f, 0.6, 'triangle', 0.1)); },
     portal(t) { tone(t, 100, 1.6, 'sine', 0.2, 900); noise(t, 1.2, 0.2, 400, 'bandpass', 4000); },
+    step(t, run) { noise(t, 0.07, run ? 0.09 : 0.06, run ? 900 : 650, 'lowpass', 180); tone(t, run ? 90 : 75, 0.07, 'sine', run ? 0.06 : 0.04, 45); },
     glide(t) { noise(t, 0.4, 0.14, 900, 'bandpass', 2400); tone(t, 520, 0.18, 'triangle', 0.04, 780); },
     launch(t) { noise(t, 1.4, 0.35, 300, 'bandpass', 5000); tone(t, 110, 1.3, 'sawtooth', 0.12, 880); [523, 784, 1046].forEach((f, i) => tone(t + 0.3 + i * 0.1, f, 0.4, 'triangle', 0.06)); },
     sprite(t) { [1046, 1318, 1568, 2093].forEach((f, i) => tone(t + i * 0.08, f, 0.22, 'sine', 0.07)); tone(t + 0.4, 784, 0.1, 'square', 0.03, 1568); tone(t + 0.52, 1568, 0.14, 'square', 0.03, 784); },
@@ -2573,52 +2575,92 @@ function buildGliderModel(scale = 1) {
   return g;
 }
 
+// Articulated player mech. Joint chain (all THREE.Groups, model faces +Z, feet at y=0):
+//   root ─ pelvis ─┬─ hip ─ knee ─ ankle ─ toe            (×2)
+//                  └─ spine ─ chest ─┬─ neck ─ head
+//                                    └─ shoulder ─ elbow ─ wrist (×2, gun in right hand)
 function buildAvatarModel() {
   const g = new THREE.Group();
   const shell = Mat.std('#3a7c98', { metal: 0.55, rough: 0.4, emissive: '#0e3a4c', ei: 0.5 });
   const dark = Mat.std('#1a3242', { metal: 0.5, rough: 0.5, emissive: '#081a24', ei: 0.5 });
+  const joint = Mat.std('#0e1a22', { metal: 0.85, rough: 0.25, flat: false });
   const cyan = Mat.glow('#3cf2ff', 4);
-  const legs = [];
+  const node = (parent, x, y, z) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
+  const J = {};
+  J.root = node(g, 0, 0, 0);
+  J.pelvis = node(J.root, 0, 0.95, 0);
+  mesh(Geo.box(0.34, 0.15, 0.22), dark, 0, 0, 0, J.pelvis);
+  mesh(Geo.box(0.2, 0.1, 0.05), shell, 0, -0.02, 0.12, J.pelvis);
+
+  J.legs = [];
   for (const s of [-1, 1]) {
-    const hip = new THREE.Group(); hip.position.set(s * 0.2, 0.9, 0); g.add(hip);
-    mesh(Geo.box(0.2, 0.5, 0.24), shell, 0, -0.22, 0, hip);
-    const knee = new THREE.Group(); knee.position.y = -0.46; hip.add(knee);
-    mesh(Geo.box(0.17, 0.46, 0.2), dark, 0, -0.22, 0, knee);
-    mesh(Geo.box(0.24, 0.1, 0.36), dark, 0, -0.44, 0.06, knee);
-    mesh(Geo.box(0.04, 0.2, 0.02), cyan, s * 0.1, -0.2, 0.1, knee);
-    legs.push({ hip, knee });
+    const hip = node(J.pelvis, s * 0.13, -0.05, 0);
+    mesh(Geo.sphere(0.075, 1), joint, 0, 0, 0, hip);
+    mesh(Geo.box(0.15, 0.34, 0.18), shell, 0, -0.21, 0.01, hip);             // thigh
+    mesh(Geo.box(0.02, 0.2, 0.02), cyan, s * 0.078, -0.2, 0.06, hip);
+    const knee = node(hip, 0, -0.43, 0);
+    mesh(Geo.sphere(0.068, 1), joint, 0, 0, 0, knee);
+    mesh(Geo.box(0.15, 0.1, 0.07), shell, 0, 0.02, 0.085, knee);             // knee cap
+    mesh(Geo.box(0.12, 0.34, 0.13), dark, 0, -0.2, 0, knee);                  // shin
+    mesh(Geo.box(0.13, 0.17, 0.05), shell, 0, -0.16, 0.08, knee);             // shin guard
+    const ankle = node(knee, 0, -0.41, 0);
+    mesh(Geo.sphere(0.05, 1), joint, 0, 0, 0, ankle);
+    mesh(Geo.box(0.14, 0.08, 0.2), dark, 0, -0.045, 0.03, ankle);             // foot
+    mesh(Geo.box(0.13, 0.05, 0.06), shell, 0, -0.02, -0.08, ankle);           // heel
+    const toe = node(ankle, 0, -0.06, 0.13);
+    mesh(Geo.box(0.13, 0.05, 0.1), shell, 0, 0, 0.045, toe);
+    J.legs.push({ hip, knee, ankle, toe, side: s });
   }
-  const torso = new THREE.Group(); torso.position.y = 1.2; g.add(torso);
-  mesh(Geo.box(0.62, 0.55, 0.4), shell, 0, 0, 0, torso);
-  mesh(Geo.box(0.3, 0.12, 0.03), cyan, 0, 0.08, 0.21, torso);
-  mesh(Geo.box(0.46, 0.5, 0.25), dark, 0, 0.02, -0.3, torso);   // backpack
-  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.36, 0.02), cyan, s * 0.15, 0.04, -0.43, torso);
-  mesh(Geo.box(0.3, 0.04, 0.02), cyan, 0, 0.22, -0.43, torso);
+
+  J.spine = node(J.pelvis, 0, 0.09, 0);
+  mesh(Geo.box(0.26, 0.2, 0.18), joint, 0, 0.08, 0, J.spine);               // abdomen
+  mesh(Geo.box(0.2, 0.04, 0.04), cyan, 0, 0.08, 0.1, J.spine);
+  J.chest = node(J.spine, 0, 0.19, 0);
+  mesh(Geo.box(0.5, 0.34, 0.3), shell, 0, 0.15, 0, J.chest);
+  mesh(Geo.box(0.3, 0.1, 0.03), cyan, 0, 0.2, 0.16, J.chest);
+  mesh(Geo.box(0.44, 0.46, 0.22), dark, 0, 0.14, -0.26, J.chest);           // backpack
+  for (const s of [-1, 1]) mesh(Geo.box(0.04, 0.34, 0.02), cyan, s * 0.14, 0.14, -0.38, J.chest);
   const thrusters = [];
   for (const s of [-1, 1]) {
-    mesh(Geo.cyl(0.07, 0.09, 0.2, 8), dark, s * 0.14, -0.28, -0.36, torso);
-    const t = glowSprite('#3cf2ff', 0.5, 2); t.position.set(s * 0.14, -0.42, -0.36); torso.add(t); thrusters.push(t);
+    mesh(Geo.cyl(0.07, 0.09, 0.18, 8), dark, s * 0.13, -0.14, -0.3, J.chest);
+    const t = glowSprite('#3cf2ff', 0.5, 2); t.position.set(s * 0.13, -0.27, -0.3); J.chest.add(t); thrusters.push(t);
   }
-  const head = new THREE.Group(); head.position.y = 0.45; torso.add(head);
-  mesh(Geo.box(0.32, 0.26, 0.3), shell, 0, 0.08, 0, head);
-  mesh(Geo.box(0.26, 0.07, 0.04), cyan, 0, 0.1, 0.16, head);
-  mesh(Geo.cyl(0.01, 0.01, 0.3, 4), dark, 0.12, 0.3, -0.08, head);
-  const arms = [];
+  J.neck = node(J.chest, 0, 0.33, 0);
+  mesh(Geo.cyl(0.05, 0.065, 0.1, 8), joint, 0, 0.04, 0, J.neck);
+  J.head = node(J.neck, 0, 0.09, 0);
+  mesh(Geo.box(0.28, 0.23, 0.28), shell, 0, 0.11, 0, J.head);
+  mesh(Geo.box(0.24, 0.06, 0.04), cyan, 0, 0.13, 0.145, J.head);             // visor
+  mesh(Geo.box(0.3, 0.05, 0.3), dark, 0, 0.23, 0, J.head);
+  mesh(Geo.cyl(0.008, 0.008, 0.26, 4), joint, 0.1, 0.36, -0.08, J.head);    // antenna
+  mesh(Geo.sphere(0.02, 0), cyan, 0.1, 0.49, -0.08, J.head);
+
+  J.arms = [];
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group(); sh.position.set(s * 0.42, 0.18, 0); torso.add(sh);
-    mesh(Geo.box(0.22, 0.2, 0.26), shell, 0, 0, 0, sh);
-    mesh(Geo.box(0.14, 0.45, 0.16), dark, 0, -0.28, 0, sh);
-    arms.push(sh);
+    const sh = node(J.chest, s * 0.31, 0.24, 0);
+    mesh(Geo.sphere(0.07, 1), joint, 0, 0, 0, sh);
+    mesh(Geo.box(0.2, 0.13, 0.24), shell, s * 0.03, 0.05, 0, sh);            // pauldron
+    mesh(Geo.box(0.1, 0.24, 0.11), dark, 0, -0.15, 0, sh);                    // upper arm
+    const elbow = node(sh, 0, -0.29, 0);
+    mesh(Geo.sphere(0.055, 1), joint, 0, 0, 0, elbow);
+    mesh(Geo.box(0.11, 0.24, 0.12), shell, 0, -0.13, 0, elbow);               // forearm
+    mesh(Geo.box(0.02, 0.14, 0.02), cyan, s * 0.058, -0.13, 0.03, elbow);
+    const wrist = node(elbow, 0, -0.27, 0);
+    mesh(Geo.box(0.09, 0.1, 0.08), dark, 0, -0.05, 0, wrist);                 // hand
+    mesh(Geo.box(0.03, 0.06, 0.03), dark, -s * 0.05, -0.04, 0.04, wrist);     // thumb
+    J.arms.push({ sh, elbow, wrist, side: s });
   }
-  // blaster held forward in the right hand
-  const gun = new THREE.Group(); gun.position.set(0, -0.45, 0.15); arms[1].add(gun);
-  mesh(Geo.box(0.12, 0.14, 0.55), shell, 0, 0, 0.18, gun);
-  mesh(Geo.box(0.125, 0.03, 0.34), cyan, 0, 0.05, 0.18, gun);
-  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.5; gun.add(muzzle);
-  const flash = glowSprite('#3cf2ff', 0.7, 4); flash.position.z = 0.52; flash.visible = false; gun.add(flash);
-  const glider = buildGliderModel(0.9); glider.position.set(0, 2.35, -0.05); glider.visible = false; g.add(glider);
+  // blaster held in the right hand, barrel along the forearm
+  const gun = node(J.arms[1].wrist, 0, -0.07, 0.04);
+  gun.rotation.x = Math.PI / 2;
+  mesh(Geo.box(0.1, 0.12, 0.5), shell, 0, 0, 0.14, gun);
+  mesh(Geo.box(0.105, 0.03, 0.3), cyan, 0, 0.05, 0.14, gun);
+  mesh(Geo.cyl(0.03, 0.035, 0.18, 8), dark, 0, 0, 0.45, gun).rotation.x = Math.PI / 2;
+  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.56; gun.add(muzzle);
+  const flash = glowSprite('#3cf2ff', 0.7, 4); flash.position.z = 0.58; flash.visible = false; gun.add(flash);
+
+  const glider = buildGliderModel(0.9); glider.position.set(0, 2.3, -0.05); glider.visible = false; J.root.add(glider);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.userData = { legs, torso, head, arms, gun, muzzle, flash, flashT: 0, glider, thrusters };
+  g.userData = { J, muzzle, flash, flashT: 0, glider, thrusters, phase: 0, bodyYaw: 0, aimT: 0, lastStep: 0 };
   return g;
 }
 
@@ -3703,12 +3745,54 @@ class Enemy {
     if (this.camp && !this.camp.alerted) { this.camp.alerted = true; Sound.play('alarm', null, G.vol(this.pos)); }
   }
 
+  // Zelda-style detection: an alarm meter fills while the player is in range (faster up close);
+  // when it fills, this robot and its whole camp attack.
+  detect(dt, p) {
+    if (this.aggro || p.dead) { this.notice = 0; this.showAlarm(0); return; }
+    const R = this.ai === 'sniper' ? 55 : this.ai === 'carrier' ? 42 : this.ai === 'swarm' ? 24 : 32;
+    const d = Math.hypot(p.pos.x - this.pos.x, p.pos.y - this.pos.y, p.pos.z - this.pos.z);
+    if (d < R) {
+      const near = 1 - d / R;
+      const rate = 0.35 + 1.9 * Math.pow(near, 1.4) + (G.riding ? 0.4 : 0);   // ~3 s at the edge, ~0.6 s point-blank
+      this.notice = Math.min(1, (this.notice || 0) + rate * dt);
+      if (!this.noticeSfx) { this.noticeSfx = true; Sound.play('chirp', null, G.vol(this.pos)); }
+      // turn toward the disturbance while deciding
+      this.facing += clamp(angDiff(this.facing, Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z)), -3 * dt, 3 * dt);
+      if (this.notice >= 1) {
+        this.notice = 0;
+        this.showAlarm(0);
+        this.alert();
+        return;
+      }
+    } else {
+      this.notice = Math.max(0, (this.notice || 0) - 0.35 * dt);
+      if (this.notice === 0) this.noticeSfx = false;
+    }
+    this.showAlarm(this.notice);
+  }
+
+  // the "?" meter above a robot's head: yellow while it's noticing you
+  showAlarm(k) {
+    if (!this.alarm) {
+      if (k <= 0) return;
+      this.alarm = glowSprite('#ffd23f', 1, 2.5);
+      G.scene.add(this.alarm);
+    }
+    this.alarm.visible = k > 0.02;
+    if (!this.alarm.visible) return;
+    const top = this.cy + this.r + 1.2 + (this.d.hitY ? 0.6 : 0);
+    this.alarm.position.set(this.pos.x, top, this.pos.z);
+    const pulse = 0.8 + 0.2 * Math.sin(G.time * (6 + k * 14));
+    this.alarm.scale.setScalar((0.5 + k * 0.9) * pulse);
+    this.alarm.material.color.set(k > 0.7 ? '#ff6a3d' : '#ffd23f').multiplyScalar(2 + k * 2);
+  }
+
   // lose interest once the player has been far away for a while (not while an uplink is running)
   calmDown(dt, dd) {
     if (!this.aggro || this.hunter) return;
     if (dd > 95) this.calmT += dt; else this.calmT = 0;
     if (this.calmT > 8) {
-      this.aggro = false; this.calmT = 0;
+      this.aggro = false; this.calmT = 0; this.notice = -0.5;
       if (this.camp) this.camp.alerted = false;
       this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.5);
     }
@@ -3727,6 +3811,7 @@ class Enemy {
     let tx = 0, tz = 0;
     const S = this.speed;
     this.calmDown(dt, dd);
+    this.detect(dt, p);
 
     if (!this.aggro || p.dead) {
       // hang out: mill around the camp brazier, face the group, pause to "chat"
@@ -3896,6 +3981,7 @@ class Enemy {
   destroy() {
     G.scene.remove(this.model);
     if (this.laser) G.scene.remove(this.laser);
+    if (this.alarm) G.scene.remove(this.alarm);
   }
 }
 
@@ -5488,8 +5574,8 @@ function restoreSnapshot() {
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
 }
 
-// A camp: a group of robots hanging out around a scrap brazier. They leave you alone
-// until you attack one of them (or start an uplink nearby).
+// A camp: a group of robots hanging out around a scrap brazier. They spot you when you
+// come close (an alarm meter fills), or instantly if you attack or start an uplink nearby.
 function spawnCamp(x, z, n, aggro = false) {
   const pool = ZONES[G.level].pool;
   const camp = World.buildBrazier(x, z);
@@ -5550,7 +5636,7 @@ function startZone(i) {
   UI.hideAll();
   UI.banner(`ZONE ${i + 1} · ${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
   setTimeout(() => { if (G.level === i && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
-  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robot camps leave you alone unless you attack them'); }, 11000);
+  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 11000);
   UI.refreshHUD(true);
 }
 
@@ -6029,38 +6115,182 @@ G.avatar.visible = false;
 scene.add(G.avatar);
 let swayX = 0, swayY = 0, camDist = 4.2;
 
+// ─────────── Procedural animation for the articulated mech ───────────
+// Each frame we build a target pose for every joint from the movement state, then ease the
+// joints toward it (critically-damped style), so gait changes and state switches blend smoothly.
+const AV = { k: 14 };
+function ease(obj, key, target, k, dt) { obj[key] += (target - obj[key]) * (1 - Math.exp(-k * dt)); }
+function rot(o, x, y, z, k, dt) { ease(o.rotation, 'x', x, k, dt); ease(o.rotation, 'y', y, k, dt); ease(o.rotation, 'z', z, k, dt); }
+
 function updateAvatar(dt) {
-  const p = G.player, a = G.avatar, U = a.userData;
+  const p = G.player, a = G.avatar, U = a.userData, J = U.J;
+  const riding = G.riding && G.vehicle;
+  const climbing = !!p.climbing, gliding = p.gliding;
+  const air = !p.grounded && !climbing && !riding && !gliding;
+  const vx = p.vel.x, vz = p.vel.z, spd = riding ? 0 : Math.hypot(vx, vz);
+  const t = G.time;
+
+  // ── gait phase (also drives footsteps in first person)
+  const sprinting = spd > p.speed * 1.25;
+  const stride = sprinting ? 1.7 : 1.1;               // metres per step
+  const fwdSpd = vx * Math.sin(U.bodyYaw) + vz * Math.cos(U.bodyYaw);
+  const dir = fwdSpd < -0.4 ? -1 : 1;                   // backpedal plays the cycle in reverse
+  const prevPhase = U.phase;
+  if (p.grounded && !climbing) U.phase += dir * (spd * dt / stride) * Math.PI;
+  else if (climbing) U.phase += Math.abs(p.vel.y) * dt * 2.2;
+  if (p.grounded && spd > 1 && Math.floor(prevPhase / Math.PI) !== Math.floor(U.phase / Math.PI)) {
+    Sound.play('step', sprinting, 0.6);
+    const side = Math.floor(U.phase / Math.PI) % 2 ? 1 : -1;
+    const rx = Math.cos(U.bodyYaw), rz = -Math.sin(U.bodyYaw);
+    Fx.smoke(p.pos.x + rx * side * 0.14, p.pos.y + 0.05, p.pos.z + rz * side * 0.14, 0.35, 0.6, rand(-0.3, 0.3), 0.4, rand(-0.3, 0.3), '#6a5a50');
+  }
+
   const show = G.thirdPerson && !p.dead && G.state !== 'menu';
   a.visible = show;
   if (!show) return;
-  const riding = G.riding && G.vehicle;
+
+  // ── facing: toward travel direction; snap to the aim direction while shooting
+  if (Input.mouse.down) U.aimT = 1.4; else U.aimT = Math.max(0, U.aimT - dt);
+  const aiming = U.aimT > 0 && !gliding && !climbing;
+  let targetYaw = U.bodyYaw;
+  if (riding || aiming) targetYaw = p.yaw + Math.PI;
+  else if (climbing) targetYaw = Math.atan2(p.climbing.x - p.pos.x, p.climbing.z - p.pos.z);
+  else if (spd > 0.6) targetYaw = Math.atan2(vx, vz);
+  const prevYaw = U.bodyYaw;
+  U.bodyYaw += angDiff(U.bodyYaw, targetYaw) * (1 - Math.exp(-(aiming ? 18 : 9) * dt));
+  const turnRate = angDiff(prevYaw, U.bodyYaw) / Math.max(dt, 1e-4);
+
   if (riding) a.position.set(G.vehicle.pos.x, G.vehicle.pos.y - 0.55, G.vehicle.pos.z);
   else a.position.copy(p.pos);
-  a.rotation.set(riding ? -p.pitch * 0.6 : 0, p.yaw + Math.PI, riding ? G.vehicle.bank : 0, 'YXZ');
-  const sw = Math.sin(p.walk * 2.2) * 0.7 * p.bobAmt;
-  const air = !p.grounded && !riding;
-  U.legs.forEach((l, i) => {
-    const s = i ? 1 : -1;
-    if (riding) { l.hip.rotation.x = -1.3; l.knee.rotation.x = 1.4; }
-    else if (p.climbing) { l.hip.rotation.x = -0.5 + Math.sin(p.walk * 3 + i * Math.PI) * 0.4; l.knee.rotation.x = 0.8; }
-    else if (p.gliding) { l.hip.rotation.x = 0.35 + Math.sin(G.time * 3 + i) * 0.08; l.knee.rotation.x = 0.3; }
-    else if (air) { l.hip.rotation.x = -0.5 * (i ? 1 : 0.4); l.knee.rotation.x = 0.9; }
-    else { l.hip.rotation.x = sw * s; l.knee.rotation.x = Math.max(0, -sw * s) * 0.9; }
-  });
-  const [la, ra] = U.arms;
-  if (p.gliding || p.climbing) {
-    const c = p.climbing ? Math.sin(p.walk * 3) * 0.3 : 0;
-    la.rotation.set(-Math.PI + 0.15 + c, 0, 0.1); ra.rotation.set(-Math.PI + 0.15 - c, 0, -0.1);
-  } else {
-    ra.rotation.set(-Math.PI / 2 - p.pitch, 0, 0);            // aiming arm follows the view
-    la.rotation.set(riding ? -1.2 : -sw * 0.6, 0, 0.1);
+  a.rotation.set(riding ? -p.pitch * 0.6 : 0, U.bodyYaw, riding ? G.vehicle.bank : 0, 'YXZ');
+
+  // ── gait weights
+  const w = clamp(spd / 6, 0, 1);                       // walking amount
+  const run = clamp((spd - 8) / 4, 0, 1);               // sprint amount
+  const ph = U.phase, s1 = Math.sin(ph), c1 = Math.cos(ph);
+  const accel = (fwdSpd - (U.prevFwd || 0)) / Math.max(dt, 1e-4);
+  U.prevFwd = fwdSpd;
+  U.lean = lerp(U.lean || 0, clamp(accel * 0.012, -0.15, 0.2), 1 - Math.exp(-5 * dt));
+  const land = p.land;
+  const breathe = Math.sin(t * 1.9);
+
+  // pose targets
+  const P = {
+    pelvisY: 0.95 - w * (0.035 + 0.045 * run) * s1 * s1 - (1 - w) * 0.02 - land * 0.2,
+    pelvis: [0, w * 0.13 * s1 * (1 + run * 0.6), w * 0.05 * s1 + (1 - w) * 0.025 * Math.sin(t * 0.7)],
+    spine: [0.04 + w * (0.05 + 0.2 * run) + U.lean + land * 0.25, 0, 0],
+    chest: [0.02 * breathe * (1 - w), -w * 0.2 * s1 * (1 + run * 0.5), 0],
+    legs: [], arms: [],
+  };
+  const A = w * lerp(0.42, 0.85, run);
+  for (let i = 0; i < 2; i++) {
+    const pi = ph + (i ? Math.PI : 0), si = Math.sin(pi), ci = Math.cos(pi);
+    const thigh = -A * si - land * 0.55 - (1 - w) * 0.06;
+    const knee = w * (0.12 + lerp(0.75, 1.55, run) * Math.pow(Math.max(0, ci), 1.4)) + (1 - w) * 0.12 + land * 1.0;
+    const ankle = -(thigh + knee) * 0.85 + w * 0.4 * Math.max(0, -si) * Math.max(0, -ci);
+    const toe = w * 0.6 * Math.max(0, -si) * Math.max(0, -ci);
+    P.legs.push({ hip: [thigh, 0, (i ? 1 : -1) * 0.03], knee, ankle, toe });
   }
-  U.torso.rotation.x = p.gliding ? 0.25 : 0;
-  U.head.rotation.x = -p.pitch * 0.5;
-  U.glider.visible = p.gliding;
-  const thrust = air || p.dashT > 0 ? 1.4 : 0.5;
-  for (const t of U.thrusters) t.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
+  const armA = w * lerp(0.4, 0.95, run);
+  for (let i = 0; i < 2; i++) {
+    const sgn = i ? -1 : 1;                               // left arm follows the right leg
+    const swing = armA * s1 * sgn;
+    P.arms.push({
+      sh: [swing + (1 - w) * 0.04 * breathe, 0, (i ? 1 : -1) * (0.13 + 0.08 * run)],
+      elbow: -(0.22 + w * lerp(0.2, 1.3, run) + Math.max(0, -swing) * 0.4),
+      wrist: 0,
+    });
+  }
+
+  // ── state overrides
+  if (air) {
+    const up = clamp(p.vel.y / 8, -1, 1);
+    const tuck = Math.max(0, up);
+    P.pelvisY = 0.95;
+    P.spine = [0.1 - 0.15 * tuck, 0, 0];
+    P.legs[0] = { hip: [-0.25 - 0.6 * tuck, 0, -0.08], knee: 0.35 + 0.9 * tuck, ankle: 0.2, toe: 0 };
+    P.legs[1] = { hip: [0.05 - 0.2 * tuck, 0, 0.08], knee: 0.25 + 0.5 * tuck, ankle: 0.3, toe: 0 };
+    const flail = Math.max(0, -up) * 0.25 * Math.sin(t * 9);
+    P.arms[0] = { sh: [-0.35 - 0.5 * tuck, 0, -0.55 - 0.35 * Math.max(0, -up) + flail], elbow: -0.5, wrist: 0 };
+    P.arms[1] = { sh: [-0.35 - 0.5 * tuck, 0, 0.55 + 0.35 * Math.max(0, -up) - flail], elbow: -0.5, wrist: 0 };
+  }
+  if (p.dashT > 0) {
+    P.spine = [0.45, 0, 0];
+    P.legs[0] = { hip: [-0.55, 0, -0.05], knee: 0.5, ankle: 0.1, toe: 0 };
+    P.legs[1] = { hip: [0.55, 0, 0.05], knee: 0.35, ankle: 0.3, toe: 0.2 };
+    P.arms[0] = { sh: [0.75, 0, -0.25], elbow: -0.35, wrist: 0 };
+    P.arms[1] = { sh: [0.75, 0, 0.25], elbow: -0.35, wrist: 0 };
+  }
+  if (gliding) {
+    const sway = Math.sin(t * 2.1);
+    P.pelvisY = 0.95;
+    P.pelvis = [0, 0, sway * 0.05];
+    P.spine = [0.12, 0, 0];
+    P.chest = [0.05, 0, 0];
+    P.legs[0] = { hip: [0.18 + sway * 0.12, 0, -0.06], knee: 0.3 + sway * 0.1, ankle: 0.35, toe: 0.2 };
+    P.legs[1] = { hip: [0.18 - sway * 0.12, 0, 0.06], knee: 0.3 - sway * 0.1, ankle: 0.35, toe: 0.2 };
+    P.arms[0] = { sh: [-Math.PI + 0.12, 0, -0.32], elbow: -0.15, wrist: 0 };
+    P.arms[1] = { sh: [-Math.PI + 0.12, 0, 0.32], elbow: -0.15, wrist: 0 };
+  }
+  if (climbing) {
+    const cp = U.phase, cs = Math.sin(cp);
+    P.pelvisY = 0.92;
+    P.spine = [0.18, 0, 0];
+    P.chest = [0.05, 0, 0];
+    P.legs[0] = { hip: [-0.75 - 0.35 * cs, 0, -0.12], knee: 1.25 + 0.3 * cs, ankle: -0.4, toe: 0 };
+    P.legs[1] = { hip: [-0.75 + 0.35 * cs, 0, 0.12], knee: 1.25 - 0.3 * cs, ankle: -0.4, toe: 0 };
+    P.arms[0] = { sh: [-Math.PI + 0.35 + 0.45 * cs, 0, -0.15], elbow: -0.5 - 0.35 * Math.max(0, cs), wrist: 0 };
+    P.arms[1] = { sh: [-Math.PI + 0.35 - 0.45 * cs, 0, 0.15], elbow: -0.5 - 0.35 * Math.max(0, -cs), wrist: 0 };
+  }
+  if (riding) {
+    P.pelvisY = 0.6; P.pelvis = [0, 0, 0]; P.spine = [0.25, 0, 0]; P.chest = [0, 0, 0];
+    P.legs[0] = { hip: [-1.45, 0, -0.12], knee: 1.55, ankle: -0.15, toe: 0 };
+    P.legs[1] = { hip: [-1.45, 0, 0.12], knee: 1.55, ankle: -0.15, toe: 0 };
+    P.arms[0] = { sh: [-1.05, 0.25, -0.1], elbow: -0.7, wrist: 0 };
+    P.arms[1] = { sh: [-1.05, -0.25, 0.1], elbow: -0.7, wrist: 0 };
+  }
+  // aiming: right arm points the blaster along the view, left hand braces it
+  if (aiming && !riding) {
+    const lookPitch = p.pitch;
+    const spineX = P.spine[0];
+    P.arms[1] = { sh: [-Math.PI / 2 - lookPitch - spineX, 0.12, 0.05], elbow: -0.12, wrist: 0.1 };
+    P.arms[0] = { sh: [-1.3 - lookPitch * 0.85 - spineX, -0.55, -0.1], elbow: -1.05, wrist: 0 };
+    P.chest[1] *= 0.3;
+  }
+
+  // ── head: stabilise against the torso and look where the camera looks
+  const look = clamp(angDiff(U.bodyYaw, p.yaw + Math.PI), -1.1, 1.1);
+  const neckX = -(P.spine[0] + P.chest[0]) * 0.8 - p.pitch * 0.45;
+  const neckY = -(P.pelvis[1] + P.chest[1]) + look * 0.7;
+
+  // ── apply with smoothing (faster for arms while aiming, snappier on landing)
+  const k = AV.k, kf = aiming ? 22 : k;
+  ease(J.pelvis.position, 'y', P.pelvisY, land > 0.05 ? 30 : k, dt);
+  rot(J.pelvis, P.pelvis[0], P.pelvis[1], P.pelvis[2], k, dt);
+  rot(J.spine, P.spine[0], P.spine[1], P.spine[2], k, dt);
+  rot(J.chest, P.chest[0], P.chest[1], P.chest[2], k, dt);
+  rot(J.neck, neckX * 0.5, neckY * 0.5, 0, k, dt);
+  rot(J.head, neckX * 0.5, neckY * 0.5, 0, k, dt);
+  P.legs.forEach((L, i) => {
+    const leg = J.legs[i];
+    rot(leg.hip, L.hip[0], L.hip[1], L.hip[2], k, dt);
+    ease(leg.knee.rotation, 'x', L.knee, k, dt);
+    ease(leg.ankle.rotation, 'x', L.ankle, k, dt);
+    ease(leg.toe.rotation, 'x', L.toe, k, dt);
+  });
+  P.arms.forEach((A2, i) => {
+    const arm = J.arms[i];
+    rot(arm.sh, A2.sh[0], A2.sh[1], A2.sh[2], kf, dt);
+    ease(arm.elbow.rotation, 'x', A2.elbow, kf, dt);
+    ease(arm.wrist.rotation, 'x', A2.wrist, kf, dt);
+  });
+  // whole-body lean into turns and speed
+  const bank = clamp(-turnRate * 0.045 * w, -0.3, 0.3);
+  rot(J.root, 0, 0, riding ? 0 : bank, 8, dt);
+
+  U.glider.visible = gliding;
+  const thrust = air || p.dashT > 0 || gliding ? 1.4 : 0.5;
+  for (const tr of U.thrusters) tr.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
   if (U.flashT > 0) { U.flashT -= dt; U.flash.visible = U.flashT > 0; } else U.flash.visible = false;
 }
 

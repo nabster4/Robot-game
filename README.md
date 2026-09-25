@@ -22,7 +22,7 @@ lava, corrupted data, freezing water, acid, plasma).
 5. **Extract.** Walk into the portal to reach the Workshop, then deploy to the next zone.
 
 **Open-world systems (inspired by *Zelda: Tears of the Kingdom*)**
-- **Peaceful camps:** robots hang out around scrap braziers and ignore you until you attack one. Then the whole camp turns hostile. Starting a beacon uplink draws every robot nearby, and hostile robots give up if you get far enough away.
+- **Robot camps:** robots hang out around scrap braziers. Come within range and a Zelda-style alarm meter ("?") fills over their heads, faster the closer you are. When it tops out, the whole camp attacks. Shooting one or starting a beacon uplink sets them off instantly, and hostile robots give up if you get far enough away.
 - **Stamina wheel:** a Zelda-style ring by the crosshair. Sprinting, climbing and gliding use stamina, and running out leaves you exhausted until it refills.
 - **Climbing:** walk into rocks, pillars and beacons to climb them, stand on top, and leap off.
 - **Paraglider:** press Space in mid-air to glide, and ride the hot-air updrafts over camp braziers.
@@ -30,6 +30,7 @@ lava, corrupted data, freezing water, acid, plasma).
 - **Sky islands:** floating ruins with golden caches, reached by launching and gliding (or by Skyrider).
 - **Scrap Sprites:** hidden Korok-like collectibles on pillar tops, rocks and islands. Every 3 you find adds a stamina vessel.
 - **Focus:** shooting while gliding or falling slows time.
+- **Articulated mech:** in third person the player mech has a full joint chain: hips, knees, ankles and toes; a two-part spine, neck and head; shoulders, elbows and wrists. Procedural animation gives it walk and sprint gaits with stride-matched hip bob, pelvis sway and twist, counter-rotating chest, opposite arm swing and toe push-off. It leans into acceleration and turns, crouches on landing, and has distinct jump, fall, dash, glide, climb and riding poses. It brings up a two-handed aim when you fire, and its head tracks the camera. Every joint eases toward its target pose, so state changes blend smoothly, and footsteps are synced to the stride.
 - **Third-person view:** press `V` (or use the pause menu, or the VIEW touch button) to see your mech in an over-the-shoulder camera that avoids walls.
 
 **Skyrider:** craft a jet glider in the workshop's Vehicles tab. Press `F` to deploy it or dock it anywhere. It flies where you look (`Space` climbs, `C` dives, `Shift` boosts), and its twin cannons fire at the crosshair. It takes the hits meant for you and repairs itself while docked. If it's destroyed, you're thrown clear and can glide down.
