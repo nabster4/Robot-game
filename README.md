@@ -21,13 +21,29 @@ lava, corrupted data, freezing water, acid, plasma).
 4. **Boss.** Step in to face the zone's boss. Attacks include ground-hugging bullet rings, spirals, aimed fans, charges, summons, **rotating lasers and shockwave slams you have to jump over**, and an enraged Overdrive phase.
 5. **Extract.** Walk into the portal to reach the Workshop, then deploy to the next zone.
 
-**Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump · `Q` dash ·
-right-click or `G` plasma grenade · `E` interact · `R` repair kit · `Tab` workshop · `Esc` pause and settings
-(mouse sensitivity, invert Y, performance mode) · `M` mute.
+**Open-world systems (inspired by *Zelda: Tears of the Kingdom*)**
+- **Peaceful camps:** robots hang out around scrap braziers and ignore you until you attack one. Then the whole camp turns hostile. Starting a beacon uplink draws every robot nearby, and hostile robots give up if you get far enough away.
+- **Stamina wheel:** a Zelda-style ring by the crosshair. Sprinting, climbing and gliding use stamina, and running out leaves you exhausted until it refills.
+- **Climbing:** walk into rocks, pillars and beacons to climb them, stand on top, and leap off.
+- **Paraglider:** press Space in mid-air to glide, and ride the hot-air updrafts over camp braziers.
+- **Sky launch:** activated beacons work like Skyview Towers. They launch you high into the sky and reveal nearby caches on your compass.
+- **Sky islands:** floating ruins with golden caches, reached by launching and gliding (or by Skyrider).
+- **Scrap Sprites:** hidden Korok-like collectibles on pillar tops, rocks and islands. Every 3 you find adds a stamina vessel.
+- **Focus:** shooting while gliding or falling slows time.
+- **Third-person view:** press `V` (or use the pause menu, or the VIEW touch button) to see your mech in an over-the-shoulder camera that avoids walls.
+
+**Skyrider:** craft a jet glider in the workshop's Vehicles tab. Press `F` to deploy it or dock it anywhere. It flies where you look (`Space` climbs, `C` dives, `Shift` boosts), and its twin cannons fire at the crosshair. It takes the hits meant for you and repairs itself while docked. If it's destroyed, you're thrown clear and can glide down.
+
+**Music:** three composed themes (an exploration theme, a combat chorus hook and a boss theme) with drum fills and echo on the lead. Each zone plays them in its own key and tempo.
+
+**Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump, and glide in mid-air · `Q` dash ·
+right-click or `G` plasma grenade · `E` interact or launch · `F` Skyrider · `V` camera view · `R` repair kit · `Tab` workshop ·
+`Esc` pause and settings (sensitivity, third-person, invert Y, performance mode) · `M` mute.
 
 **On a phone or tablet** (landscape): touch controls turn on automatically.
 - Left thumb: floating move stick (push to the rim to sprint). Right side: drag to look.
-- **FIRE**: hold to shoot, and drag it to aim at the same time. **JUMP**, **DASH** and **BOMB** show cooldown rings.
+- **FIRE**: hold to shoot, and drag it to aim at the same time. **JUMP** (tap it again in mid-air to glide), **DASH** and **BOMB** show cooldown rings.
+- **RIDE** deploys or docks the Skyrider (hold **UP**/**DIVE** while flying), and **VIEW** switches between first and third person.
 - **USE** lights up next to caches and beacons. **FIX** uses a repair kit, **CRAFT** opens the workshop, and **❚❚** pauses.
 - Light aim assist is on, and performance mode is on by default (no shadows, lower resolution, no MSAA).
 - The game asks you to rotate to landscape, goes fullscreen where the browser allows it, and pauses when you switch apps.

@@ -21,6 +21,9 @@ const World = {
     this.lamps = [];
     this.animated = [];
     this.anim = [];
+    this.islands = [];
+    this.braziers = [];
+    this.sprites = [];
 
     // key locations
     this.arena = { x: 0, z: 0, r: 30 };
@@ -47,6 +50,8 @@ const World = {
     this.buildSpawnPad();
     this.scatterProps();
     this.placeCaches(10 + idx);
+    this.buildIslands(idx >= 3 ? 3 : 2);
+    this.placeSprites(8 + Math.floor(idx / 2));
     return this;
   },
 
@@ -218,8 +223,8 @@ const World = {
   },
 
   // ─────────── Colliders ───────────
-  addCollider(x, z, r, top) {
-    const c = { x, z, r, top };
+  addCollider(x, z, r, top, kind = 'prop', bottom = -Infinity) {
+    const c = { x, z, r, top, kind, bottom };
     this.colliders.push(c);
     const cs = 16;
     const x0 = Math.floor((x - r) / cs), x1 = Math.floor((x + r) / cs), z0 = Math.floor((z - r) / cs), z1 = Math.floor((z + r) / cs);
@@ -232,23 +237,23 @@ const World = {
   },
   near(x, z) { return this.grid.get(Math.floor(x / 16) * 1000 + Math.floor(z / 16)) || []; },
 
-  // push a circle out of colliders; returns true if touched
+  // push a circle out of colliders; returns the collider that was touched (or null)
   collide(p, r, y) {
-    let hit = false;
+    let hit = null;
     for (const c of this.near(p.x, p.z)) {
-      if (y > c.top) continue;
+      if (y > c.top || y < c.bottom) continue;
       const dx = p.x - c.x, dz = p.z - c.z, rr = c.r + r;
       const d2 = dx * dx + dz * dz;
       if (d2 < rr * rr) {
         const d = Math.sqrt(d2) || 0.001;
         p.x = c.x + (dx / d) * rr; p.z = c.z + (dz / d) * rr;
-        hit = true;
+        hit = c;
       }
     }
     // sealed arena dome
     if (this.domeSealed) {
       const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 2;
-      if (d < R + r && d > R - 4) { p.x = this.arena.x + (dx / d) * (R + r); p.z = this.arena.z + (dz / d) * (R + r); hit = true; }
+      if (d < R + r && d > R - 4) { p.x = this.arena.x + (dx / d) * (R + r); p.z = this.arena.z + (dz / d) * (R + r); hit = hit || { dome: true }; }
     }
     const lim = this.half * 0.93;
     p.x = clamp(p.x, -lim, lim); p.z = clamp(p.z, -lim, lim);
@@ -258,7 +263,7 @@ const World = {
   solidAt(x, y, z) {
     if (y < this.heightAt(x, z)) return true;
     for (const c of this.near(x, z)) {
-      if (y < c.top && (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return true;
+      if (y < c.top && y >= c.bottom && (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return true;
     }
     return false;
   },
@@ -305,7 +310,7 @@ const World = {
       m.scale.set(s * rand(0.8, 1.2), s * ys, s * rand(0.8, 1.2));
       m.rotation.set(rand(-0.3, 0.3), rand(0, TAU), rand(-0.3, 0.3));
       m.receiveShadow = true;
-      this.addCollider(x, z, s * 0.85, y + s * ys * 0.9);
+      this.addCollider(x, z, s * 0.85, y + s * ys * 0.9, 'rock');
     }
 
     const concrete = Mat.std('#3a3a44', { rough: 0.85, metal: 0.2 });
@@ -329,7 +334,7 @@ const World = {
         const w = new THREE.Vector3(5, 0, 0).applyEuler(grp.rotation);
         this.addCollider(x + w.x, z + w.z, 1.1, y + h);
       }
-      this.addCollider(x, z, 1.1, y + h);
+      this.addCollider(x, z, 1.1, y + h, 'pillar');
     }
 
     if (P.crystals) {
@@ -391,8 +396,8 @@ const World = {
     }
   },
 
-  buildCache(x, z, golden) {
-    const y = this.heightAt(x, z);
+  buildCache(x, z, golden, yOverride) {
+    const y = yOverride ?? this.heightAt(x, z);
     const c = golden ? '#ffd23f' : '#3cf2ff';
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rand(0, TAU);
     this.group.add(g);
@@ -405,7 +410,7 @@ const World = {
     const sp = glowSprite(c, 3, 1.4); sp.position.y = 1.8; g.add(sp);
     const cache = { x, y, z, golden, opened: false, group: g, lid, sprite: sp, openT: 0 };
     this.caches.push(cache);
-    this.addCollider(x, z, 0.8, y + 0.9);
+    this.addCollider(x, z, 0.8, y + 0.9, 'cache', yOverride !== undefined ? y - 0.5 : -Infinity);
     return cache;
   },
 
@@ -504,6 +509,107 @@ const World = {
     return this.portal;
   },
 
+  // Walkable height at (x,z) for something currently at height y: terrain, the tops of
+  // rocks/pillars it has climbed onto, and floating sky islands.
+  groundAt(x, z, y) {
+    let h = this.heightAt(x, z);
+    for (const c of this.near(x, z)) {
+      if (c.top > h && y >= c.top - 0.7 && (x - c.x) ** 2 + (z - c.z) ** 2 < (c.r * 0.95) ** 2) h = c.top;
+    }
+    for (const is of this.islands) {
+      if (y >= is.top - 1.6 && (x - is.x) ** 2 + (z - is.z) ** 2 < is.r * is.r) h = Math.max(h, is.top);
+    }
+    return h;
+  },
+
+  // ─────────── Sky islands ───────────
+  buildIslands(n) {
+    const Z = this.zone;
+    const beacons = this.flats.filter((f) => f.beacon);
+    const topM = Mat.std(new THREE.Color(Z.ground.mid).lerp(new THREE.Color('#ffffff'), 0.12).getStyle(), { rough: 0.9, metal: 0.05 });
+    const rockM = Mat.std(Z.ground.rock, { rough: 0.95, metal: 0.05 });
+    const stone = Mat.std('#4a4a58', { rough: 0.8, metal: 0.2 });
+    for (let i = 0; i < n; i++) {
+      const b = beacons[i % beacons.length];
+      let x = 0, z = 0, ok = false;
+      for (let t = 0; t < 30 && !ok; t++) {
+        const a = rand(0, TAU), d = rand(45, 85);
+        x = b.x + Math.cos(a) * d; z = b.z + Math.sin(a) * d;
+        ok = Math.max(Math.abs(x), Math.abs(z)) < this.half * 0.68 && Math.hypot(x - this.arena.x, z - this.arena.z) > 55 &&
+          this.islands.every((o) => Math.hypot(o.x - x, o.z - z) > 40);
+      }
+      if (!ok) continue;
+      const r = rand(8, 12);
+      const top = Math.max(this.heightAt(x, z) + 22, b.h + rand(28, 40));
+      const g = new THREE.Group(); g.position.set(x, top, z); this.group.add(g);
+      const disc = mesh(new THREE.CylinderGeometry(r, r * 0.9, 1.4, 14), topM, 0, -0.7, 0, g); disc.receiveShadow = true;
+      const under = mesh(new THREE.ConeGeometry(r * 0.92, r * 1.5, 12), rockM, 0, -1.4 - r * 0.75, 0, g); under.rotation.x = Math.PI;
+      for (let k = 0; k < 5; k++) {
+        const a = rand(0, TAU), rr = rand(0.3, 0.8) * r;
+        const chunk = mesh(Geo.sphere(1, 0), rockM, Math.cos(a) * rr, -2 - rand(0, r), Math.sin(a) * rr, g);
+        chunk.scale.setScalar(rand(0.6, 1.6));
+      }
+      // ancient arch & glowing runes
+      mesh(Geo.box(0.9, 4.5, 0.9), stone, -2.2, 2.25, -r * 0.45, g);
+      mesh(Geo.box(0.9, 4.5, 0.9), stone, 2.2, 2.25, -r * 0.45, g);
+      mesh(Geo.box(5.6, 0.7, 1.1), stone, 0, 4.7, -r * 0.45, g);
+      mesh(Geo.box(3.4, 0.1, 0.05), Mat.glow(Z.accent, 3), 0, 4.7, -r * 0.45 + 0.56, g);
+      const ring = new THREE.Mesh(Geo.torus(r - 0.8, 0.06, 40), Mat.glow(Z.accent, 2)); ring.rotation.x = Math.PI / 2; ring.position.y = 0.02; g.add(ring);
+      const under2 = glowSprite(Z.accent, r * 2.2, 0.35); under2.position.y = -4; g.add(under2);
+      const is = { x, z, r, top, group: g };
+      this.islands.push(is);
+      this.buildCache(x + rand(-2, 2), z + r * 0.2, i === 0, top);
+      for (const s2 of [-2.2, 2.2]) {
+        const w = new THREE.Vector3(s2, 0, -r * 0.45);
+        this.addCollider(x + w.x, z + w.z, 0.6, top + 4.5, 'pillar', top - 0.5);
+      }
+    }
+  },
+
+  // ─────────── Enemy camps ───────────
+  buildBrazier(x, z) {
+    const y = this.heightAt(x, z);
+    const g = new THREE.Group(); g.position.set(x, y, z); this.group.add(g);
+    const dark = Mat.std('#1c1a1e', { metal: 0.7, rough: 0.5 });
+    mesh(Geo.cyl(0.25, 0.45, 0.9, 6), dark, 0, 0.45, 0, g);
+    mesh(Geo.cyl(0.9, 0.55, 0.4, 8), dark, 0, 1.05, 0, g);
+    for (let k = 0; k < 4; k++) {
+      const b = mesh(Geo.box(0.12, 0.5, 0.12), Mat.std('#5a3a2a', { metal: 0.5 }), rand(-0.3, 0.3), 1.35, rand(-0.3, 0.3), g);
+      b.rotation.set(rand(-0.6, 0.6), 0, rand(-0.6, 0.6));
+    }
+    const flames = [];
+    for (const [c, s2, yy] of [['#ff6a1a', 2.6, 1.6], ['#ffb347', 1.6, 1.9], ['#fff2c0', 0.8, 1.5]]) {
+      const f = glowSprite(c, s2, 2.2); f.position.y = yy; g.add(f); flames.push(f);
+    }
+    // a ring of scrap seats the robots gather around
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + rand(-0.2, 0.2);
+      const sx = Math.cos(a) * 4.2, sz = Math.sin(a) * 4.2;
+      const seat = mesh(Geo.box(rand(0.8, 1.4), 0.4, rand(0.5, 0.8)), Mat.std('#4a3e38', { metal: 0.5, rough: 0.7 }), sx, this.heightAt(x + sx, z + sz) - y + 0.15, sz, g);
+      seat.rotation.y = -a + rand(-0.3, 0.3);
+    }
+    this.addCollider(x, z, 0.9, y + 1.3, 'brazier');
+    const camp = { x, z, y, r: 6, flames, alerted: false };
+    this.braziers.push(camp);
+    return camp;
+  },
+
+  // ─────────── Scrap Sprites (hidden collectibles, like Koroks) ───────────
+  placeSprites(n) {
+    const spots = [];
+    for (const is of this.islands) spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
+    const tall = this.colliders.filter((c) => (c.kind === 'pillar' && c.top - this.heightAt(c.x, c.z) > 6 && c.bottom === -Infinity) || (c.kind === 'rock' && c.top - this.heightAt(c.x, c.z) > 3.2));
+    tall.sort(() => Math.random() - 0.5);
+    for (const c of tall) { if (spots.length >= n - 1) break; spots.push([c.x, c.top + 0.6, c.z]); }
+    // one hidden in a quiet corner of the map
+    const hid = this.randomClear(1, 40);
+    if (hid) spots.push([hid[0], this.heightAt(hid[0], hid[1]) + 0.6, hid[1]]);
+    for (const [x, y, z] of spots.slice(0, n)) {
+      const m = buildSpriteModel(); m.position.set(x, y, z); this.group.add(m);
+      this.sprites.push({ x, y, z, model: m, found: false, ph: rand(0, TAU) });
+    }
+  },
+
   update(dt, time, cam) {
     if (this.sky) this.sky.position.copy(cam.position);
     // hazard shimmer
@@ -540,6 +646,17 @@ const World = {
     } else if (this.domeSealed) {
       this.domeWire.rotation.y += dt * 0.05;
       this.dome.material.opacity = 0.1 + 0.04 * Math.sin(time * 2);
+    }
+    for (const b of this.braziers) {
+      b.flames.forEach((f, i) => { const k = 1 + Math.sin(time * (9 + i * 3) + b.x) * 0.12 + Math.random() * 0.08; f.scale.setScalar([2.6, 1.6, 0.8][i] * k); });
+      if (Math.random() < dt * 8 && Math.abs(b.x - cam.position.x) < 90 && Math.abs(b.z - cam.position.z) < 90) {
+        Fx.glow.emit(b.x + rand(-0.4, 0.4), b.y + 1.6, b.z + rand(-0.4, 0.4), rand(-0.3, 0.3), rand(2, 4), rand(-0.3, 0.3), rand(1, 2), 0.15, new THREE.Color('#ff8a3a'), 3, 0.2, -0.5, 1);
+      }
+    }
+    for (const sp of this.sprites) {
+      if (sp.found) continue;
+      sp.model.position.y = sp.y + Math.sin(time * 2 + sp.ph) * 0.12;
+      sp.model.rotation.y += dt * 1.2;
     }
     if (this.portal) {
       this.portal.ring.rotation.z += dt * 2;

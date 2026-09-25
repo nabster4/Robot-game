@@ -33,6 +33,13 @@
   <div id="bossbar"><div id="boss-name"></div><div class="boss-track"><i id="boss-fill"></i></div></div>
 
   <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+  <svg id="stamina" viewBox="0 0 44 44" aria-label="Stamina">
+    <circle class="st-bg" cx="22" cy="22" r="17"/>
+    <circle class="st-extra" cx="22" cy="22" r="20.5"/>
+    <circle class="st-fill" id="st-fill" cx="22" cy="22" r="17" pathLength="100"/>
+    <circle class="st-fill2" id="st-fill2" cx="22" cy="22" r="20.5" pathLength="100"/>
+  </svg>
+  <div id="focus-vignette"></div>
   <div id="dmgdir"></div>
   <div id="prompt"></div>
   <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
@@ -44,6 +51,7 @@
     <div class="track big"><i id="bar-hull"></i></div>
     <div class="vrow small"><span class="lbl plasma">PLASMA</span><div class="track"><i id="bar-plasma" class="plasma"></i></div><span id="val-plasma" class="val plasma"></span></div>
     <div class="vrow small"><span class="lbl">DASH</span><div class="track"><i id="bar-dash"></i></div><span id="val-repair" class="val green"></span></div>
+    <div class="vrow small" id="veh-row"><span class="lbl veh">JET</span><div class="track"><i id="bar-veh" class="veh"></i></div><span id="val-veh" class="val veh"></span></div>
   </div>
 
   <div id="bottom-center">
@@ -62,6 +70,9 @@
   <div class="tbtn small" data-tbtn="workshop" id="tb-workshop" role="button" aria-label="Workshop">
     <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8 6.2 21l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>CRAFT</span>
   </div>
+  <div class="tbtn small" data-tbtn="view" id="tb-view" role="button" aria-label="Switch camera view">
+    <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>VIEW</span>
+  </div>
   <div class="tbtn small" data-tbtn="pause" id="tb-pause" role="button" aria-label="Pause">
     <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
   </div>
@@ -79,6 +90,12 @@
   </div>
   <div class="tbtn use" data-tbtn="use" id="tb-use" role="button" aria-label="Use">
     <svg viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V3.5a1.5 1.5 0 0 1 3 0V11M14 11V5a1.5 1.5 0 0 1 3 0v8c0 4-2.5 7-6 7-2.5 0-4-1.5-5.5-4L4 12.5a1.5 1.5 0 0 1 2.5-1.5L8 13"/></svg><span>USE</span>
+  </div>
+  <div class="tbtn ride" data-tbtn="ride" id="tb-ride" role="button" aria-label="Ride Skyrider">
+    <svg viewBox="0 0 24 24"><path d="M12 3l2 6 7 3-7 3-2 6-2-6-7-3 7-3z"/></svg><span>RIDE</span>
+  </div>
+  <div class="tbtn dive" data-tbtn="descend" id="tb-descend" role="button" aria-label="Dive">
+    <svg viewBox="0 0 24 24"><path d="M5 10l7 7 7-7M5 4l7 7 7-7"/></svg><span>DIVE</span>
   </div>
   <div class="tbtn repair" data-tbtn="repair" id="tb-repair" role="button" aria-label="Repair kit" data-n="0">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>FIX</span>
@@ -107,7 +124,10 @@
         <div><kbd>Left thumb</kbd><span>Move · push to the rim to sprint</span></div>
         <div><kbd>Right side</kbd><span>Drag anywhere to look around</span></div>
         <div><kbd>FIRE</kbd><span>Hold to shoot · drag it to aim</span></div>
-        <div><kbd>JUMP</kbd><span>Hop over shockwaves &amp; lasers</span></div>
+        <div><kbd>JUMP</kbd><span>Jump · tap again mid-air to glide</span></div>
+        <div><kbd>Walk into rocks</kbd><span>Climb them (uses stamina)</span></div>
+        <div><kbd>RIDE</kbd><span>Deploy / dock your Skyrider</span></div>
+        <div><kbd>VIEW</kbd><span>First / third person</span></div>
         <div><kbd>DASH</kbd><span>Burst with brief invulnerability</span></div>
         <div><kbd>BOMB</kbd><span>Plasma grenade</span></div>
         <div><kbd>USE</kbd><span>Open caches · start uplinks</span></div>
@@ -116,7 +136,10 @@
       <div class="howto-grid desk-only">
         <div><kbd>W A S D</kbd><span>Move · <b>Shift</b> sprint</span></div>
         <div><kbd>Mouse</kbd><span>Look · left-click to fire</span></div>
-        <div><kbd>Space</kbd><span>Jump (over shockwaves &amp; lasers)</span></div>
+        <div><kbd>Space</kbd><span>Jump · again mid-air to glide</span></div>
+        <div><kbd>Walk into rocks</kbd><span>Climb (uses stamina)</span></div>
+        <div><kbd>F</kbd><span>Deploy / dock Skyrider</span></div>
+        <div><kbd>V</kbd><span>First / third person</span></div>
         <div><kbd>Q</kbd><span>Dash — brief invulnerability</span></div>
         <div><kbd>Right-click / G</kbd><span>Plasma grenade</span></div>
         <div><kbd>E</kbd><span>Open caches · activate beacons</span></div>
@@ -125,6 +148,9 @@
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>M</kbd><span>Mute</span></div>
       </div>
+      <p>Robots hang out in camps and leave you alone <b>until you attack them</b> or start an uplink.
+        Climb anything, glide from high places, launch skyward from activated beacons to reach
+        <b>sky islands</b>, and hunt for hidden <b>Scrap Sprites</b> (every 3 grows your stamina).</p>
       <p>Each zone hides <b>signal beacons</b> — follow their light pillars. Activate one and hold its uplink ring
         while the machines counter-attack. Bring every beacon online to open the <b>Core Gate</b> and face the
         zone's boss. Destroyed robots and hidden <b>salvage caches</b> drop parts — craft them into
@@ -143,6 +169,7 @@
     <button class="btn" id="btn-p-workshop">Workshop</button>
     <div class="settings">
       <label><span id="opt-sens-label">Mouse sensitivity</span> <b id="opt-sens-val">1.0</b><input type="range" id="opt-sens" min="0.2" max="3" step="0.1" value="1"></label>
+      <label class="check"><input type="checkbox" id="opt-third"> Third-person view (V)</label>
       <label class="check"><input type="checkbox" id="opt-invert"> Invert mouse Y</label>
       <label class="check"><input type="checkbox" id="opt-quality"> Performance mode (no shadows, lower resolution)</label>
     </div>
@@ -174,6 +201,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="companion">Companions</button>
           <button class="tab" data-tab="upgrade">Upgrades</button>
+          <button class="tab" data-tab="vehicle">Vehicles</button>
           <button class="tab" data-tab="item">Supplies</button>
         </div>
         <div id="ws-recipes" class="recipes"></div>

@@ -33,8 +33,13 @@ class Player {
     this.recoil = 0; this.bob = 0; this.bobAmt = 0; this.land = 0;
     this.hazardT = 0;
     this.lastHurtFrom = null;
+    // Zelda-style traversal
+    this.stamina = 100; this.exhausted = false; this.stamRest = 0;
+    this.gliding = false; this.climbing = null; this.airT = 0; this.launchT = 0;
+    this.walk = 0;
   }
   get maxHp() { return 100 + 25 * G.up.armor; }
+  get maxStamina() { return 100 + 20 * (G.vessels || 0); }
   get fireRate() { return 6 * Math.pow(1.2, G.up.overclock); }
   get speed() { return 7.5 * (1 + 0.1 * G.up.thruster); }
   get dashMax() { return 1.2 * Math.pow(0.72, G.up.thruster); }
@@ -44,11 +49,44 @@ class Player {
 
   forward(out) { return out.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); }
 
-  update(dt) {
-    const I = Input;
+  useStamina(v) {
+    this.stamina -= v;
+    this.stamRest = 0.6;
+    if (this.stamina <= 0) {
+      this.stamina = 0; this.exhausted = true;
+      this.gliding = false; this.climbing = null;
+      Sound.play('deny');
+    }
+  }
+
+  look(I) {
     const sens = 0.0022 * G.settings.sens;
     this.yaw -= I.mouse.dx * sens;
     this.pitch = clamp(this.pitch - I.mouse.dy * sens * (G.settings.invert ? -1 : 1), -1.5, 1.5);
+  }
+
+  timers(dt) {
+    this.invuln -= dt;
+    this.recoil = Math.max(0, this.recoil - dt * 12);
+    this.energy = Math.min(100, this.energy + 11 * dt);
+    this.land = Math.max(0, this.land - dt * 3);
+    this.stamRest -= dt;
+    const resting = this.grounded || G.riding;
+    if (this.stamRest <= 0 && resting) this.stamina = Math.min(this.maxStamina, this.stamina + (this.exhausted ? 28 : 40) * dt);
+    if (this.exhausted && this.stamina >= this.maxStamina) this.exhausted = false;
+  }
+
+  update(dt) {
+    const I = Input;
+    this.look(I);
+    if (I.touchMode && !G.riding) touchAimAssist(this, dt);
+    G.focus = false;
+    if (G.riding) {
+      this.timers(dt);
+      this.gliding = false; this.climbing = null;
+      if (I.hit('KeyR')) this.useRepair();
+      return;
+    }
 
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
@@ -58,44 +96,115 @@ class Player {
     let wx = fx * mf + rx * mr, wz = fz * mf + rz * mr;
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; } // analog stick keeps partial deflection as walking speed
-    const sprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint)) && mf > 0;
-    if (I.touchMode) touchAimAssist(this, dt);
-    let spd = this.speed * (sprint ? 1.6 : 1);
-    const inHaz = this.grounded && World.inHazard(this.pos.x, this.pos.z);
+    const wantSprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint)) && mf > 0;
+    const sprinting = wantSprint && this.grounded && !this.exhausted && wl > 0.1;
+    if (sprinting) this.useStamina(13 * dt);
+    let spd = this.speed * (sprinting ? 1.6 : 1) * (this.exhausted ? 0.75 : 1);
+    const inHaz = this.grounded && World.inHazard(this.pos.x, this.pos.z) && World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= World.heightAt(this.pos.x, this.pos.z) + 0.01;
     if (inHaz) spd *= World.zone.hazard.slow;
 
     // dash
     this.dashCd -= dt;
-    if (I.hit('KeyQ') && this.dashCd <= 0) {
+    if (I.hit('KeyQ') && this.dashCd <= 0 && !this.climbing) {
       if (wl > 0.1) this.dashDir.set(wx, 0, wz).normalize(); else this.dashDir.set(fx, 0, fz);
       this.dashT = 0.18; this.dashCd = this.dashMax;
       this.invuln = Math.max(this.invuln, 0.3);
+      this.gliding = false;
       Sound.play('dash');
       G.fov.kick = 12;
     }
-    if (this.dashT > 0) {
-      this.dashT -= dt;
-      this.vel.x = this.dashDir.x * 34; this.vel.z = this.dashDir.z * 34;
-      Fx.trail(this.pos.x + rand(-0.5, 0.5), this.pos.y + rand(0.3, 1.5), this.pos.z + rand(-0.5, 0.5), '#3cf2ff', 0.6, 0.3, 2);
-    } else {
-      const k = 1 - Math.exp(-(this.grounded ? 12 : 2.5) * dt);
-      this.vel.x += (wx * spd - this.vel.x) * k;
-      this.vel.z += (wz * spd - this.vel.z) * k;
+
+    // jump · glide · wall leap
+    if (I.hit('Space')) {
+      if (this.climbing) {
+        const c = this.climbing;
+        const ox = this.pos.x - c.x, oz = this.pos.z - c.z, ol = Math.hypot(ox, oz) || 1;
+        this.climbing = null;
+        this.vel.set((ox / ol) * 6, 7.5, (oz / ol) * 6);
+        this.useStamina(12);
+        Sound.play('jump');
+      } else if (this.grounded) {
+        this.vel.y = this.jumpV; this.grounded = false; Sound.play('jump');
+      } else if (this.gliding) {
+        this.gliding = false;
+      } else if (!this.exhausted && this.stamina > 1 && this.pos.y - World.groundAt(this.pos.x, this.pos.z, this.pos.y) > 1.6) {
+        this.gliding = true; this.launchT = 0;
+        Sound.play('glide');
+        if (G.hint) G.hint(Touch.enabled ? 'Gliding — steer with the stick, tap DROP to let go' : 'Gliding — steer with movement, press Space again to drop');
+      }
     }
 
-    // jump & gravity
-    if (I.hit('Space') && this.grounded) {
-      this.vel.y = this.jumpV; this.grounded = false; Sound.play('jump');
+    if (this.climbing) {
+      // ── climbing a rock / pillar ──
+      const c = this.climbing;
+      const ox = this.pos.x - c.x, oz = this.pos.z - c.z;
+      let ang = Math.atan2(oz, ox);
+      ang += (mr * 2.4 * dt) / (c.r + this.r);
+      const R = c.r + this.r + 0.02;
+      this.pos.x = c.x + Math.cos(ang) * R; this.pos.z = c.z + Math.sin(ang) * R;
+      const climbV = mf > 0.2 ? 3.4 : mf < -0.2 ? -3.4 : 0;
+      this.vel.set(0, climbV, 0);
+      this.pos.y += climbV * dt;
+      if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
+      this.walk += Math.abs(climbV) * dt * 2;
+      if (this.climbing && this.pos.y >= c.top - 0.35) {
+        // vault onto the top
+        this.pos.y = c.top + 0.05;
+        this.pos.x = c.x + Math.cos(ang) * c.r * 0.45; this.pos.z = c.z + Math.sin(ang) * c.r * 0.45;
+        this.climbing = null; this.vel.set(0, 2, 0);
+        Sound.play('land');
+      } else if (this.climbing && this.pos.y <= World.heightAt(this.pos.x, this.pos.z) && climbV < 0) {
+        this.climbing = null;
+      }
+    } else {
+      if (this.dashT > 0) {
+        this.dashT -= dt;
+        this.vel.x = this.dashDir.x * 34; this.vel.z = this.dashDir.z * 34;
+        Fx.trail(this.pos.x + rand(-0.5, 0.5), this.pos.y + rand(0.3, 1.5), this.pos.z + rand(-0.5, 0.5), '#3cf2ff', 0.6, 0.3, 2);
+      } else if (this.gliding) {
+        const gs = 8 + 5 * Math.max(0, mf);
+        const k = 1 - Math.exp(-2 * dt);
+        this.vel.x += (fx * gs + rx * mr * 5 - this.vel.x) * k;
+        this.vel.z += (fz * gs + rz * mr * 5 - this.vel.z) * k;
+        this.useStamina(4.5 * dt);
+      } else {
+        const k = 1 - Math.exp(-(this.grounded ? 12 : 2.5) * dt);
+        this.vel.x += (wx * spd - this.vel.x) * k;
+        this.vel.z += (wz * spd - this.vel.z) * k;
+      }
+      // gravity, glide sink rate, campfire updrafts
+      if (this.gliding) {
+        this.vel.y = Math.max(this.vel.y - 26 * dt, -2.3);
+        for (const u of G.updrafts) {
+          if ((this.pos.x - u.x) ** 2 + (this.pos.z - u.z) ** 2 < u.r * u.r && this.pos.y < u.y + 38) {
+            this.vel.y = Math.min(11, this.vel.y + 40 * dt);
+            if (Math.random() < dt * 20) Fx.trail(this.pos.x + rand(-1, 1), this.pos.y - 1, this.pos.z + rand(-1, 1), '#ffb347', 0.4, 0.5, 1.5);
+          }
+        }
+      } else this.vel.y -= 26 * dt;
+      this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vel.y * dt;
+      const hit = World.collide(this.pos, this.r, this.pos.y + 0.4);
+      // start climbing when pushing into something climbable
+      if (hit && hit.top !== undefined && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && this.pos.y < hit.top - 0.6) {
+        const dx = hit.x - this.pos.x, dz = hit.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
+        if ((dx / dl) * fx + (dz / dl) * fz > 0.35) {
+          this.climbing = hit; this.gliding = false; this.vel.set(0, 0, 0);
+          if (G.hint) G.hint(Touch.enabled ? 'Climbing — push the stick up to climb, JUMP to leap off' : 'Climbing — hold forward to climb, Space to leap off');
+        }
+      }
     }
-    this.vel.y -= 26 * dt;
-    this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vel.y * dt;
-    World.collide(this.pos, this.r, this.pos.y + 0.4);
-    const gy = World.heightAt(this.pos.x, this.pos.z);
-    if (this.pos.y <= gy) {
-      if (!this.grounded && this.vel.y < -8) { this.land = Math.min(1, -this.vel.y / 20); Sound.play('land'); }
-      this.pos.y = gy; this.vel.y = 0; this.grounded = true;
-    } else if (this.pos.y > gy + 0.25) this.grounded = false;
-    else if (this.grounded) this.pos.y = gy;
+
+    const gy = World.groundAt(this.pos.x, this.pos.z, this.pos.y);
+    if (!this.climbing) {
+      if (this.pos.y <= gy) {
+        if (!this.grounded && this.vel.y < -8) { this.land = Math.min(1, -this.vel.y / 20); Sound.play('land'); }
+        this.pos.y = gy; this.vel.y = Math.max(0, this.vel.y); this.grounded = true;
+        this.gliding = false; this.launchT = 0;
+      } else if (this.pos.y > gy + 0.25) this.grounded = false;
+      else if (this.grounded) this.pos.y = gy;
+    } else this.grounded = false;
+    this.airT = this.grounded || this.climbing ? 0 : this.airT + dt;
+    if (this.launchT > 0) { this.launchT -= dt; Fx.trail(this.pos.x, this.pos.y + 0.5, this.pos.z, '#6bff9e', 0.8, 0.5, 2); }
 
     // hazard
     if (inHaz && World.zone.hazard.dmg) {
@@ -108,14 +217,18 @@ class Player {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     this.bobAmt = lerp(this.bobAmt, this.grounded ? Math.min(1, hs / 8) : 0, 1 - Math.exp(-8 * dt));
     this.bob += hs * dt * 1.1;
-    this.land = Math.max(0, this.land - dt * 3);
+    this.walk += hs * dt * 0.9;
 
-    this.invuln -= dt;
-    this.recoil = Math.max(0, this.recoil - dt * 12);
-    this.energy = Math.min(100, this.energy + 11 * dt);
+    this.timers(dt);
+
+    // Zelda-style focus: aiming while gliding or falling slows time
+    if (I.mouse.down && (this.gliding || (this.airT > 0.45 && this.vel.y < 0)) && !this.exhausted && this.stamina > 0) {
+      G.focus = true;
+      this.useStamina(16 * dt / Math.max(0.3, G.timeScale));
+    }
 
     this.fireCd -= dt;
-    if (I.mouse.down && this.fireCd <= 0) {
+    if (I.mouse.down && this.fireCd <= 0 && !this.climbing) {
       this.fireCd += 1 / this.fireRate;
       if (this.fireCd < 0) this.fireCd = 0;
       this.shoot();
@@ -147,6 +260,7 @@ class Player {
     this.recoil = 1;
     G.vm.userData.flash.visible = true;
     G.vm.userData.flashT = 0.05;
+    if (G.avatar) G.avatar.userData.flashT = 0.06;
     Sound.play('shoot');
   }
 
@@ -173,6 +287,7 @@ class Player {
   heal(v) { this.hp = Math.min(this.maxHp, this.hp + v); }
 
   hurt(dmg, from, silent) {
+    if (G.riding && G.vehicle) { G.vehicle.hurt(dmg, from); return; }
     if ((this.invuln > 0 && !silent) || this.dead || G.levelDone) return;
     this.hp -= dmg;
     if (!silent) this.invuln = 0.35;
@@ -187,7 +302,7 @@ class Player {
 
 // ═════════════════════════ ENEMIES ═════════════════════════
 class Enemy {
-  constructor(type, x, z, elite = false, aggro = false) {
+  constructor(type, x, z, elite = false, aggro = false, camp = null) {
     const d = ENEMY_TYPES[type];
     const L = G.level;
     this.type = type; this.d = d; this.ai = d.ai;
@@ -201,6 +316,9 @@ class Enemy {
     this.home = { x, z };
     this.wander = { x, z, t: 0 };
     this.aggro = aggro;
+    this.camp = camp;          // the group this robot hangs out with
+    this.calmT = 0;            // time spent far from the player while hunting
+    this.chatT = rand(1, 5);
     this.t = rand(0, 10);
     this.cd = rand(0.8, 1.6) * (d.fireCd || 1);
     this.state = 'move'; this.stateT = 0;
@@ -234,10 +352,30 @@ class Enemy {
     return Math.atan2(p.pos.x + p.vel.x * t * 0.6 - this.pos.x, p.pos.z + p.vel.z * t * 0.6 - this.pos.z);
   }
 
+  // Robots only fight when provoked: hurting one turns its whole camp (and anyone close by) hostile.
   alert() {
     if (this.aggro) return;
-    this.aggro = true;
-    for (const e of G.enemies) if (!e.aggro && !e.isBoss && Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) < 25) e.aggro = true;
+    this.aggro = true; this.calmT = 0;
+    Fx.glowBurst(this.pos.x, this.cy + 1.6, this.pos.z, '#ff3355', 0.9, 0.6, 4);
+    for (const e of G.enemies) {
+      if (e.aggro || e.isBoss || e.dead) continue;
+      if ((this.camp && e.camp === this.camp) || Math.hypot(e.pos.x - this.pos.x, e.pos.z - this.pos.z) < 22) {
+        e.aggro = true; e.calmT = 0;
+        Fx.glowBurst(e.pos.x, e.cy + 1.6, e.pos.z, '#ff3355', 0.9, 0.6, 4);
+      }
+    }
+    if (this.camp && !this.camp.alerted) { this.camp.alerted = true; Sound.play('alarm', null, G.vol(this.pos)); }
+  }
+
+  // lose interest once the player has been far away for a while (not while an uplink is running)
+  calmDown(dt, dd) {
+    if (!this.aggro || this.hunter) return;
+    if (dd > 95) this.calmT += dt; else this.calmT = 0;
+    if (this.calmT > 8) {
+      this.aggro = false; this.calmT = 0;
+      if (this.camp) this.camp.alerted = false;
+      this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.5);
+    }
   }
 
   update(dt) {
@@ -252,16 +390,29 @@ class Enemy {
     this.cd -= dt;
     let tx = 0, tz = 0;
     const S = this.speed;
-    const aggroR = this.ai === 'sniper' ? 70 : 48;
-
-    if (!this.aggro && (dd < aggroR || this.hp < this.maxHp) && !p.dead) this.alert();
+    this.calmDown(dt, dd);
 
     if (!this.aggro || p.dead) {
+      // hang out: mill around the camp brazier, face the group, pause to "chat"
+      const cx = this.camp ? this.camp.x : this.home.x, cz = this.camp ? this.camp.z : this.home.z;
+      const rad = this.camp ? this.camp.r : 10;
       this.wander.t -= dt;
-      if (this.wander.t <= 0) { this.wander.t = rand(3, 7); this.wander.x = this.home.x + rand(-14, 14); this.wander.z = this.home.z + rand(-14, 14); }
+      if (this.wander.t <= 0) {
+        this.wander.t = rand(4, 9);
+        const a = rand(0, TAU), r = rand(rad * 0.55, rad);
+        this.wander.x = cx + Math.cos(a) * r; this.wander.z = cz + Math.sin(a) * r;
+      }
       const wx = this.wander.x - this.pos.x, wz = this.wander.z - this.pos.z, wd = Math.hypot(wx, wz);
-      if (wd > 1.5) { tx = (wx / wd) * S * 0.35; tz = (wz / wd) * S * 0.35; this.facing += clamp(angDiff(this.facing, Math.atan2(wx, wz)), -3 * dt, 3 * dt); }
+      if (wd > 1.2) { tx = (wx / wd) * S * 0.3; tz = (wz / wd) * S * 0.3; this.facing += clamp(angDiff(this.facing, Math.atan2(wx, wz)), -3 * dt, 3 * dt); }
+      else {
+        const lookA = Math.atan2(cx - this.pos.x, cz - this.pos.z) + Math.sin(this.t * 0.7) * 0.6;
+        this.facing += clamp(angDiff(this.facing, lookA), -1.5 * dt, 1.5 * dt);
+        this.chatT -= dt;
+        if (this.chatT <= 0) { this.chatT = rand(3, 8); this.hop = 0.35; if (dd < 30) Sound.play('chirp', null, G.vol(this.pos)); }
+      }
       if (this.laser) this.laser.visible = false;
+      if (this.state === 'aim') this.state = 'move';
+      this.burst = 0;
     } else switch (this.ai) {
       case 'drone': {
         const pref = 12;
@@ -366,13 +517,13 @@ class Enemy {
 
     // contact damage
     const cdy = Math.abs(p.chestY - this.cy);
-    if (dd < this.r + p.r + 0.2 && cdy < this.r + 1.2 && !p.dead) {
+    if (this.aggro && !G.riding && dd < this.r + p.r + 0.2 && cdy < this.r + 1.2 && !p.dead) {
       if (this.ai === 'swarm') { p.hurt(this.dmg, this.pos); G.killEnemy(this, true); return; }
       if (this.contactCd <= 0) { p.hurt(this.dmg, this.pos); this.contactCd = 0.9; }
     }
     for (const c of G.companions) {
       if (c.offline > 0) continue;
-      if (this.pos.distanceToSquared(c.pos) < (this.r + c.r) ** 2) {
+      if (this.aggro && this.pos.distanceToSquared(c.pos) < (this.r + c.r) ** 2) {
         if (this.ai === 'swarm') { c.hurt(this.dmg); G.killEnemy(this, true); return; }
         if (this.contactCd <= 0) { c.hurt(this.dmg * 0.8); this.contactCd = 0.9; }
       }
@@ -383,6 +534,7 @@ class Enemy {
   sync(dt) {
     const m = this.model, P = m.userData.parts;
     m.position.copy(this.pos);
+    if (this.hop > 0) { this.hop = Math.max(0, this.hop - dt); m.position.y += Math.sin((this.hop / 0.35) * Math.PI) * 0.35; }
     const face = this.ai === 'tank' || this.ai === 'carrier' ? Math.atan2(this.vel.x, this.vel.z) || this.facing : this.facing;
     if (this.ai === 'tank') {
       if (Math.hypot(this.vel.x, this.vel.z) > 0.3) m.rotation.y += angDiff(m.rotation.y, face) * Math.min(1, dt * 3);
@@ -857,5 +1009,141 @@ class Companion {
     if (P.arcs) { P.arcs.rotation.x += dt * 2; P.arcs.rotation.y += dt * 3; }
     if (P.orb) P.orb.scale.setScalar(1 + 0.3 * Math.sin(this.t * 20));
     m.userData.bodyMat.emissiveIntensity = 0.05 + this.flash * 2;
+  }
+}
+
+// ═════════════════════════ SKYRIDER (craftable flying vehicle) ═════════════════════════
+// Deploy with F (or RIDE), fly where you look, shoot with twin cannons. It soaks up the
+// hits aimed at you; if it's destroyed you're thrown clear and can glide down.
+class Vehicle {
+  constructor(hp) {
+    this.maxHp = 240;
+    this.hp = hp ?? this.maxHp;
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.model = buildSkyriderModel();
+    this.fireCd = 0; this.side = 1; this.bank = 0; this.flash = 0;
+    this.deployed = false;
+  }
+
+  deploy() {
+    const p = G.player;
+    this.pos.set(p.pos.x, p.pos.y + 1.4, p.pos.z);
+    this.vel.copy(p.vel); this.vel.y = Math.max(this.vel.y, 6);
+    this.model.position.copy(this.pos);
+    G.scene.add(this.model);
+    this.deployed = true;
+    G.riding = true;
+    p.gliding = false; p.climbing = null;
+    Fx.shockRing(this.pos.x, this.pos.y, this.pos.z, '#ffb347', 3, 40);
+    Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, '#ffffff', 4, 0.3, 4);
+    Sound.play('deploy');
+    G.hint(Touch.enabled ? 'Skyrider: fly where you look · hold UP / DIVE · EXIT to dock' : 'Skyrider: fly where you look · Space climbs · C dives · F to dock');
+  }
+
+  dock() {
+    const p = G.player;
+    G.scene.remove(this.model);
+    this.deployed = false;
+    G.riding = false;
+    p.pos.set(this.pos.x, this.pos.y - 0.6, this.pos.z);
+    p.vel.copy(this.vel).multiplyScalar(0.5);
+    p.grounded = false;
+    Fx.shockRing(this.pos.x, this.pos.y, this.pos.z, '#3cf2ff', 2, 30);
+    Sound.play('deploy');
+  }
+
+  hurt(dmg, from) {
+    this.hp -= dmg;
+    this.flash = 1;
+    Fx.addShake(0.15);
+    Fx.sparks(this.pos.x, this.pos.y, this.pos.z, 6, '#ffb347', 7);
+    if (from) UI.damageDir(from.x, from.z);
+    Sound.play('hit');
+    if (this.hp <= 0) this.destroy();
+  }
+
+  destroy() {
+    const p = G.player;
+    Fx.explosion(this.pos.x, this.pos.y, this.pos.z, '#ffb347', 2.4);
+    Fx.addShake(0.9);
+    Sound.play('explode', true);
+    G.scene.remove(this.model);
+    G.vehicle = null;
+    G.riding = false;
+    p.pos.set(this.pos.x, this.pos.y - 0.6, this.pos.z);
+    p.vel.set(this.vel.x * 0.4, 7, this.vel.z * 0.4);
+    p.grounded = false;
+    p.invuln = 1.5;
+    UI.banner('SKYRIDER DESTROYED', Touch.enabled ? 'Tap GLIDE to open your glider' : 'Press Space to open your glider', '#ffb347', 2.6);
+  }
+
+  update(dt) {
+    const p = G.player, I = Input;
+    let mf = (I.key('KeyW') || I.key('ArrowUp') ? 1 : 0) - (I.key('KeyS') || I.key('ArrowDown') ? 1 : 0);
+    let mr = (I.key('KeyD') || I.key('ArrowRight') ? 1 : 0) - (I.key('KeyA') || I.key('ArrowLeft') ? 1 : 0);
+    if (I.touch) { mf -= I.touch.my; mr += I.touch.mx; }
+    const up = I.key('Space'), down = I.key('KeyC') || I.key('ControlLeft');
+    const boost = I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint);
+    const dir = p.forward(_v1).clone();
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+    const speed = 26 * (boost ? 1.7 : 1);
+    const tx = dir.x * mf * speed + rx * mr * 15;
+    const tz = dir.z * mf * speed + rz * mr * 15;
+    const ty = dir.y * Math.max(0, mf) * speed + (up ? 12 : 0) - (down ? 12 : 0);
+    const k = 1 - Math.exp(-2.2 * dt);
+    this.vel.x += (tx - this.vel.x) * k; this.vel.y += (ty - this.vel.y) * k; this.vel.z += (tz - this.vel.z) * k;
+    this.pos.addScaledVector(this.vel, dt);
+    const floor = Math.max(World.groundAt(this.pos.x, this.pos.z, this.pos.y), World.hazardLevel) + 1.4;
+    if (this.pos.y < floor) {
+      if (this.vel.y < -14) this.hurt(8);
+      this.pos.y = floor; this.vel.y = Math.max(0, this.vel.y);
+    }
+    this.pos.y = Math.min(this.pos.y, World.hazardLevel + 170);
+    World.collide(this.pos, 1.3, this.pos.y - 0.5);
+
+    p.pos.set(this.pos.x, this.pos.y - 0.9, this.pos.z);
+    p.vel.copy(this.vel);
+    p.grounded = false;
+
+    // twin cannons
+    this.fireCd -= dt;
+    if (I.mouse.down && this.fireCd <= 0) {
+      this.fireCd = 0.09;
+      this.side *= -1;
+      const aim = G.aimPoint();
+      const mx = this.pos.x + rx * this.side * 1.35 + dir.x * 1.6, my = this.pos.y - 0.15 + dir.y * 1.6, mz = this.pos.z + rz * this.side * 1.35 + dir.z * 1.6;
+      const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
+      G.spawnBolt(mx, my, mz, d, 200, 12 + G.level * 1.5, '#ffb347', true);
+      Fx.muzzle(mx, my, mz, '#ffb347');
+      Sound.play('shoot');
+    }
+    if (I.mouse.rightPressed || I.hit('KeyG')) {
+      if (p.energy < 100 && G.cells > 0) { G.cells--; p.energy = 100; }
+      if (p.energy >= 100) {
+        p.energy = 0;
+        G.spawnGrenade(new THREE.Vector3(this.pos.x, this.pos.y - 1, this.pos.z), this.vel.clone().addScaledVector(dir, 12));
+        Sound.play('throw');
+      } else Sound.play('deny');
+    }
+
+    // model: nose follows the view, banks into turns
+    this.flash = Math.max(0, this.flash - dt * 5);
+    const m = this.model;
+    m.position.copy(this.pos);
+    const yawRate = (this.lastYaw !== undefined ? angDiff(this.lastYaw, p.yaw) : 0) / Math.max(dt, 0.001);
+    this.lastYaw = p.yaw;
+    this.bank = lerp(this.bank, clamp(-mr * 0.5 + yawRate * 0.15, -0.9, 0.9), 1 - Math.exp(-4 * dt));
+    m.rotation.set(-p.pitch * 0.6, p.yaw + Math.PI, this.bank, 'YXZ');
+    m.userData.bodyMat.emissiveIntensity = this.flash * 2;
+    const thrust = 0.8 + Math.min(1.6, this.vel.length() / 25);
+    for (const t of m.userData.thrusters) { t.scale.setScalar(thrust * (0.9 + Math.random() * 0.2)); }
+    if (Math.random() < 0.8) {
+      for (const s of [-1, 1]) {
+        const bx = this.pos.x + rx * s * 0.95 - dir.x * 1.6, bz = this.pos.z + rz * s * 0.95 - dir.z * 1.6;
+        Fx.trail(bx, this.pos.y - 0.25 - dir.y * 1.6, bz, '#ffb347', 0.5 * thrust, 0.25, 2.5);
+      }
+    }
+    if (this.hp < this.maxHp * 0.3 && Math.random() < dt * 12) Fx.smoke(this.pos.x, this.pos.y, this.pos.z, 0.8, 1, 0, 1, 0);
   }
 }

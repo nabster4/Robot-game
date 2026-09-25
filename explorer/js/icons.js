@@ -303,3 +303,22 @@ const partIconURL = (type) => iconURL('p_' + type, 48, (g, s) => { glow(g, s / 2
 const compIconURL = (kind) => iconURL('c_' + kind, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.55, COMP_DEFS[kind].color, 0.5); drawCompanionShape(g, kind, s / 2, s / 2 + 2, 1.35, 0.3, -Math.PI / 4); });
 const upgIconURL = (id, color) => iconURL('u_' + id, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.5, color, 0.35); drawUpgradeIcon(g, id, s / 2, s / 2, s * 0.28, color); });
 
+
+// Skyrider & Scrap Sprite icons for the workshop
+const vehIconURL = () => iconURL('v_skyrider', 64, (g, s) => {
+  glow(g, s / 2, s / 2, s * 0.5, '#ffb347', 0.35);
+  g.save(); g.translate(s / 2, s / 2); g.rotate(-Math.PI / 4);
+  g.fillStyle = '#2c3e52'; g.strokeStyle = '#ffb347'; g.lineWidth = 2; g.lineJoin = 'round';
+  poly(g, [[0, -1], [0.18, -0.2], [0.95, 0.25], [0.95, 0.4], [0.18, 0.3], [0.14, 0.75], [0.4, 0.95], [-0.4, 0.95], [-0.14, 0.75], [-0.18, 0.3], [-0.95, 0.4], [-0.95, 0.25], [-0.18, -0.2]], s * 0.36);
+  g.fill(); g.stroke();
+  g.fillStyle = '#3cf2ff'; g.beginPath(); g.ellipse(0, -s * 0.12, s * 0.05, s * 0.1, 0, 0, TAU); g.fill();
+  g.restore();
+});
+const spriteIconURL = () => iconURL('sprite', 48, (g, s) => {
+  glow(g, s / 2, s / 2, s * 0.5, '#3aff9a', 0.5);
+  g.fillStyle = '#2a4a3a'; g.strokeStyle = '#3aff9a'; g.lineWidth = 2;
+  g.beginPath(); g.arc(s / 2, s * 0.58, s * 0.2, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(s * 0.44, s * 0.56, 2, 0, TAU); g.arc(s * 0.56, s * 0.56, 2, 0, TAU); g.fill();
+  g.fillStyle = '#3aff9a'; g.beginPath(); g.ellipse(s * 0.58, s * 0.28, s * 0.12, s * 0.05, -0.4, 0, TAU); g.fill();
+  g.strokeStyle = '#3aff9a'; g.beginPath(); g.moveTo(s / 2, s * 0.38); g.lineTo(s * 0.52, s * 0.3); g.stroke();
+});

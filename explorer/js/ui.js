@@ -38,6 +38,9 @@ const UI = {
     if (Touch.enabled) $('opt-sens-label').textContent = 'Look sensitivity';
     sens.oninput = () => { G.settings.sens = +sens.value; $('opt-sens-val').textContent = (+sens.value).toFixed(1); };
     $('opt-invert').onchange = (e) => { G.settings.invert = e.target.checked; };
+    $('opt-third').onchange = (e) => { G.settings.view = e.target.checked ? 'third' : 'first'; this.saveSettings(); };
+    try { const v = localStorage.getItem('sf-view'); if (v === 'third') G.settings.view = 'third'; } catch (e) { /* storage unavailable */ }
+    $('opt-third').checked = G.settings.view === 'third';
     $('opt-quality').onchange = (e) => { G.settings.quality = e.target.checked ? 'low' : 'high'; renderer.shadowMap.enabled = !e.target.checked; resize(); scene.traverse((o) => { if (o.material && o.material.needsUpdate !== undefined) o.material.needsUpdate = true; }); };
 
     // HUD: parts strip
@@ -97,6 +100,15 @@ const UI = {
     $('hud').classList.remove('show');
   },
 
+  saveSettings() { try { localStorage.setItem('sf-view', G.settings.view); } catch (e) { /* storage unavailable */ } },
+
+  toggleView() {
+    G.settings.view = G.settings.view === 'third' ? 'first' : 'third';
+    $('opt-third').checked = G.settings.view === 'third';
+    this.saveSettings();
+    this.feed(G.settings.view === 'third' ? 'Third-person view' : 'First-person view', '#9fdcff');
+  },
+
   toggleMute() {
     const m = Sound.toggleMute();
     $('btn-mute').textContent = m ? 'Sound: Off' : 'Sound: On';
@@ -152,6 +164,7 @@ const UI = {
   recipeState(r) {
     if (r.kind === 'upgrade' && G.up[r.id] >= r.max) return { ok: false, why: 'MAXED' };
     if (r.kind === 'companion' && G.companions.length >= G.slots) return { ok: false, why: 'SQUAD FULL' };
+    if (r.kind === 'vehicle' && G.vehicle) return { ok: false, why: 'OWNED' };
     if (!this.canAfford(r.cost)) return { ok: false, why: 'NEED PARTS' };
     return { ok: true };
   },
@@ -159,7 +172,7 @@ const UI = {
   craft(id) {
     const r = RECIPES.find((x) => x.id === id);
     const st = this.recipeState(r);
-    if (!st.ok) { Sound.play('deny'); this.toast(st.why === 'NEED PARTS' ? 'Not enough parts' : st.why === 'SQUAD FULL' ? 'Squad is full — scrap a bot or build a Command Uplink' : 'Already at maximum', true); return; }
+    if (!st.ok) { Sound.play('deny'); this.toast(st.why === 'NEED PARTS' ? 'Not enough parts' : st.why === 'SQUAD FULL' ? 'Squad is full — scrap a bot or build a Command Uplink' : st.why === 'OWNED' ? 'You already own a Skyrider' : 'Already at maximum', true); return; }
     for (const [k, v] of Object.entries(r.cost)) G.inv[k] -= v;
     const p = G.player;
     if (r.kind === 'companion') {
@@ -171,6 +184,9 @@ const UI = {
       if (r.id === 'firmware') G.companions.forEach((c) => (c.hp = c.maxHp));
       if (r.id === 'split') setViewModelBarrels(G.vm, 1 + G.up.split);
       this.toast(`${r.name} installed (${G.up[r.id]}/${r.max})`);
+    } else if (r.kind === 'vehicle') {
+      G.vehicle = new Vehicle();
+      this.toast(`${r.name} built! Press ${Touch.enabled ? 'RIDE' : 'F'} in the field to fly`);
     } else if (r.id === 'repair') { G.repairKits++; this.toast('Repair kit assembled'); }
     else if (r.id === 'cell') { G.cells++; this.toast('Plasma cell charged'); }
     G.total.crafted = (G.total.crafted || 0) + 1;
@@ -219,16 +235,19 @@ const UI = {
       </div>`).join('');
     $('ws-items').innerHTML = `
       <div class="inv-item" style="--c:#6bff9e"><img src="${upgIconURL('repair', '#6bff9e')}" alt=""><div class="inv-info"><div class="inv-name">Repair Kit</div><div class="inv-desc">${Touch.enabled ? 'Repair button' : 'R'} — restore 40 hull</div></div><div class="inv-count">${G.repairKits}</div></div>
-      <div class="inv-item" style="--c:#b98cff"><img src="${upgIconURL('cell', '#b98cff')}" alt=""><div class="inv-info"><div class="inv-name">Plasma Cell</div><div class="inv-desc">Refills grenade charge</div></div><div class="inv-count">${G.cells}</div></div>`;
+      <div class="inv-item" style="--c:#b98cff"><img src="${upgIconURL('cell', '#b98cff')}" alt=""><div class="inv-info"><div class="inv-name">Plasma Cell</div><div class="inv-desc">Refills grenade charge</div></div><div class="inv-count">${G.cells}</div></div>
+      <div class="inv-item ${G.vehicle ? '' : 'empty'}" style="--c:#ffb347"><img src="${vehIconURL()}" alt=""><div class="inv-info"><div class="inv-name">Skyrider</div><div class="inv-desc">${G.vehicle ? `Hull ${Math.ceil(G.vehicle.hp)}/240 · ${Touch.enabled ? 'RIDE' : 'F'} to fly` : 'Craft one in the Vehicles tab'}</div></div><div class="inv-count">${G.vehicle ? 1 : 0}</div></div>
+      <div class="inv-item" style="--c:#3aff9a"><img src="${spriteIconURL()}" alt=""><div class="inv-info"><div class="inv-name">Scrap Sprites</div><div class="inv-desc">Every 3 found = +20 max stamina</div></div><div class="inv-count">${G.spritesFound}</div></div>`;
 
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === this.tab));
 
     const list = RECIPES.filter((r) => r.kind === this.tab);
     $('ws-recipes').innerHTML = list.map((r) => {
       const st = this.recipeState(r);
-      const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.kind === 'upgrade' ? '#3cf2ff' : r.id === 'repair' ? '#6bff9e' : '#b98cff';
-      const icon = r.kind === 'companion' ? compIconURL(r.id) : upgIconURL(r.id, color);
+      const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.kind === 'upgrade' ? '#3cf2ff' : r.kind === 'vehicle' ? '#ffb347' : r.id === 'repair' ? '#6bff9e' : '#b98cff';
+      const icon = r.kind === 'companion' ? compIconURL(r.id) : r.kind === 'vehicle' ? vehIconURL() : upgIconURL(r.id, color);
       let meta = '';
+      if (r.kind === 'vehicle') meta = `<div class="meta">HULL ${G.vehicle ? Math.ceil(G.vehicle.hp) + '/' : ''}240 · TWIN CANNONS${G.vehicle ? ' · <b>OWNED</b>' : ''}</div>`;
       if (r.kind === 'upgrade') meta = `<div class="pips">${Array.from({ length: r.max }, (_, i) => `<i class="${i < G.up[r.id] ? 'on' : ''}"></i>`).join('')}</div>`;
       if (r.kind === 'companion') {
         const d = COMP_DEFS[r.id];
@@ -344,6 +363,23 @@ const UI = {
     $('bar-dash').style.width = (100 * (1 - Math.max(0, p.dashCd) / p.dashMax)) + '%';
     $('val-repair').textContent = Touch.enabled ? `REPAIR ×${G.repairKits}` : `[R] REPAIR ×${G.repairKits}`;
     $('vitals').classList.toggle('low', hk < 0.3);
+    const vr = $('veh-row');
+    vr.classList.toggle('show', !!G.vehicle);
+    if (G.vehicle) {
+      $('bar-veh').style.width = (100 * G.vehicle.hp / G.vehicle.maxHp) + '%';
+      $('val-veh').textContent = G.riding ? 'FLYING' : Touch.enabled ? 'RIDE' : '[F] RIDE';
+    }
+    document.body.classList.toggle('riding', G.riding);
+    // stamina wheel (hidden while full)
+    const stEl = $('stamina');
+    const base = Math.min(p.stamina, 100), extra = Math.max(0, p.stamina - 100), extraMax = p.maxStamina - 100;
+    $('st-fill').style.strokeDasharray = `${base} 100`;
+    stEl.classList.toggle('extra', extraMax > 0);
+    if (extraMax > 0) $('st-fill2').style.strokeDasharray = `${(extra / extraMax) * 100} 100`;
+    if (p.stamina < p.maxStamina - 0.5 || p.exhausted) this.stShowT = 1.2; else this.stShowT = (this.stShowT || 0) - 1 / 60;
+    stEl.classList.toggle('show', this.stShowT > 0 && !G.riding);
+    stEl.classList.toggle('exhausted', p.exhausted);
+    $('focus-vignette').classList.toggle('on', G.focus);
 
     for (const k of PART_ORDER) {
       if (this.counts[k] !== G.inv[k] || force) {
@@ -387,7 +423,7 @@ const UI = {
     $('obj-text').classList.toggle('warn', !!charging && !charging.inside);
     $('obj-prog').style.display = prog >= 0 ? '' : 'none';
     $('obj-prog-fill').style.width = (prog * 100).toFixed(1) + '%';
-    $('obj-kills').textContent = `KILLS ${G.stats.kills}  ·  CACHES ${World.caches.filter((c) => c.opened).length}/${World.caches.length}`;
+    $('obj-kills').textContent = `KILLS ${G.stats.kills}  ·  CACHES ${World.caches.filter((c) => c.opened).length}/${World.caches.length}  ·  SPRITES ${World.sprites.filter((s) => s.found).length}/${World.sprites.length}`;
 
     // boss bar
     const b = G.boss;
@@ -403,7 +439,7 @@ const UI = {
     const pr = $('prompt');
     if (it) {
       const key = Touch.enabled ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
-      pr.innerHTML = it.kind === 'cache' ? `${key} Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache` : `${key} Start beacon uplink`;
+      pr.innerHTML = it.kind === 'cache' ? `${key} Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache` : it.kind === 'launch' ? `${key} Launch skyward` : `${key} Start beacon uplink`;
       pr.classList.add('show');
     } else pr.classList.remove('show');
 
@@ -417,7 +453,8 @@ const UI = {
     for (const b of World.beacons) {
       M.push({ x: b.x, z: b.z, color: b.state === 'done' ? '#6bff9e' : b.state === 'charging' ? Z.accent : '#ffb347', shape: 'diamond', label: true, big: b.state !== 'done' });
     }
-    for (const c of World.caches) if (!c.opened) M.push({ x: c.x, z: c.z, color: c.golden ? '#ffd23f' : '#3cf2ff', shape: 'square', range: 70 });
+    for (const c of World.caches) if (!c.opened) M.push({ x: c.x, z: c.z, color: c.golden ? '#ffd23f' : '#3cf2ff', shape: 'square', range: c.revealed ? 0 : 70 });
+    for (const is of World.islands) M.push({ x: is.x, z: is.z, color: '#dff6ff', shape: 'cloud', range: 160 });
     if (G.objective === 'arena' || G.objective === 'boss' || (G.objective === 'beacons' && false)) M.push({ x: World.arena.x, z: World.arena.z, color: Z.boss.color, shape: 'skull', label: true, big: true });
     if (World.portal) M.push({ x: World.portal.x, z: World.portal.z, color: '#6bff9e', shape: 'ring', label: true, big: true });
     return M;
@@ -457,6 +494,7 @@ const UI = {
       if (m.shape === 'diamond') { g.moveTo(x, y - s); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x - s, y); g.closePath(); g.fill(); }
       else if (m.shape === 'square') { g.fillRect(x - s / 2 - 1, y - s / 2 - 1, s + 2, s + 2); }
       else if (m.shape === 'ring') { g.arc(x, y, s, 0, TAU); g.stroke(); }
+      else if (m.shape === 'cloud') { g.arc(x - 3, y + 1, 3, 0, TAU); g.arc(x + 3, y + 1, 3, 0, TAU); g.arc(x, y - 1.5, 3.6, 0, TAU); g.fill(); }
       else { g.arc(x, y - 1, s, 0, TAU); g.fill(); g.fillStyle = '#05060a'; g.fillRect(x - 3, y - 2, 2, 2); g.fillRect(x + 1, y - 2, 2, 2); }
       if (m.label && !clampd) {
         g.font = '600 11px Rajdhani, sans-serif'; g.fillStyle = m.color;
@@ -500,6 +538,8 @@ const UI = {
     for (const k of G.pickups) dot(k.pos.x, k.pos.z, k.type === 'health' ? '#6bff9e' : PARTS[k.type].color, 1.5);
     for (const c of World.caches) if (!c.opened) dot(c.x, c.z, c.golden ? '#ffd23f' : '#3cf2ff', 2.5);
     for (const b of World.beacons) dot(b.x, b.z, b.state === 'done' ? '#6bff9e' : '#ffb347', 4, true);
+    for (const is of World.islands) dot(is.x, is.z, 'rgba(223,246,255,0.5)', 5);
+    for (const b of World.braziers) dot(b.x, b.z, b.alerted ? '#ff3b5c' : '#ffb347', 1.5);
     for (const s of G.spawns) dot(s.x, s.z, '#ffffff', 2);
     for (const e of G.enemies) dot(e.pos.x, e.pos.z, e.isBoss ? e.color : e.elite ? '#ffd700' : e.aggro ? '#ff3b5c' : '#ff8a6a', e.isBoss ? 5 : e.r > 1.5 ? 3.5 : 2.5, e.isBoss);
     for (const c of G.companions) dot(c.pos.x, c.pos.z, c.d.color, 2);

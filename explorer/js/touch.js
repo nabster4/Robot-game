@@ -61,8 +61,11 @@ const Touch = {
           this.roles.set(t.identifier, { role: 'fire', x: t.clientX, y: t.clientY, el: btn });
           Input.mouse.down = true;
         } else {
-          this.roles.set(t.identifier, { role: 'btn', el: btn });
+          this.roles.set(t.identifier, { role: 'btn', el: btn, k });
           this.press(k);
+          // held buttons: climb/ascend and dive while flying
+          if (k === 'jump') Input.keys.Space = true;
+          if (k === 'descend') Input.keys.KeyC = true;
         }
         continue;
       }
@@ -118,7 +121,11 @@ const Touch = {
       this.roles.delete(t.identifier);
       if (r.role === 'move') this.releaseStick();
       else if (r.role === 'fire') { Input.mouse.down = false; r.el.classList.remove('down'); }
-      else if (r.role === 'btn') r.el.classList.remove('down');
+      else if (r.role === 'btn') {
+        r.el.classList.remove('down');
+        if (r.k === 'jump') Input.keys.Space = false;
+        if (r.k === 'descend') Input.keys.KeyC = false;
+      }
     }
   },
 
@@ -133,12 +140,14 @@ const Touch = {
     this.roles.clear();
     this.releaseStick();
     Input.mouse.down = false;
+    Input.keys.Space = false; Input.keys.KeyC = false;
     this.layer.querySelectorAll('.down').forEach((b) => b.classList.remove('down'));
   },
 
   press(k) {
     if (k === 'pause') { UI.pause(); return; }
-    const map = { jump: 'Space', dash: 'KeyQ', grenade: 'KeyG', use: 'KeyE', repair: 'KeyR', workshop: 'Tab' };
+    if (k === 'view') { UI.toggleView(); return; }
+    const map = { jump: 'Space', dash: 'KeyQ', grenade: 'KeyG', use: 'KeyE', repair: 'KeyR', workshop: 'Tab', ride: 'KeyF' };
     if (map[k]) Input.pressed[map[k]] = true;
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) { /* ignore */ }
   },
@@ -156,7 +165,12 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? (it.kind === 'cache' ? 'OPEN' : 'UPLINK') : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH' })[it.kind] : 'USE';
+    const ride = document.getElementById('tb-ride');
+    ride.classList.toggle('avail', !!G.vehicle);
+    ride.classList.toggle('on', G.riding);
+    ride.querySelector('span').textContent = G.riding ? 'EXIT' : 'RIDE';
+    document.getElementById('tb-jump').querySelector('span').textContent = G.riding ? 'UP' : p.grounded || p.climbing ? 'JUMP' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };
 

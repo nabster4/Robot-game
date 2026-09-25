@@ -335,3 +335,114 @@ function buildPickupModel(type) {
   g.add(glowSprite(c, type === 'quantum' ? 1.6 : 1.1, 1.8));
   return g;
 }
+
+// ═════════════════════════ Player mech (third-person view) ═════════════════════════
+function buildGliderModel(scale = 1) {
+  const g = new THREE.Group();
+  // kite-shaped canopy lying flat (nose toward +Z)
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, 0.18, 0.95, -1.6, 0, -0.25, 0, 0.12, -0.45,
+    0, 0.18, 0.95, 0, 0.12, -0.45, 1.6, 0, -0.25,
+  ], 3));
+  sg.computeVertexNormals();
+  const sail = new THREE.Mesh(sg, Mat.glowT('#3cf2ff', 0.9, 0.55));
+  g.add(sail);
+  const frameM = Mat.std('#1a2a36', { metal: 0.8, rough: 0.3 });
+  const bar = new THREE.Mesh(Geo.box(3.2, 0.05, 0.05), frameM); bar.position.z = -0.2; g.add(bar);
+  for (const s of [-1, 1]) {
+    const tip = new THREE.Mesh(Geo.box(0.05, 0.05, 0.05), Mat.glow('#3cf2ff', 5)); tip.position.set(s * 1.6, 0, -0.25); g.add(tip);
+    const strut = new THREE.Mesh(Geo.cyl(0.015, 0.015, 1.1, 4), frameM); strut.position.set(s * 0.25, -0.5, 0.2); strut.rotation.z = s * 0.25; g.add(strut);
+  }
+  g.scale.setScalar(scale);
+  return g;
+}
+
+function buildAvatarModel() {
+  const g = new THREE.Group();
+  const shell = Mat.std('#3a7c98', { metal: 0.55, rough: 0.4, emissive: '#0e3a4c', ei: 0.5 });
+  const dark = Mat.std('#1a3242', { metal: 0.5, rough: 0.5, emissive: '#081a24', ei: 0.5 });
+  const cyan = Mat.glow('#3cf2ff', 4);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(s * 0.2, 0.9, 0); g.add(hip);
+    mesh(Geo.box(0.2, 0.5, 0.24), shell, 0, -0.22, 0, hip);
+    const knee = new THREE.Group(); knee.position.y = -0.46; hip.add(knee);
+    mesh(Geo.box(0.17, 0.46, 0.2), dark, 0, -0.22, 0, knee);
+    mesh(Geo.box(0.24, 0.1, 0.36), dark, 0, -0.44, 0.06, knee);
+    mesh(Geo.box(0.04, 0.2, 0.02), cyan, s * 0.1, -0.2, 0.1, knee);
+    legs.push({ hip, knee });
+  }
+  const torso = new THREE.Group(); torso.position.y = 1.2; g.add(torso);
+  mesh(Geo.box(0.62, 0.55, 0.4), shell, 0, 0, 0, torso);
+  mesh(Geo.box(0.3, 0.12, 0.03), cyan, 0, 0.08, 0.21, torso);
+  mesh(Geo.box(0.46, 0.5, 0.25), dark, 0, 0.02, -0.3, torso);   // backpack
+  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.36, 0.02), cyan, s * 0.15, 0.04, -0.43, torso);
+  mesh(Geo.box(0.3, 0.04, 0.02), cyan, 0, 0.22, -0.43, torso);
+  const thrusters = [];
+  for (const s of [-1, 1]) {
+    mesh(Geo.cyl(0.07, 0.09, 0.2, 8), dark, s * 0.14, -0.28, -0.36, torso);
+    const t = glowSprite('#3cf2ff', 0.5, 2); t.position.set(s * 0.14, -0.42, -0.36); torso.add(t); thrusters.push(t);
+  }
+  const head = new THREE.Group(); head.position.y = 0.45; torso.add(head);
+  mesh(Geo.box(0.32, 0.26, 0.3), shell, 0, 0.08, 0, head);
+  mesh(Geo.box(0.26, 0.07, 0.04), cyan, 0, 0.1, 0.16, head);
+  mesh(Geo.cyl(0.01, 0.01, 0.3, 4), dark, 0.12, 0.3, -0.08, head);
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(s * 0.42, 0.18, 0); torso.add(sh);
+    mesh(Geo.box(0.22, 0.2, 0.26), shell, 0, 0, 0, sh);
+    mesh(Geo.box(0.14, 0.45, 0.16), dark, 0, -0.28, 0, sh);
+    arms.push(sh);
+  }
+  // blaster held forward in the right hand
+  const gun = new THREE.Group(); gun.position.set(0, -0.45, 0.15); arms[1].add(gun);
+  mesh(Geo.box(0.12, 0.14, 0.55), shell, 0, 0, 0.18, gun);
+  mesh(Geo.box(0.125, 0.03, 0.34), cyan, 0, 0.05, 0.18, gun);
+  const muzzle = new THREE.Object3D(); muzzle.position.z = 0.5; gun.add(muzzle);
+  const flash = glowSprite('#3cf2ff', 0.7, 4); flash.position.z = 0.52; flash.visible = false; gun.add(flash);
+  const glider = buildGliderModel(0.9); glider.position.set(0, 2.35, -0.05); glider.visible = false; g.add(glider);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.userData = { legs, torso, head, arms, gun, muzzle, flash, flashT: 0, glider, thrusters };
+  return g;
+}
+
+// ═════════════════════════ Skyrider (craftable flying vehicle) ═════════════════════════
+function buildSkyriderModel() {
+  const g = new THREE.Group();
+  const body = Mat.std('#2c3e52', { metal: 0.85, rough: 0.28 }).clone();
+  body.emissive = new THREE.Color('#ff5533'); body.emissiveIntensity = 0;
+  const dark = Mat.std('#111a24', { metal: 0.7, rough: 0.4 });
+  const orange = Mat.glow('#ffb347', 4), cyan = Mat.glow('#3cf2ff', 4);
+  const fus = mesh(Geo.cyl(0.42, 0.5, 3.2, 10), body, 0, 0, 0, g); fus.rotation.x = Math.PI / 2;
+  const nose = mesh(Geo.cyl(0.02, 0.42, 1.2, 10), body, 0, 0, 2.2, g); nose.rotation.x = Math.PI / 2;
+  const canopy = mesh(Geo.sphere(0.5, 1), Mat.glowT('#3cf2ff', 0.8, 0.5, THREE.FrontSide), 0, 0.35, 0.7, g); canopy.scale.set(0.75, 0.6, 1.5);
+  for (const s of [-1, 1]) {
+    const w = mesh(Geo.box(2.4, 0.08, 1.3), body, s * 1.45, -0.05, -0.2, g); w.rotation.y = s * 0.28;
+    mesh(Geo.box(0.08, 0.1, 0.9), orange, s * 2.6, -0.02, -0.6, g).rotation.y = s * 0.28;
+    const eng = mesh(Geo.cyl(0.28, 0.32, 1.4, 10), dark, s * 0.95, -0.25, -0.6, g); eng.rotation.x = Math.PI / 2;
+    mesh(Geo.torus(0.26, 0.05, 16), orange, s * 0.95, -0.25, -1.32, g);
+    mesh(Geo.cyl(0.04, 0.05, 1.0, 6), dark, s * 1.35, -0.18, 1.0, g).rotation.x = Math.PI / 2;
+    const fin = mesh(Geo.box(0.06, 0.7, 0.7), body, s * 0.35, 0.45, -1.35, g); fin.rotation.z = s * -0.35;
+  }
+  mesh(Geo.box(0.9, 0.04, 0.05), cyan, 0, 0.02, 1.4, g);
+  const thrusters = [];
+  for (const s of [-1, 1]) { const t = glowSprite('#ffb347', 1.4, 2.5); t.position.set(s * 0.95, -0.25, -1.45); g.add(t); thrusters.push(t); }
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.userData = { bodyMat: body, thrusters };
+  return g;
+}
+
+// ═════════════════════════ Scrap Sprite (hidden collectible) ═════════════════════════
+function buildSpriteModel() {
+  const g = new THREE.Group();
+  const leaf = Mat.std('#3aff9a', { metal: 0.2, rough: 0.4, emissive: '#3aff9a', ei: 0.9 });
+  mesh(Geo.sphere(0.24, 1), Mat.std('#2a4a3a', { metal: 0.5, rough: 0.3 }), 0, 0, 0, g);
+  mesh(Geo.sphere(0.07, 0), Mat.glow('#ffffff', 4), -0.08, 0.05, 0.2, g);
+  mesh(Geo.sphere(0.07, 0), Mat.glow('#ffffff', 4), 0.08, 0.05, 0.2, g);
+  const stem = mesh(Geo.cyl(0.015, 0.015, 0.3, 4), leaf, 0, 0.35, 0, g);
+  const l = mesh(Geo.oct(0.14), leaf, 0.06, 0.52, 0, g); l.scale.set(1.3, 0.35, 0.8); l.rotation.z = -0.4;
+  g.add(glowSprite('#3aff9a', 1.4, 1.6));
+  void stem;
+  return g;
+}

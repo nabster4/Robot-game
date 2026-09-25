@@ -159,6 +159,8 @@ const RECIPES = [
   { id: 'firmware',  kind: 'upgrade', name: 'Squad Firmware',      desc: '+30% companion damage and hull.', max: 3, cost: { circuit: 4, quantum: 1 } },
   { id: 'slot',      kind: 'upgrade', name: 'Command Uplink',      desc: '+1 companion slot.', max: 2, cost: { circuit: 3, core: 2, quantum: 1 } },
 
+  { id: 'skyrider', kind: 'vehicle', name: 'Skyrider', desc: 'Jet glider with twin plasma cannons. Press F (or RIDE) to deploy and fly; it takes the hits for you. If it is destroyed you are thrown clear.', cost: { scrap: 10, servo: 4, wire: 4, core: 3 } },
+
   { id: 'repair', kind: 'item', name: 'Repair Kit',  desc: 'Use in the field to restore 40 hull.', cost: { scrap: 3, wire: 2 } },
   { id: 'cell',   kind: 'item', name: 'Plasma Cell', desc: 'Instantly recharges your plasma grenade when it is empty.', cost: { core: 1, wire: 1 } },
 ];

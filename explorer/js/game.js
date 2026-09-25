@@ -25,7 +25,7 @@ function resize() {
   post.setSize(W, H, DPR);
 }
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c3 = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c3 = new THREE.Vector3(), _cv = new THREE.Vector3();
 const boltGeo = new THREE.BoxGeometry(0.07, 0.07, 1.4);
 const bulletGeo = new THREE.IcosahedronGeometry(1, 1);
 const missileGeo = (() => { const g = new THREE.CylinderGeometry(0.07, 0.09, 0.5, 6); g.rotateX(Math.PI / 2); return g; })();
@@ -34,7 +34,8 @@ const missileGeo = (() => { const g = new THREE.CylinderGeometry(0.07, 0.09, 0.5
 const G = {
   state: 'menu',
   level: 0, time: 0, timeScale: 1,
-  settings: { sens: 1, invert: false, quality: 'high' },
+  settings: { sens: 1, invert: false, quality: 'high', view: 'first' },
+  riding: false, vehicle: null, vessels: 0, spritesFound: 0, updrafts: [], focus: false,
   scene, camera,
   player: null,
   enemies: [], bullets: [], ebullets: [], pickups: [], spawns: [], companions: [],
@@ -143,21 +144,24 @@ const G = {
     this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: 5, mesh: m, hugH });
   },
 
-  muzzleWorld() { return this.vm.userData.muzzle.getWorldPosition(_b); },
+  get thirdPerson() { return this.settings.view === 'third' || this.riding; },
+  muzzleWorld() { return (this.thirdPerson ? this.avatar.userData.muzzle : this.vm.userData.muzzle).getWorldPosition(_b); },
 
   aimPoint() {
     const o = camera.getWorldPosition(_a).clone();
     const d = camera.getWorldDirection(_c3).clone();
     let best = 220;
+    // in third person the ray starts at the camera; skip the stretch behind the player
+    const t0 = this.thirdPerson ? Math.max(1, o.distanceTo(_cv.set(this.player.pos.x, this.player.pos.y + 1.4, this.player.pos.z)) - 0.5) : 1;
     for (const e of this.enemies) {
       const cx = e.pos.x - o.x, cy = e.cy - o.y, cz = e.pos.z - o.z;
       const t = cx * d.x + cy * d.y + cz * d.z;
-      if (t < 0 || t > best) continue;
+      if (t < t0 || t > best) continue;
       const r = e.r + 0.2;
       const dd = cx * cx + cy * cy + cz * cz - t * t;
       if (dd < r * r) best = Math.min(best, t - Math.sqrt(r * r - dd));
     }
-    for (let t = 1; t < best; t += 1.2) {
+    for (let t = t0; t < best; t += 1.2) {
       if (World.solidAt(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t)) { best = t; break; }
     }
     return o.addScaledVector(d, Math.max(best, 3));
@@ -218,6 +222,9 @@ function newRun() {
   G.inv.scrap = 2; G.inv.wire = 1;
   G.up = { armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 };
   G.repairKits = 1; G.cells = 0;
+  G.vessels = 0; G.spritesFound = 0;
+  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
+  G.vehicle = null; G.riding = false;
   G.companions.forEach((c) => c.destroy());
   G.companions = [];
   G.player = new Player();
@@ -226,7 +233,8 @@ function newRun() {
 }
 
 function takeSnapshot() {
-  G.snapshot = JSON.stringify({ inv: G.inv, up: G.up, repairKits: G.repairKits, cells: G.cells, comps: G.companions.map((c) => c.kind), hp: G.player.hp, total: G.total });
+  G.snapshot = JSON.stringify({ inv: G.inv, up: G.up, repairKits: G.repairKits, cells: G.cells, comps: G.companions.map((c) => c.kind), hp: G.player.hp, total: G.total,
+    veh: G.vehicle ? G.vehicle.hp : null, vessels: G.vessels, spritesFound: G.spritesFound });
 }
 function restoreSnapshot() {
   const s = JSON.parse(G.snapshot);
@@ -234,25 +242,39 @@ function restoreSnapshot() {
   G.companions.forEach((c) => c.destroy());
   G.player = new Player(); G.player.hp = s.hp;
   G.companions = s.comps.map((k) => new Companion(k));
+  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
+  G.riding = false;
+  G.vehicle = s.veh !== null && s.veh !== undefined ? new Vehicle(s.veh) : null;
+  G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
 }
 
+// A camp: a group of robots hanging out around a scrap brazier. They leave you alone
+// until you attack one of them (or start an uplink nearby).
 function spawnCamp(x, z, n, aggro = false) {
   const pool = ZONES[G.level].pool;
+  const camp = World.buildBrazier(x, z);
+  G.updrafts.push({ x, z, y: camp.y, r: 3.2 });
   for (let i = 0; i < n; i++) {
     const type = weighted(pool);
     const elite = G.level > 0 && Math.random() < 0.06 * G.level;
     const k = type === 'swarmer' ? 3 : 1;
     for (let j = 0; j < k; j++) {
-      const ex = x + rand(-6, 6), ez = z + rand(-6, 6);
+      const a = rand(0, TAU), r = rand(2.8, 6);
+      const ex = x + Math.cos(a) * r, ez = z + Math.sin(a) * r;
       if (World.inHazard(ex, ez)) continue;
-      G.enemies.push(new Enemy(type, ex, ez, elite && j === 0, aggro));
+      const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp);
+      e.facing = Math.atan2(x - ex, z - ez);
+      G.enemies.push(e);
     }
   }
+  return camp;
 }
 
 function startZone(i) {
+  if (G.riding && G.vehicle) G.vehicle.dock();
   clearEntities();
   World.dispose();
+  G.updrafts = [];
   G.level = i;
   const Z = ZONES[i];
   World.build(scene, Z, i);
@@ -262,16 +284,17 @@ function startZone(i) {
   p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
   p.pitch = -0.05;
   p.dead = false; p.invuln = 2; p.energy = 100; p.dashCd = 0;
+  p.gliding = false; p.climbing = null; p.stamina = p.maxStamina; p.exhausted = false;
   p.hp = Math.min(p.hp, p.maxHp);
   setViewModelBarrels(G.vm, 1 + G.up.split);
   G.companions.forEach((c) => { c.offline = 0; c.hp = c.maxHp; c.pos.set(p.pos.x + rand(-2, 2), p.pos.y + 2, p.pos.z + rand(-2, 2)); c.target = null; c.attach(); c.model.rotation.z = 0; c.model.userData.parts.halo.visible = true; });
 
   // roaming machine camps
-  const camps = 7 + i * 2;
+  const camps = 8 + i * 2;
   for (let c = 0; c < camps; c++) {
-    const at = World.randomClear(4, 40);
+    const at = World.randomClear(7, 40);
     if (!at || Math.hypot(at[0] - World.spawn.x, at[1] - World.spawn.z) < 55) continue;
-    spawnCamp(at[0], at[1], randi(2, 3 + Math.floor(i / 2)));
+    spawnCamp(at[0], at[1], randi(3, 4 + Math.floor(i / 2)));
   }
 
   G.objective = 'beacons';
@@ -283,9 +306,11 @@ function startZone(i) {
   Weather.init(scene, Z.ambient, Z.accent);
   G.state = 'playing';
   Sound.setIntensity(0);
+  Sound.setZone(i);
   UI.hideAll();
   UI.banner(`ZONE ${i + 1} · ${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
   setTimeout(() => { if (G.level === i && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
+  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robot camps leave you alone unless you attack them'); }, 11000);
   UI.refreshHUD(true);
 }
 
@@ -304,6 +329,13 @@ function nextInteractable() {
       if (d < 5.5 && d < bd) { bd = d; best = { kind: 'beacon', obj: b }; }
     }
   }
+  if (!G.riding) {
+    for (const b of World.beacons) {
+      if (b.state !== 'done') continue;
+      const d = Math.hypot(b.x - p.pos.x, b.z - p.pos.z);
+      if (d < 5.5 && d < bd && Math.abs(p.pos.y - b.y) < 3) { bd = d; best = { kind: 'launch', obj: b }; }
+    }
+  }
   return best;
 }
 
@@ -320,8 +352,29 @@ function openCache(c) {
   UI.feed(c.golden ? 'Golden cache opened!' : 'Salvage cache opened', c.golden ? '#ffd23f' : '#3cf2ff');
 }
 
+function launchFrom(b) {
+  const p = G.player;
+  p.pos.x = b.x + 1.5; p.pos.z = b.z;
+  p.vel.set(0, 52, 0);
+  p.grounded = false; p.gliding = false; p.launchT = 2.2;
+  p.stamina = p.maxStamina; p.exhausted = false;
+  Fx.shockRing(b.x, b.y + 0.6, b.z, '#6bff9e', 4, 60);
+  Fx.explosion(b.x, b.y + 1, b.z, '#6bff9e', 0.8);
+  Sound.play('launch');
+  // the view from up high reveals nearby caches on the compass
+  let n = 0;
+  for (const c of World.caches) if (!c.opened && !c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < 170) { c.revealed = true; n++; }
+  UI.banner('SKY LAUNCH', n ? `${n} salvage caches revealed on your compass` : 'Open your glider in mid-air', '#6bff9e', 2.4);
+  UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — sky islands hold golden caches`);
+}
+
 function startUplink(b) {
   b.state = 'charging'; b.progress = 0; b.spawnT = 1.5;
+  // the uplink signal draws every robot in the area
+  for (const e of G.enemies) {
+    if (e.isBoss || e.dead) continue;
+    if (Math.hypot(e.pos.x - b.x, e.pos.z - b.z) < 110) { e.aggro = true; e.hunter = true; }
+  }
   World.setBeaconColor(b, ZONES[G.level].accent);
   Sound.play('uplink');
   UI.banner('UPLINK STARTED', 'Stay inside the ring and defend the beacon', ZONES[G.level].accent, 2.6);
@@ -351,6 +404,8 @@ function updateObjectives(dt) {
       }
       if (b.progress >= 1) {
         b.state = 'done';
+        for (const e of G.enemies) e.hunter = false;
+        setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
         World.setBeaconColor(b, '#6bff9e', 5);
         Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
         Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
@@ -380,7 +435,8 @@ function updateObjectives(dt) {
     }
   } else if (G.objective === 'extract' && World.portal) {
     const P = World.portal;
-    if (Math.hypot(p.pos.x - P.x, p.pos.z - P.z) < 2.8 && !p.dead) {
+    if (Math.hypot(p.pos.x - P.x, p.pos.z - P.z) < 2.8 && Math.abs(p.pos.y - P.y) < 6 && !p.dead) {
+      if (G.riding && G.vehicle) G.vehicle.dock();
       G.objective = 'done';
       G.levelDone = true;
       Sound.play('portal');
@@ -398,18 +454,43 @@ function updateObjectives(dt) {
   if (G.objective === 'beacons' || G.objective === 'arena') {
     G.reinforceT -= dt;
     if (G.reinforceT <= 0) {
-      G.reinforceT = Math.max(24, 48 - G.level * 4);
+      G.reinforceT = Math.max(45, 75 - G.level * 5);
       if (G.enemies.length < 24 + G.level * 4) {
         for (let tries = 0; tries < 10; tries++) {
-          const a = rand(0, TAU), r = rand(45, 60);
+          const a = rand(0, TAU), r = rand(80, 120);
           const x = p.pos.x + Math.cos(a) * r, z = p.pos.z + Math.sin(a) * r;
-          if (Math.abs(x) > World.half * 0.75 || Math.abs(z) > World.half * 0.75 || World.inHazard(x, z)) continue;
+          if (Math.abs(x) > World.half * 0.72 || Math.abs(z) > World.half * 0.72 || !World.isClear(x, z, 6)) continue;
           spawnCamp(x, z, randi(2, 3), false);
           break;
         }
       }
     }
   }
+}
+
+function toggleVehicle() {
+  if (G.riding && G.vehicle) { G.vehicle.dock(); return; }
+  if (!G.vehicle) { UI.feed('No Skyrider — craft one in the Workshop (Vehicles tab)', '#ffb347'); Sound.play('deny'); return; }
+  if (G.player.climbing) return;
+  G.vehicle.deploy();
+}
+
+function collectSprite(sp) {
+  sp.found = true;
+  sp.model.visible = false;
+  G.spritesFound++;
+  Fx.shockRing(sp.x, sp.y, sp.z, '#3aff9a', 1.5, 30);
+  for (let i = 0; i < 20; i++) Fx.spark(sp.x, sp.y, sp.z, rand(-1, 1), rand(0.2, 1.5), rand(-1, 1), rand(2, 6), pick(['#3aff9a', '#ffffff', '#ffd23f']), 0.8, 0.12, 4);
+  Sound.play('sprite');
+  const left = World.sprites.filter((s) => !s.found).length;
+  if (G.spritesFound % 3 === 0) {
+    G.vessels++;
+    G.player.stamina = G.player.maxStamina;
+    UI.banner('STAMINA VESSEL', `Beep-boop! Max stamina is now ${G.player.maxStamina}`, '#3aff9a', 3);
+  } else {
+    UI.banner('BEEP-BOOP!', `You found a Scrap Sprite · ${3 - (G.spritesFound % 3)} more for a stamina vessel`, '#3aff9a', 2.4);
+  }
+  UI.feed(`Scrap Sprite found (${left} left in this zone)`, '#3aff9a');
 }
 
 // ═════════════════════════ Update ═════════════════════════
@@ -428,13 +509,23 @@ function update(dt) {
       return;
     }
   } else if (!p.dead && !G.levelDone) {
+    if (Input.hit('KeyF')) toggleVehicle();
+    if (Input.hit('KeyV')) UI.toggleView();
     p.update(dt);
+    if (G.riding && G.vehicle) G.vehicle.update(dt);
     if (Input.hit('KeyE')) {
       const it = nextInteractable();
       if (it && it.kind === 'cache') openCache(it.obj);
       else if (it && it.kind === 'beacon') startUplink(it.obj);
+      else if (it && it.kind === 'launch') launchFrom(it.obj);
+    }
+    // Scrap Sprites (hidden collectibles)
+    for (const sp of World.sprites) {
+      if (sp.found) continue;
+      if (Math.hypot(sp.x - p.pos.x, sp.y - (p.pos.y + 0.8), sp.z - p.pos.z) < 1.7) collectSprite(sp);
     }
   }
+  if (G.vehicle && !G.riding) G.vehicle.hp = Math.min(G.vehicle.maxHp, G.vehicle.hp + 4 * dt);
 
   updateObjectives(dt);
 
@@ -454,7 +545,9 @@ function update(dt) {
         Fx.addShake(0.8);
         Sound.play('explode', true);
       } else {
-        G.enemies.push(new Enemy(s.type, s.x, s.z, s.elite, s.aggro));
+        const e = new Enemy(s.type, s.x, s.z, s.elite, s.aggro);
+        if (World.beacons.some((b) => b.state === 'charging')) e.hunter = true;
+        G.enemies.push(e);
         Fx.shockRing(s.x, s.y + 0.5, s.z, ENEMY_TYPES[s.type].color, 1.5, 20);
       }
     }
@@ -629,6 +722,10 @@ function updateEnemyBullets(dt) {
       }
     }
     if (b.dead || p.dead) continue;
+    if (G.riding && G.vehicle) {
+      if (b.pos.distanceTo(G.vehicle.pos) < 1.7 + b.r) { b.dead = true; G.vehicle.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); }
+      continue;
+    }
     if (segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, b.pos.x, b.pos.y, b.pos.z) < 0.45 + b.r) {
       b.dead = true;
       if (p.dashT <= 0) p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z });
@@ -653,7 +750,7 @@ function updatePickups(dt) {
     } else {
       k.vel.y -= 20 * dt;
       k.pos.addScaledVector(k.vel, dt);
-      const gy = Math.max(World.heightAt(k.pos.x, k.pos.z), World.hazardLevel) + 0.45;
+      const gy = Math.max(World.groundAt(k.pos.x, k.pos.z, k.pos.y), World.hazardLevel) + 0.45;
       if (k.pos.y < gy) { k.pos.y = gy; k.vel.y = Math.abs(k.vel.y) * 0.3; k.vel.x *= 0.7; k.vel.z *= 0.7; }
     }
     k.model.position.set(k.pos.x, k.pos.y + Math.sin(G.time * 3 + k.bob) * 0.1, k.pos.z);
@@ -675,38 +772,107 @@ function updatePickups(dt) {
   G.pickups = G.pickups.filter((k) => !k.dead);
 }
 
-// ═════════════════════════ Camera & view model ═════════════════════════
+// ═════════════════════════ Camera, view model & avatar ═════════════════════════
 G.vm = buildViewModel();
 camera.add(G.vm);
 G.vm.position.set(0.2, -0.19, -0.46);
 G.vm.scale.setScalar(0.7);
-let swayX = 0, swayY = 0;
+// first-person glider canopy overhead
+G.fpGlider = buildGliderModel(0.75);
+G.fpGlider.rotation.set(0.12, Math.PI, 0);
+G.fpGlider.position.set(0, 0.95, -0.35);
+G.fpGlider.visible = false;
+camera.add(G.fpGlider);
+// third-person mech
+G.avatar = buildAvatarModel();
+G.avatar.visible = false;
+scene.add(G.avatar);
+let swayX = 0, swayY = 0, camDist = 4.2;
+
+function updateAvatar(dt) {
+  const p = G.player, a = G.avatar, U = a.userData;
+  const show = G.thirdPerson && !p.dead && G.state !== 'menu';
+  a.visible = show;
+  if (!show) return;
+  const riding = G.riding && G.vehicle;
+  if (riding) a.position.set(G.vehicle.pos.x, G.vehicle.pos.y - 0.55, G.vehicle.pos.z);
+  else a.position.copy(p.pos);
+  a.rotation.set(riding ? -p.pitch * 0.6 : 0, p.yaw + Math.PI, riding ? G.vehicle.bank : 0, 'YXZ');
+  const sw = Math.sin(p.walk * 2.2) * 0.7 * p.bobAmt;
+  const air = !p.grounded && !riding;
+  U.legs.forEach((l, i) => {
+    const s = i ? 1 : -1;
+    if (riding) { l.hip.rotation.x = -1.3; l.knee.rotation.x = 1.4; }
+    else if (p.climbing) { l.hip.rotation.x = -0.5 + Math.sin(p.walk * 3 + i * Math.PI) * 0.4; l.knee.rotation.x = 0.8; }
+    else if (p.gliding) { l.hip.rotation.x = 0.35 + Math.sin(G.time * 3 + i) * 0.08; l.knee.rotation.x = 0.3; }
+    else if (air) { l.hip.rotation.x = -0.5 * (i ? 1 : 0.4); l.knee.rotation.x = 0.9; }
+    else { l.hip.rotation.x = sw * s; l.knee.rotation.x = Math.max(0, -sw * s) * 0.9; }
+  });
+  const [la, ra] = U.arms;
+  if (p.gliding || p.climbing) {
+    const c = p.climbing ? Math.sin(p.walk * 3) * 0.3 : 0;
+    la.rotation.set(-Math.PI + 0.15 + c, 0, 0.1); ra.rotation.set(-Math.PI + 0.15 - c, 0, -0.1);
+  } else {
+    ra.rotation.set(-Math.PI / 2 - p.pitch, 0, 0);            // aiming arm follows the view
+    la.rotation.set(riding ? -1.2 : -sw * 0.6, 0, 0.1);
+  }
+  U.torso.rotation.x = p.gliding ? 0.25 : 0;
+  U.head.rotation.x = -p.pitch * 0.5;
+  U.glider.visible = p.gliding;
+  const thrust = air || p.dashT > 0 ? 1.4 : 0.5;
+  for (const t of U.thrusters) t.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
+  if (U.flashT > 0) { U.flashT -= dt; U.flash.visible = U.flashT > 0; } else U.flash.visible = false;
+}
 
 function updateCamera(dt) {
   const p = G.player;
   const shake = Fx.shake * Fx.shake;
+  updateAvatar(dt);
   if (p.dead) {
     const k = Math.min(1, (2.4 - G.dying) / 1.5);
     camera.position.set(p.pos.x, p.pos.y + lerp(p.eye, 0.4, k), p.pos.z);
     camera.rotation.set(p.pitch * (1 - k) - 0.2 * k, p.yaw, k * 0.6);
-    G.vm.visible = false;
+    G.vm.visible = false; G.fpGlider.visible = false;
     return;
   }
-  G.vm.visible = true;
+  const third = G.thirdPerson;
+  G.vm.visible = !third;
+  G.fpGlider.visible = !third && p.gliding;
   const bobY = Math.sin(p.bob * 2) * 0.045 * p.bobAmt;
   const bobX = Math.cos(p.bob) * 0.03 * p.bobAmt;
-  camera.position.set(p.pos.x + rand(-1, 1) * shake * 0.25, p.pos.y + p.eye + bobY - p.land * 0.25 + rand(-1, 1) * shake * 0.25, p.pos.z + rand(-1, 1) * shake * 0.25);
-  camera.rotation.set(p.pitch + rand(-1, 1) * shake * 0.02, p.yaw, bobX * 0.3);
-  const sprint = (Input.key('ShiftLeft') || Input.key('ShiftRight')) && Math.hypot(p.vel.x, p.vel.z) > p.speed * 1.2;
+  if (third) {
+    // over-the-shoulder follow camera (chase camera while flying) that stays out of walls
+    const riding = G.riding && G.vehicle;
+    const fx = -Math.sin(p.yaw) * Math.cos(p.pitch), fy = Math.sin(p.pitch), fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+    const px = (riding ? G.vehicle.pos.x : p.pos.x + rx * 0.6);
+    const py = riding ? G.vehicle.pos.y + 1.8 : p.pos.y + 1.6;
+    const pz = (riding ? G.vehicle.pos.z : p.pos.z + rz * 0.6);
+    const want = riding ? 9 : 4.3;
+    let d = want;
+    for (let t = 0.4; t <= want; t += 0.35) {
+      const cx = px - fx * t, cy = py - fy * t, cz = pz - fz * t;
+      if (World.solidAt(cx, cy - 0.35, cz)) { d = Math.max(0.6, t - 0.4); break; }
+    }
+    camDist = d < camDist ? d : lerp(camDist, d, 1 - Math.exp(-4 * dt));
+    let cx = px - fx * camDist, cy = py - fy * camDist, cz = pz - fz * camDist;
+    cy = Math.max(cy, World.heightAt(cx, cz) + 0.5);
+    camera.position.set(cx + rand(-1, 1) * shake * 0.3, cy + rand(-1, 1) * shake * 0.3, cz + rand(-1, 1) * shake * 0.3);
+    camera.rotation.set(p.pitch + rand(-1, 1) * shake * 0.02, p.yaw, 0);
+  } else {
+    camera.position.set(p.pos.x + rand(-1, 1) * shake * 0.25, p.pos.y + p.eye + bobY - p.land * 0.25 + rand(-1, 1) * shake * 0.25, p.pos.z + rand(-1, 1) * shake * 0.25);
+    camera.rotation.set(p.pitch + rand(-1, 1) * shake * 0.02, p.yaw, bobX * 0.3);
+  }
+  const fast = Math.hypot(p.vel.x, p.vel.z) > p.speed * 1.2;
   G.fov.kick = Math.max(0, G.fov.kick - dt * 40);
-  const target = G.fov.base + (sprint ? 8 : 0) + G.fov.kick;
+  const target = G.fov.base + (fast ? 8 : 0) + G.fov.kick - (G.focus ? 10 : 0);
   G.fov.cur = lerp(G.fov.cur, target, 1 - Math.exp(-8 * dt));
   if (Math.abs(camera.fov - G.fov.cur) > 0.01) { camera.fov = G.fov.cur; camera.updateProjectionMatrix(); }
   // weapon sway / recoil
   swayX = lerp(swayX, clamp(-Input.mouse.dx * 0.0006, -0.05, 0.05), 1 - Math.exp(-10 * dt));
   swayY = lerp(swayY, clamp(Input.mouse.dy * 0.0006, -0.05, 0.05), 1 - Math.exp(-10 * dt));
   const vm = G.vm;
-  vm.position.set(0.2 + bobX * 0.6 + swayX, -0.19 + bobY * 0.6 + swayY - p.land * 0.05, -0.46 + p.recoil * 0.06);
+  vm.position.set(0.2 + bobX * 0.6 + swayX, -0.19 + bobY * 0.6 + swayY - p.land * 0.05 - (p.gliding || p.climbing ? 0.25 : 0), -0.46 + p.recoil * 0.06);
   vm.rotation.set(p.recoil * 0.12, swayX * 2, 0);
   if (vm.userData.flashT > 0) { vm.userData.flashT -= dt; if (vm.userData.flashT <= 0) vm.userData.flash.visible = false; }
 }
@@ -723,7 +889,8 @@ function frame(now) {
     if (Input.hit('Tab') || Input.hit('KeyI')) UI.openWorkshop('field');
     else if (Input.hit('Escape') || Input.hit('KeyP')) UI.pause();
     else {
-      G.timeScale += (1 - G.timeScale) * (1 - Math.exp(-(G.dying > 0 ? 0.5 : 2) * dt));
+      const tsTarget = G.focus && G.dying <= 0 ? 0.4 : 1;
+      G.timeScale += (tsTarget - G.timeScale) * (1 - Math.exp(-(G.dying > 0 ? 0.5 : G.focus ? 8 : 2) * dt));
       const sdt = dt * G.timeScale;
       update(sdt);
       if (G.state === 'playing' || G.state === 'gameover') updateCamera(sdt);
@@ -758,6 +925,10 @@ function frame(now) {
 }
 
 function initMenuScene() {
+  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
+  G.riding = false; G.focus = false;
+  if (G.avatar) G.avatar.visible = false;
+  if (G.fpGlider) G.fpGlider.visible = false;
   clearEntities();
   World.dispose();
   G.level = 0;

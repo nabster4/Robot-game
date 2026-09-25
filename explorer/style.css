@@ -544,3 +544,30 @@ body.touch .dmg-arc { left: -80px; top: -80px; width: 160px; height: 160px; }
   .ws-col.craft { order: -1; }
   .inv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
 }
+
+/* ─────────── Zelda-style stamina wheel, focus, vehicle bar ─────────── */
+#stamina { position: absolute; left: calc(50% + 46px); top: calc(50% - 30px); width: 44px; height: 44px; opacity: 0; transition: opacity .4s; transform: rotate(-90deg); }
+#stamina.show { opacity: 1; }
+#stamina circle { fill: none; stroke-linecap: round; }
+#stamina .st-bg { stroke: rgba(0,0,0,0.45); stroke-width: 5; }
+#stamina .st-fill { stroke: #6bff9e; stroke-width: 5; stroke-dasharray: 100 100; filter: drop-shadow(0 0 4px rgba(107,255,158,0.8)); transition: stroke .2s; }
+#stamina .st-extra { stroke: rgba(0,0,0,0.35); stroke-width: 3; display: none; }
+#stamina .st-fill2 { stroke: #b8ffd4; stroke-width: 3; stroke-dasharray: 0 100; display: none; }
+#stamina.extra .st-extra, #stamina.extra .st-fill2 { display: block; }
+#stamina.exhausted .st-fill { stroke: #ff5a5a; filter: drop-shadow(0 0 4px rgba(255,90,90,0.8)); }
+#stamina.exhausted { animation: blink .35s infinite alternate; }
+#focus-vignette { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(20,120,110,0.35) 100%); }
+#focus-vignette.on { opacity: 1; }
+#veh-row { display: none; }
+#veh-row.show { display: flex; }
+.lbl.veh, .val.veh { color: #ffc27a; }
+.track i.veh { --c: #ffb347; }
+.tbtn.ride { width: 56px; height: 56px; right: calc(222px + env(safe-area-inset-right)); bottom: 186px; color: #ffe0b0; border-color: rgba(255,179,71,0.6); display: none; }
+.tbtn.ride.avail { display: flex; }
+.tbtn.ride.on { background: rgba(255,179,71,0.35); }
+.tbtn.dive { width: 52px; height: 52px; right: calc(131px + env(safe-area-inset-right)); bottom: 172px; display: none; }
+body.riding .tbtn.dive { display: flex; }
+body.riding .tbtn.use, body.riding .tbtn.dash { opacity: 0.35; }
+#tb-view { right: calc(118px + env(safe-area-inset-right)); }
+body.touch #stamina { left: calc(50% + 36px); width: 36px; height: 36px; top: calc(50% - 24px); }
