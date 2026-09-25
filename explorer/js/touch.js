@@ -34,7 +34,10 @@ const Touch = {
 
   // Fullscreen + landscape lock where the browser allows it (Android Chrome; iOS ignores it gracefully).
   goFullscreen() {
-    if (!this.enabled || document.fullscreenElement) return;
+    if (!this.enabled) return;
+    // keep the screen awake while playing (optional; ignored where not allowed)
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* ignore */ }
+    if (document.fullscreenElement) return;
     const el = document.documentElement;
     const req = el.requestFullscreen || el.webkitRequestFullscreen;
     if (!req) return;
