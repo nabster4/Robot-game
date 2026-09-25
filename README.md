@@ -49,7 +49,15 @@ right-click or `G` plasma grenade · `E` interact or launch · `F` Skyrider · `
 - The game asks you to rotate to landscape, goes fullscreen where the browser allows it, and pauses when you switch apps.
 - Add `?touch=1` or `?touch=0` to the URL to force touch controls on or off.
 
-To play on a phone, the files need to be served over the web, for example with GitHub Pages
+**Easiest way to play on a phone or tablet:** download **`Scrapforge-3D.html`** from the repo root
+(or take it out of the downloaded zip), then open it on the device with Chrome or Samsung Internet.
+It's one self-contained file, with the styles, game code and 3D library built in, so it works when opened
+straight from the Downloads folder. (Opening `explorer/index.html` that way shows only unstyled text,
+because mobile browsers can't load the files beside it. The root `index.html` is the original 2D game,
+which has no touch controls.) The first launch needs internet only for the fonts, and it falls back
+to built-in fonts offline. Rebuild the file after changing the game with `python3 tools/build_standalone.py`.
+
+Alternatively, serve the files over the web, for example with GitHub Pages
 (repo Settings → Pages → deploy from this branch) and then opening `…/explorer/`.
 On iOS, "Add to Home Screen" gives a fullscreen, app-like launch.
 
