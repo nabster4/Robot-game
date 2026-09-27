@@ -5,7 +5,7 @@ const Sound = (() => {
   let muted = false;
   let volMul = 1;
   const last = {};
-  const gaps = { step: 110, chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
+  const gaps = { jet: 120, coin: 40, step: 110, chirp: 400, alarm: 600, shoot: 45, hit: 35, enemyShoot: 70, explode: 45, pickup: 35, zap: 60, block: 50, heal: 350, laser: 250, missile: 90, click: 30 };
 
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -86,6 +86,12 @@ const Sound = (() => {
     deploy(t) { tone(t, 180, 0.5, 'sawtooth', 0.08, 520); noise(t, 0.5, 0.18, 1200, 'bandpass', 3000); },
     alarm(t) { for (let i = 0; i < 3; i++) tone(t + i * 0.16, 880, 0.12, 'square', 0.05, 660); },
     chirp(t) { const f = rand(900, 1500); tone(t, f, 0.07, 'square', 0.02, f * 1.4); tone(t + 0.09, f * 1.2, 0.07, 'square', 0.02, f * 0.8); },
+    jet(t) { noise(t, 0.35, 0.16, 500, 'bandpass', 1400); tone(t, 90, 0.3, 'sawtooth', 0.03, 140); },
+    freeze(t) { noise(t, 0.6, 0.2, 5000, 'highpass', 9000); [1568, 1318, 1046].forEach((f, i) => tone(t + i * 0.05, f, 0.3, 'sine', 0.05)); },
+    coin(t) { tone(t, 1318, 0.06, 'square', 0.04); tone(t + 0.06, 1760, 0.12, 'square', 0.04); },
+    buy(t) { [784, 988, 1318].forEach((f, i) => tone(t + i * 0.06, f, 0.18, 'triangle', 0.08)); noise(t, 0.1, 0.06, 6000, 'highpass'); },
+    rifle(t) { tone(t, 2200, 0.18, 'sawtooth', 0.05, 300); noise(t, 0.08, 0.1, 5000, 'highpass'); },
+    scatter(t) { noise(t, 0.25, 0.3, 1800, 'lowpass', 300); tone(t, 180, 0.15, 'square', 0.06, 70); },
     slam(t) { noise(t, 0.9, 0.6, 500, 'lowpass', 40); tone(t, 55, 0.9, 'sine', 0.5, 25); },
   };
 

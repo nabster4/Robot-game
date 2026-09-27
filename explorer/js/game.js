@@ -36,6 +36,12 @@ const G = {
   level: 0, time: 0, timeScale: 1,
   settings: { sens: 1, invert: false, quality: 'high', view: 'first' },
   riding: false, vehicle: null, vessels: 0, spritesFound: 0, updrafts: [], focus: false,
+  where: 'hub',                 // 'hub' (home base) or 'biome'
+  bar: [], sel: 0, weapon: 'blaster',   // Minecraft-style hotbar: one item per slot
+  storage: {}, bucks: 0,        // unlimited storage at home · Botbucks
+  gear: { jetpack: false, fireboots: false, backpack: 0 },
+  base: { shield: false, charger: 0 },
+  progress: { unlocked: 0, beaten: [false, false, false, false, false] },
   scene, camera,
   player: null,
   enemies: [], bullets: [], ebullets: [], pickups: [], spawns: [], companions: [],
@@ -46,6 +52,76 @@ const G = {
   reinforceT: 40, musicT: 0,
 
   get slots() { return 3 + this.up.slot; },
+  get barSize() { return 9 + 3 * this.gear.backpack; },
+
+  // ─── hotbar & storage helpers. Items: { t: 'part'|'weapon'|'supply', id } ───
+  itemKey(it) { return it.t + ':' + it.id; },
+  countItem(t, id) { return this.bar.reduce((n, it) => n + (it && it.t === t && it.id === id ? 1 : 0), 0); },
+  freeSlots() { let n = 0; for (let i = 0; i < this.barSize; i++) if (!this.bar[i]) n++; return n; },
+  addItem(it) {
+    for (let i = 0; i < this.barSize; i++) if (!this.bar[i]) { this.bar[i] = { t: it.t, id: it.id }; UI.hotbarDirty = true; return true; }
+    return false;
+  },
+  takeItem(t, id) {
+    // take from the end so the weapons at the front stay put
+    for (let i = this.barSize - 1; i >= 0; i--) {
+      const it = this.bar[i];
+      if (it && it.t === t && it.id === id) { this.bar[i] = null; UI.hotbarDirty = true; this.checkWeapon(); return true; }
+    }
+    return false;
+  },
+  get repairKits() { return this.countItem('supply', 'repair'); },
+  get cells() { return this.countItem('supply', 'cell'); },
+  partCount(k, useStorage) { return this.countItem('part', k) + (useStorage ? this.storage['part:' + k] || 0 : 0); },
+  canAfford(cost, useStorage) { return Object.entries(cost).every(([k, v]) => this.partCount(k, useStorage) >= v); },
+  consume(cost, useStorage) {
+    for (const [k, v] of Object.entries(cost)) {
+      let need = v;
+      if (useStorage) { const s = this.storage['part:' + k] || 0, u = Math.min(s, need); this.storage['part:' + k] = s - u; need -= u; }
+      while (need > 0 && this.takeItem('part', k)) need--;
+    }
+  },
+  store(it, n = 1) { const k = this.itemKey(it); this.storage[k] = (this.storage[k] || 0) + n; },
+  // the weapon in hand: the selected slot if it holds one, otherwise the last weapon you held
+  selectSlot(i) {
+    this.sel = (i + this.barSize) % this.barSize;
+    const it = this.bar[this.sel];
+    if (it && it.t === 'weapon' && it.id !== this.weapon) this.equip(it.id);
+    UI.hotbarDirty = true;
+  },
+  equip(id) {
+    this.weapon = id;
+    setViewModelWeapon(this.vm, id, 1 + this.up.split);
+    if (this.avatar) this.avatar.userData.flash.material.color.set(WEAPONS[id].color).multiplyScalar(4);
+    if (this.player) this.player.fireCd = Math.max(this.player.fireCd, 0.15);
+    UI.feed(WEAPONS[id].name, WEAPONS[id].color);
+  },
+  checkWeapon() {
+    if (this.bar.some((it) => it && it.t === 'weapon' && it.id === this.weapon)) return;
+    const w = this.bar.find((it) => it && it.t === 'weapon');
+    this.weapon = w ? w.id : 'blaster';
+    setViewModelWeapon(this.vm, this.weapon, 1 + this.up.split);
+  },
+  // why a biome portal is closed (null when it is open)
+  portalLock(i) {
+    if (i > this.progress.unlocked) return `Defeat ${ZONES[i - 1].boss.name} in ${ZONES[i - 1].name}`;
+    if (ZONES[i].id === 'volcano' && !this.gear.fireboots) return 'Fire Boots required (Mountains shop)';
+    if (ZONES[i].id === 'sky' && !this.gear.jetpack) return 'Jetpack required (Mountains shop)';
+    return null;
+  },
+
+  // aim assist: the enemy closest to the aim ray (within a narrow cone) — player shots curve into it
+  assistTarget(o, d) {
+    let best = null, bestA = 0.11;
+    for (const e of this.enemies) {
+      if (e.dead || e.hidden) continue;
+      const tx = e.pos.x - o.x, ty = e.cy - o.y, tz = e.pos.z - o.z, L = Math.hypot(tx, ty, tz);
+      if (L > 110 || L < 1.5) continue;
+      const a = Math.acos(clamp((tx * d.x + ty * d.y + tz * d.z) / L, -1, 1));
+      if (a < bestA) { bestA = a; best = e; }
+    }
+    return best;
+  },
   banner(text, sub, color, dur = 3) { UI.banner(text, sub, color, dur); },
   hint(text) { UI.hint(text); },
 
@@ -57,7 +133,7 @@ const G = {
   nearestEnemy(x, z, maxD, exclude, aggroOnly) {
     let best = null, bd = maxD * maxD;
     for (const e of this.enemies) {
-      if (e.dead || (exclude && exclude.has(e))) continue;
+      if (e.dead || e.hidden || (exclude && exclude.has(e))) continue;
       if (aggroOnly && !e.isBoss && !e.aggro && e.hp >= e.maxHp) continue;
       const dx = e.pos.x - x, dz = e.pos.z - z, dd = dx * dx + dz * dz;
       if (dd < bd) { bd = dd; best = e; }
@@ -68,7 +144,7 @@ const G = {
   queueSpawn(type, x, z, elite = false, t = 1.1, aggro = true) {
     const lim = World.half * 0.9;
     x = clamp(x, -lim, lim); z = clamp(z, -lim, lim);
-    const y = World.heightAt(x, z);
+    const y = World.floorAt(x, z);
     const beam = makeBeam(type === 'boss' ? ZONES[this.level].boss.color : ENEMY_TYPES[type].color, 2.5, type === 'boss' ? 3 : 0.8, 0.5);
     setBeam(beam, x, y, z, x, y + 40, z);
     scene.add(beam);
@@ -76,7 +152,7 @@ const G = {
   },
 
   damageEnemy(e, dmg, hx, hy, hz, color, quiet = false) {
-    if (e.dead) return;
+    if (e.dead || e.hidden) return;
     e.hp -= dmg;
     e.flash = Math.max(e.flash, quiet ? 0.4 : 1);
     if (!e.isBoss && e.alert) e.alert();
@@ -108,6 +184,22 @@ const G = {
       this.dropPart('scrap', e.pos.x, e.cy, e.pos.z);
     }
     if (Math.random() < 0.06) this.dropPart('health', e.pos.x, e.cy, e.pos.z);
+    if (Math.random() < 0.3 + (e.elite ? 0.5 : 0)) this.dropBucks(e.elite ? randi(8, 15) : randi(1, 4), e.pos.x, e.cy, e.pos.z);
+  },
+
+  dropBucks(v, x, y, z, burst = 1) {
+    const model = buildPickupModel('bucks');
+    model.position.set(x, y, z);
+    scene.add(model);
+    const a = rand(0, TAU), s = rand(2, 5) * burst;
+    this.pickups.push({ type: 'bucks', value: v, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(Math.cos(a) * s, rand(4, 8), Math.sin(a) * s), t: 0, model, pulled: false, bob: rand(0, TAU) });
+  },
+  dropItem(it, x, y, z) {
+    const model = buildPickupModel(it.t === 'part' ? it.id : 'item');
+    model.position.set(x, y, z);
+    scene.add(model);
+    const d = this.player.forward(new THREE.Vector3());
+    this.pickups.push({ type: it.t === 'part' ? it.id : 'item', item: it, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(d.x * 5, 4, d.z * 5), t: -1.2, model, pulled: false, bob: rand(0, TAU) });
   },
 
   dropPart(type, x, y, z, burst = 1) {
@@ -118,12 +210,27 @@ const G = {
     this.pickups.push({ type, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(Math.cos(a) * s, rand(4, 8), Math.sin(a) * s), t: 0, model, pulled: false, bob: rand(0, TAU) });
   },
 
-  spawnBolt(x, y, z, dir, speed, dmg, color, fromPlayer) {
+  spawnBolt(x, y, z, dir, speed, dmg, color, fromPlayer, life = 1.4, home = null) {
     const m = new THREE.Mesh(boltGeo, Mat.glow(color, fromPlayer ? 6 : 5));
     m.position.set(x, y, z);
+    if (speed > 300) m.scale.set(0.7, 0.7, 2.6);
     _a.set(x + dir.x, y + dir.y, z + dir.z); m.lookAt(_a);
     scene.add(m);
-    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life: 1.4, mesh: m });
+    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life, mesh: m, fromPlayer, home });
+  },
+
+  // player rocket: flies straight (aim assist nudges it), big splash that hurts you too
+  spawnRocket(x, y, z, dir, speed, dmg, splash, home) {
+    const m = new THREE.Mesh(missileGeo, Mat.glow('#c6ff4d', 3));
+    m.scale.setScalar(1.8); m.position.set(x, y, z); scene.add(m);
+    this.bullets.push({ kind: 'rocket', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color: '#c6ff4d', life: 3, mesh: m, splash, fromPlayer: true, home });
+  },
+
+  // Bomber Bot payload
+  spawnBomb(pos, vel, dmg) {
+    const m = new THREE.Mesh(bulletGeo, Mat.glow('#ff7a3d', 4));
+    m.scale.setScalar(0.25); m.position.copy(pos); scene.add(m);
+    this.bullets.push({ kind: 'grenade', bomb: true, pos: pos.clone(), vel, dmg, color: '#ff7a3d', life: 4, mesh: m });
   },
 
   spawnMissile(x, y, z, vel, dmg, target) {
@@ -138,10 +245,12 @@ const G = {
     this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 90 + this.level * 12, color: '#b98cff', life: 4, mesh: m });
   },
 
-  spawnEnemyBullet(x, y, z, vx, vy, vz, dmg, r, color, hugH = 0) {
-    const m = new THREE.Mesh(bulletGeo, Mat.glow(color, 4));
+  // opts: { effect: 'frost'|'fire'|'freeze', grav, splash, life, marker, big }
+  spawnEnemyBullet(x, y, z, vx, vy, vz, dmg, r, color, hugH = 0, opts = null) {
+    const m = new THREE.Mesh(bulletGeo, opts && opts.big ? Mat.std(color, { rough: 0.9, metal: 0.1, emissive: '#ff8a3a', ei: 0.4 }) : Mat.glow(color, 4));
     m.scale.setScalar(r); m.position.set(x, y, z); scene.add(m);
-    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: 5, mesh: m, hugH });
+    const o = opts || {};
+    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor });
   },
 
   get thirdPerson() { return this.settings.view === 'third' || this.riding; },
@@ -154,6 +263,7 @@ const G = {
     // in third person the ray starts at the camera; skip the stretch behind the player
     const t0 = this.thirdPerson ? Math.max(1, o.distanceTo(_cv.set(this.player.pos.x, this.player.pos.y + 1.4, this.player.pos.z)) - 0.5) : 1;
     for (const e of this.enemies) {
+      if (e.hidden) continue;
       const cx = e.pos.x - o.x, cy = e.cy - o.y, cz = e.pos.z - o.z;
       const t = cx * d.x + cy * d.y + cz * d.z;
       if (t < t0 || t > best) continue;
@@ -190,16 +300,23 @@ const G = {
     for (const bb of this.ebullets) bb.dead = true;
     b.destroy();
     const L = this.level;
-    const loot = { scrap: 6, wire: 5, servo: 3, circuit: 4, core: 2 + Math.floor(L / 2), lens: 2 + Math.floor(L / 2), quantum: 2 + Math.floor(L / 2) };
-    for (const [k, n] of Object.entries(loot)) for (let i = 0; i < n; i++) this.dropPart(k, b.pos.x, b.pos.y, b.pos.z, 2);
+    const loot = { scrap: 3, wire: 2, servo: 2, circuit: 2, core: 1 + Math.floor(L / 2), lens: 1 + Math.floor(L / 2), quantum: 1 + Math.floor(L / 2) };
+    for (const [k, n] of Object.entries(loot)) for (let i = 0; i < n; i++) this.dropPart(k, b.pos.x, b.cy, b.pos.z, 2);
+    for (let i = 0; i < 10; i++) this.dropBucks(15 + L * 10, b.pos.x, b.cy, b.pos.z, 2);
     this.stats.kills++;
     this.objective = 'extract';
+    World.openDome();
+    const first = !this.progress.beaten[L];
+    this.progress.beaten[L] = true;
+    if (first && L + 1 < ZONES.length) this.progress.unlocked = Math.max(this.progress.unlocked, L + 1);
     Sound.setIntensity(0);
     setTimeout(() => {
       if (this.objective !== 'extract') return;
       World.buildPortal();
       Sound.play('portal');
-      this.banner(`${ZONES[L].boss.name} DESTROYED`, 'Extraction portal open — step inside when ready', '#6bff9e', 4);
+      const next = ZONES[L + 1];
+      const sub = first && next ? `The ${next.name} portal is now open at home base!` : L === ZONES.length - 1 ? 'The skies are free! Step into the portal' : 'Portal home is open — step inside when ready';
+      this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
     }, 1800);
   },
@@ -209,19 +326,25 @@ const G = {
 function clearEntities() {
   for (const e of G.enemies) e.destroy();
   for (const b of G.bullets) scene.remove(b.mesh);
-  for (const b of G.ebullets) scene.remove(b.mesh);
+  for (const b of G.ebullets) { scene.remove(b.mesh); if (b.marker) scene.remove(b.marker); }
   for (const p of G.pickups) scene.remove(p.model);
   for (const s of G.spawns) scene.remove(s.beam);
   G.enemies = []; G.bullets = []; G.ebullets = []; G.pickups = []; G.spawns = [];
-  G.boss = null; G.bossDeath = null;
+  G.boss = null; G.bossDeath = null; G.raid = null;
   Fx.clear();
 }
 
+const NEW_UP = () => ({ armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 });
+
 function newRun() {
-  G.inv = {}; PART_ORDER.forEach((k) => (G.inv[k] = 0));
-  G.inv.scrap = 2; G.inv.wire = 1;
-  G.up = { armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 };
-  G.repairKits = 1; G.cells = 0;
+  G.bar = [{ t: 'weapon', id: 'blaster' }, { t: 'supply', id: 'repair' }, { t: 'part', id: 'scrap' }, { t: 'part', id: 'scrap' }, { t: 'part', id: 'wire' }];
+  G.sel = 0; G.weapon = 'blaster';
+  G.storage = { 'part:scrap': 4, 'part:wire': 2 };
+  G.bucks = 40;
+  G.gear = { jetpack: false, fireboots: false, backpack: 0 };
+  G.base = { shield: false, charger: 0 };
+  G.progress = { unlocked: 0, beaten: [false, false, false, false, false] };
+  G.up = NEW_UP();
   G.vessels = 0; G.spritesFound = 0;
   if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
   G.vehicle = null; G.riding = false;
@@ -229,39 +352,60 @@ function newRun() {
   G.companions = [];
   G.player = new Player();
   G.total = { kills: 0, parts: 0, crafted: 0, time: 0, damageTaken: 0, caches: 0 };
-  startZone(0);
+  setViewModelWeapon(G.vm, 'blaster', 1);
+  startHub(true);
 }
 
-function takeSnapshot() {
-  G.snapshot = JSON.stringify({ inv: G.inv, up: G.up, repairKits: G.repairKits, cells: G.cells, comps: G.companions.map((c) => c.kind), hp: G.player.hp, total: G.total,
+function stateJSON() {
+  return JSON.stringify({ bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
+    up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: G.player.hp, total: G.total,
     veh: G.vehicle ? G.vehicle.hp : null, vessels: G.vessels, spritesFound: G.spritesFound });
 }
-function restoreSnapshot() {
-  const s = JSON.parse(G.snapshot);
-  G.inv = s.inv; G.up = s.up; G.repairKits = s.repairKits; G.cells = s.cells; G.total = s.total;
+function applyState(json) {
+  const s = JSON.parse(json);
+  G.bar = s.bar; G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base; G.progress = s.progress;
+  G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
   G.companions.forEach((c) => c.destroy());
   G.player = new Player(); G.player.hp = s.hp;
-  G.companions = s.comps.map((k) => new Companion(k));
+  G.companions = s.comps.map((d) => { const c = new Companion(d.kind, d.battery); c.hp = Math.min(c.maxHp, d.hp); if (d.away) { c.state = 'away'; c.detach(); } return c; });
   if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
   G.riding = false;
   G.vehicle = s.veh !== null && s.veh !== undefined ? new Vehicle(s.veh) : null;
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
+  G.weapon = s.weapon || 'blaster';
+  G.checkWeapon();
+  setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
+  UI.hotbarDirty = true;
+}
+function takeSnapshot() { G.snapshot = stateJSON(); }
+function restoreSnapshot() { applyState(G.snapshot); }
+
+// progress is saved every time you get home
+const SAVE_KEY = 'sf-outlands-save';
+function saveGame() { try { localStorage.setItem(SAVE_KEY, stateJSON()); } catch (e) { /* storage unavailable */ } }
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function continueGame() {
+  let json = null;
+  try { json = localStorage.getItem(SAVE_KEY); } catch (e) { /* storage unavailable */ }
+  if (!json) { newRun(); return; }
+  G.player = new Player();
+  applyState(json);
+  startHub(false);
 }
 
 // A camp: a group of robots hanging out around a scrap brazier. They spot you when you
 // come close (an alarm meter fills), or instantly if you attack or start an uplink nearby.
-function spawnCamp(x, z, n, aggro = false) {
-  const pool = ZONES[G.level].pool;
+function spawnCamp(x, z, n, aggro = false, pool = ZONES[G.level].pool, lvl = G.level) {
   const camp = World.buildBrazier(x, z);
   G.updrafts.push({ x, z, y: camp.y, r: 3.2 });
   for (let i = 0; i < n; i++) {
     const type = weighted(pool);
-    const elite = G.level > 0 && Math.random() < 0.06 * G.level;
-    const k = type === 'swarmer' ? 3 : 1;
+    const elite = lvl > 0 && Math.random() < 0.06 * lvl;
+    const k = type === 'swarmer' || type === 'icemite' || type === 'embermite' ? 3 : 1;
     for (let j = 0; j < k; j++) {
-      const a = rand(0, TAU), r = rand(2.8, 6);
+      const a = rand(0, TAU), r = rand(2.8, World.sky ? 4.5 : 6);
       const ex = x + Math.cos(a) * r, ez = z + Math.sin(a) * r;
-      if (World.inHazard(ex, ez)) continue;
+      if (!World.sky && World.inHazard(ex, ez)) continue;
       const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp);
       e.facing = Math.atan2(x - ex, z - ez);
       G.enemies.push(e);
@@ -270,82 +414,167 @@ function spawnCamp(x, z, n, aggro = false) {
   return camp;
 }
 
-function startZone(i) {
+// common setup when arriving anywhere (home base or a biome)
+function arrive(Z, i, spawnYaw) {
   if (G.riding && G.vehicle) G.vehicle.dock();
   clearEntities();
   World.dispose();
   G.updrafts = [];
-  G.level = i;
-  const Z = ZONES[i];
   World.build(scene, Z, i);
+  G.updrafts.push(...World.updraftCols);
   const p = G.player;
-  p.pos.set(World.spawn.x, World.heightAt(World.spawn.x, World.spawn.z), World.spawn.z);
+  p.pos.set(World.spawn.x, World.surf(World.spawn.x, World.spawn.z), World.spawn.z);
   p.vel.set(0, 0, 0);
-  p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
+  p.yaw = spawnYaw;
   p.pitch = -0.05;
   p.dead = false; p.invuln = 2; p.energy = 100; p.dashCd = 0;
   p.gliding = false; p.climbing = null; p.stamina = p.maxStamina; p.exhausted = false;
+  p.jetting = false; p.fuel = 100; p.fallTop = p.pos.y; p.safe = null;
+  p.frozenT = 0; p.burnT = 0; p.slowT = 0;
   p.hp = Math.min(p.hp, p.maxHp);
-  setViewModelBarrels(G.vm, 1 + G.up.split);
-  G.companions.forEach((c) => { c.offline = 0; c.hp = c.maxHp; c.pos.set(p.pos.x + rand(-2, 2), p.pos.y + 2, p.pos.z + rand(-2, 2)); c.target = null; c.attach(); c.model.rotation.z = 0; c.model.userData.parts.halo.visible = true; });
+  setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
+  G.companions.forEach((c) => c.onTravel());
+  G.levelDone = false; G.dying = 0; G.timeScale = 1;
+  G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
+  G.hintShown = {};
+  G.state = 'playing';
+  Sound.setIntensity(0);
+  UI.hideAll();
+  UI.hotbarDirty = true;
+}
+
+// ─────────── Home base ───────────
+function startHub(fresh) {
+  G.where = 'hub';
+  G.level = 0;
+  arrive(HUB, 99, 0);
+  G.objective = 'home';
+  G.player.hp = G.player.maxHp;      // home sweet home: fully repaired
+  takeSnapshot();
+  saveGame();
+  Weather.init(scene, HUB.ambient, HUB.ambientColor);
+  Sound.setZone(5);
+  UI.banner('HOME BASE', fresh ? 'Five portals surround your house — start with the Green Plains' : 'Progress saved · your bots recharge in the Charging Room', '#3cf2ff', 4);
+  if (fresh) {
+    setTimeout(() => { if (G.where === 'hub' && G.state === 'playing') UI.hint(`Walk into the house: Mechanic, Charging and Storage rooms — ${Touch.enabled ? 'tap USE' : 'press E'} at a terminal`); }, 4500);
+    setTimeout(() => { if (G.where === 'hub' && G.state === 'playing') UI.hint('Build a Gunner Drone in the Mechanic Room, then take the Green Plains portal (in front of the house)'); }, 13000);
+  }
+  // raids: once you've made enemies, they sometimes come knocking
+  const beaten = G.progress.beaten.filter(Boolean).length;
+  if (beaten && !fresh && Math.random() < 0.5) G.raidT = rand(25, 45); else G.raidT = -1;
+  UI.refreshHUD(true);
+}
+
+function startRaid() {
+  const beaten = G.progress.beaten.filter(Boolean).length;
+  const zi = Math.max(0, Math.min(ZONES.length - 1, beaten - 1));
+  const Z = ZONES[zi];
+  const pool = Z.id === 'sky' ? [['drone', 3], ['grunt', 3], ['sniper', 1]] : Z.pool;
+  G.raid = { camps: [] };
+  let n = 0;
+  for (let t = 0; t < 30 && n < 2; t++) {
+    const a = rand(0, TAU), r = rand(85, 110), x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (!World.isClear(x, z, 6)) continue;
+    const before = G.enemies.length;
+    spawnCamp(x, z, randi(3, 4), true, pool, zi);
+    for (const e of G.enemies.slice(before)) e.hunter = true;
+    n++;
+  }
+  UI.banner('RAID!', 'Robots are attacking home base', '#ff3b5c', 3.5);
+  Sound.play('warn');
+  Sound.setIntensity(1);
+  if (!G.base.shield) setTimeout(() => UI.hint('Build a Shield Generator in the Mechanic Room — its dome keeps raiders out'), 4000);
+}
+
+// ─────────── Biomes ───────────
+function startZone(i) {
+  G.where = 'biome';
+  G.level = i;
+  const Z = ZONES[i];
+  arrive(Z, i, Math.atan2(0, 165));
+  const p = G.player;
+  p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
 
   // roaming machine camps
-  const camps = 8 + i * 2;
-  for (let c = 0; c < camps; c++) {
-    const at = World.randomClear(7, 40);
-    if (!at || Math.hypot(at[0] - World.spawn.x, at[1] - World.spawn.z) < 55) continue;
-    spawnCamp(at[0], at[1], randi(3, 4 + Math.floor(i / 2)));
+  if (World.sky) {
+    for (const is of World.islands) if (is.kind === 'camp' || is.kind === 'beacon') {
+      const a = rand(0, TAU), off = is.kind === 'beacon' ? is.r * 0.55 : 0;
+      spawnCamp(is.x + Math.cos(a) * off, is.z + Math.sin(a) * off, randi(3, 4 + Math.floor(i / 2)));
+    }
+  } else {
+    const camps = 8 + i * 2;
+    for (let c = 0; c < camps; c++) {
+      const at = World.randomClear(7, 40);
+      if (!at || Math.hypot(at[0] - World.spawn.x, at[1] - World.spawn.z) < 55) continue;
+      spawnCamp(at[0], at[1], randi(3, 4 + Math.floor(i / 2)));
+    }
   }
 
   G.objective = 'beacons';
-  G.levelDone = false; G.dying = 0; G.timeScale = 1;
   G.reinforceT = 45;
-  G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
-  G.hintShown = {};
   takeSnapshot();
-  Weather.init(scene, Z.ambient, Z.accent);
-  G.state = 'playing';
-  Sound.setIntensity(0);
+  Weather.init(scene, Z.ambient, Z.ambientColor || Z.accent);
   Sound.setZone(i);
-  UI.hideAll();
-  UI.banner(`ZONE ${i + 1} · ${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
-  setTimeout(() => { if (G.level === i && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
-  if (i === 0) setTimeout(() => { if (G.level === 0 && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 11000);
+  UI.banner(`${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
+  setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
+  setTimeout(() => { if (G.level === i && G.where === 'biome' && G.state === 'playing') UI.hint(`${Z.shop.name} is right by the portal — sell salvage for Botbucks`); }, 11000);
+  if (i === 0) setTimeout(() => { if (G.level === 0 && G.where === 'biome' && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 19000);
+  if (World.sky) setTimeout(() => { if (G.where === 'biome' && World.sky) UI.hint(Touch.enabled ? 'Hold JUMP in mid-air to fly with the jetpack between islands' : 'Hold Space in mid-air to fly with the jetpack between islands'); }, 5000);
   UI.refreshHUD(true);
+}
+
+function goHome() {
+  Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
+  Sound.play('portal');
+  Fx.tintFlash('#3cf2ff', 1);
+  startHub(false);
 }
 
 function nextInteractable() {
   const p = G.player;
   let best = null, bd = 1e9;
-  for (const c of World.caches) {
-    if (c.opened) continue;
-    const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
-    if (d < 3.2 && d < bd) { bd = d; best = { kind: 'cache', obj: c }; }
-  }
+  const near = (x, z, r, kind, obj, dy = 3) => {
+    const d = Math.hypot(x - p.pos.x, z - p.pos.z);
+    if (d < r && d < bd && Math.abs(p.pos.y - (obj && obj.y !== undefined ? obj.y : p.pos.y)) < dy) { bd = d; best = { kind, obj }; }
+  };
+  for (const c of World.caches) if (!c.opened) near(c.x, c.z, 3.2, 'cache', c);
+  for (const t of World.terminals) near(t.x, t.z, 2.6, t.kind, t);
+  for (const P of World.hubPortals) near(P.x, P.z, 5, 'portal', P, 4);
+  if (World.homePortal && !World.domeTrap) near(World.homePortal.x, World.homePortal.z, 4.5, 'home', World.homePortal, 4);
+  if (World.shop) near(World.shop.x, World.shop.z, 3.4, 'shop', World.shop);
   if (G.objective === 'beacons' && !World.beacons.some((b) => b.state === 'charging')) {
-    for (const b of World.beacons) {
-      if (b.state !== 'idle') continue;
-      const d = Math.hypot(b.x - p.pos.x, b.z - p.pos.z);
-      if (d < 5.5 && d < bd) { bd = d; best = { kind: 'beacon', obj: b }; }
-    }
+    for (const b of World.beacons) if (b.state === 'idle') near(b.x, b.z, 5.5, 'beacon', b, 6);
   }
-  if (!G.riding) {
-    for (const b of World.beacons) {
-      if (b.state !== 'done') continue;
-      const d = Math.hypot(b.x - p.pos.x, b.z - p.pos.z);
-      if (d < 5.5 && d < bd && Math.abs(p.pos.y - b.y) < 3) { bd = d; best = { kind: 'launch', obj: b }; }
-    }
-  }
+  if (!G.riding) for (const b of World.beacons) if (b.state === 'done') near(b.x, b.z, 5.5, 'launch', b);
   return best;
+}
+
+function interact(it) {
+  switch (it.kind) {
+    case 'cache': openCache(it.obj); break;
+    case 'beacon': startUplink(it.obj); break;
+    case 'launch': launchFrom(it.obj); break;
+    case 'mechanic': case 'storage': case 'charging': case 'shop': UI.openStation(it.kind); break;
+    case 'home': goHome(); break;
+    case 'portal': {
+      const lock = G.portalLock(it.obj.i);
+      if (lock) { Sound.play('deny'); UI.banner('PORTAL LOCKED', lock, '#8a94a8', 2.6); return; }
+      Sound.play('portal');
+      Fx.tintFlash(ZONES[it.obj.i].accent, 1);
+      startZone(it.obj.i);
+      break;
+    }
+  }
 }
 
 function openCache(c) {
   c.opened = true;
   const n = c.golden ? 3 : randi(3, 5);
-  const bag = c.golden ? ['quantum', 'quantum', 'core', 'core', 'lens'] : [];
+  const bag = c.golden ? ['quantum', 'core', 'lens'] : [];
   for (let i = 0; i < n; i++) bag.push(weighted([['scrap', 4], ['wire', 3], ['servo', 2], ['circuit', 2], ['lens', 1], ['core', 1], ['quantum', 0.15]]));
   if (Math.random() < 0.3) bag.push('health');
   for (const t of bag) G.dropPart(t, c.x, c.y + 1, c.z, 0.7);
+  for (let i = c.golden ? 5 : 2; i > 0; i--) G.dropBucks(c.golden ? 12 : randi(3, 6), c.x, c.y + 1, c.z, 0.7);
   Fx.explosion(c.x, c.y + 0.8, c.z, c.golden ? '#ffd23f' : '#3cf2ff', 0.4);
   Sound.play('cache');
   G.stats.caches++;
@@ -365,7 +594,7 @@ function launchFrom(b) {
   let n = 0;
   for (const c of World.caches) if (!c.opened && !c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < 170) { c.revealed = true; n++; }
   UI.banner('SKY LAUNCH', n ? `${n} salvage caches revealed on your compass` : 'Open your glider in mid-air', '#6bff9e', 2.4);
-  UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — sky islands hold golden caches`);
+  UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — a long fall without it hurts!`);
 }
 
 function startUplink(b) {
@@ -383,6 +612,15 @@ function startUplink(b) {
 
 function updateObjectives(dt) {
   const p = G.player;
+  if (G.where === 'hub') {
+    if (G.raidT > 0) { G.raidT -= dt; if (G.raidT <= 0) startRaid(); }
+    if (G.raid && !G.enemies.some((e) => !e.dead)) {
+      G.raid = null;
+      UI.banner('RAID REPELLED', 'Home base is safe · +40 Botbucks', '#6bff9e', 3);
+      G.bucks += 40; Sound.play('win'); Sound.setIntensity(0);
+    }
+    return;
+  }
   const Z = ZONES[G.level];
   if (G.objective === 'beacons') {
     for (const b of World.beacons) {
@@ -393,13 +631,14 @@ function updateObjectives(dt) {
       b.spawnT -= dt;
       if (b.spawnT <= 0 && G.enemies.length < 30 + G.level * 4) {
         b.spawnT = rand(3.2, 4.8) - G.level * 0.2;
-        const a = rand(0, TAU), r = rand(26, 36);
+        const is = World.sky ? World.islandAt(b.x, b.z) : null;
+        const a = rand(0, TAU), r = is ? rand(5, is.r - 2) : rand(26, 36);
         const sx = b.x + Math.cos(a) * r, sz = b.z + Math.sin(a) * r;
         const n = 1 + Math.floor(G.level / 2) + (Math.random() < 0.5 ? 1 : 0);
         for (let k = 0; k < n; k++) {
           const t = weighted(Z.pool);
-          const cnt = t === 'swarmer' ? 3 : 1;
-          for (let j = 0; j < cnt; j++) G.queueSpawn(t, sx + rand(-4, 4), sz + rand(-4, 4), G.level > 0 && Math.random() < 0.05 * G.level, 1.1, true);
+          const cnt = ENEMY_TYPES[t].ai === 'swarm' ? 3 : 1;
+          for (let j = 0; j < cnt; j++) G.queueSpawn(t, sx + rand(-4, 4) * (is ? 0.4 : 1), sz + rand(-4, 4) * (is ? 0.4 : 1), G.level > 0 && Math.random() < 0.05 * G.level, 1.1, true);
         }
       }
       if (b.progress >= 1) {
@@ -410,7 +649,8 @@ function updateObjectives(dt) {
         Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
         Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
         Sound.play('beaconDone');
-        for (let k = 0; k < 4; k++) G.dropPart(weighted([['circuit', 2], ['core', 1], ['servo', 2], ['lens', 1]]), b.x, b.y + 3, b.z, 1.3);
+        for (let k = 0; k < 3; k++) G.dropPart(weighted([['circuit', 2], ['core', 1], ['servo', 2], ['lens', 1]]), b.x, b.y + 3, b.z, 1.3);
+        for (let k = 0; k < 4; k++) G.dropBucks(10 + G.level * 3, b.x, b.y + 3, b.z, 1.3);
         for (const pk of G.pickups) pk.pulled = pk.pulled || pk.pos.distanceTo(p.pos) < 50;
         const done = World.beacons.filter((x) => x.state === 'done').length;
         if (done >= World.beacons.length) {
@@ -425,12 +665,18 @@ function updateObjectives(dt) {
       }
     }
   } else if (G.objective === 'arena') {
-    if (Math.hypot(p.pos.x - World.arena.x, p.pos.z - World.arena.z) < World.arena.r - 6) {
+    const A = World.arena;
+    if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r - 6 && Math.abs(p.pos.y - A.y) < 12) {
       G.objective = 'boss';
-      const a = Math.atan2(p.pos.x - World.arena.x, p.pos.z - World.arena.z) + Math.PI;
-      G.queueSpawn('boss', World.arena.x + Math.sin(a) * 12, World.arena.z + Math.cos(a) * 12, false, 2.2);
+      // the dome slams shut: you and your squad are locked in until the boss falls
+      World.trapDome();
+      for (const c of G.companions) if (c.active) { World.keepInside(c.pos, c.r); }
+      const a = Math.atan2(p.pos.x - A.x, p.pos.z - A.z) + Math.PI;
+      G.queueSpawn('boss', A.x + Math.sin(a) * 12, A.z + Math.cos(a) * 12, false, 2.2);
       UI.banner('⚠ WARNING ⚠', `${Z.boss.name} — ${Z.boss.title.toUpperCase()}`, '#ff3355', 3.2);
+      setTimeout(() => UI.hint('The dome has sealed — there is no way out until the boss is destroyed'), 3400);
       Sound.play('warn');
+      Sound.play('slam');
       Sound.setIntensity(2);
     }
   } else if (G.objective === 'extract' && World.portal) {
@@ -442,10 +688,10 @@ function updateObjectives(dt) {
       Sound.play('portal');
       Fx.tintFlash('#6bff9e', 1);
       Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
+      const last = G.level >= ZONES.length - 1;
       setTimeout(() => {
-        Input.unlock();
-        if (G.level >= ZONES.length - 1) { G.state = 'victory'; UI.showVictory(); }
-        else UI.openWorkshop('between');
+        if (last) { G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; startHub(false); G.state = 'victory'; Input.unlock(); UI.showVictory(); }
+        else startHub(false);
       }, 700);
     }
   }
@@ -459,6 +705,12 @@ function updateObjectives(dt) {
         for (let tries = 0; tries < 10; tries++) {
           const a = rand(0, TAU), r = rand(80, 120);
           const x = p.pos.x + Math.cos(a) * r, z = p.pos.z + Math.sin(a) * r;
+          if (World.sky) {
+            const is = World.islandAt(x, z);
+            if (!is || is.r < 8 || is.kind === 'arena' || is.kind === 'spawn') continue;
+            spawnCamp(is.x, is.z, randi(2, 3), false);
+            break;
+          }
           if (Math.abs(x) > World.half * 0.72 || Math.abs(z) > World.half * 0.72 || !World.isClear(x, z, 6)) continue;
           spawnCamp(x, z, randi(2, 3), false);
           break;
@@ -470,7 +722,7 @@ function updateObjectives(dt) {
 
 function toggleVehicle() {
   if (G.riding && G.vehicle) { G.vehicle.dock(); return; }
-  if (!G.vehicle) { UI.feed('No Skyrider — craft one in the Workshop (Vehicles tab)', '#ffb347'); Sound.play('deny'); return; }
+  if (!G.vehicle) { UI.feed('No Skyrider — build one in the Mechanic Room at home', '#ffb347'); Sound.play('deny'); return; }
   if (G.player.climbing) return;
   G.vehicle.deploy();
 }
@@ -490,7 +742,7 @@ function collectSprite(sp) {
   } else {
     UI.banner('BEEP-BOOP!', `You found a Scrap Sprite · ${3 - (G.spritesFound % 3)} more for a stamina vessel`, '#3aff9a', 2.4);
   }
-  UI.feed(`Scrap Sprite found (${left} left in this zone)`, '#3aff9a');
+  UI.feed(`Scrap Sprite found (${left} left here)`, '#3aff9a');
 }
 
 // ═════════════════════════ Update ═════════════════════════
@@ -511,13 +763,15 @@ function update(dt) {
   } else if (!p.dead && !G.levelDone) {
     if (Input.hit('KeyF')) toggleVehicle();
     if (Input.hit('KeyV')) UI.toggleView();
+    // hotbar: number keys / mouse wheel select a slot, X drops the selected item
+    for (let k = 0; k < 10; k++) if (Input.hit('Digit' + ((k + 1) % 10))) G.selectSlot(k);
+    if (Input.wheel) { G.selectSlot(G.sel + Math.sign(Input.wheel)); Input.wheel = 0; }
+    if (Input.hit('KeyX')) dropSelected();
     p.update(dt);
     if (G.riding && G.vehicle) G.vehicle.update(dt);
     if (Input.hit('KeyE')) {
       const it = nextInteractable();
-      if (it && it.kind === 'cache') openCache(it.obj);
-      else if (it && it.kind === 'beacon') startUplink(it.obj);
-      else if (it && it.kind === 'launch') launchFrom(it.obj);
+      if (it) interact(it);
     }
     // Scrap Sprites (hidden collectibles)
     for (const sp of World.sprites) {
@@ -616,13 +870,38 @@ function update(dt) {
   }
 }
 
-function explodeAt(x, y, z, radius, dmg, color, scale = 1) {
+// selfDmg: bombs & rockets hurt the player too when caught in the blast
+function explodeAt(x, y, z, radius, dmg, color, scale = 1, selfDmg = 0) {
   Fx.explosion(x, y, z, color, scale);
   for (const e of G.enemies) {
-    if (e.dead) continue;
-    const dd = Math.hypot(x - e.pos.x, y - e.cy, z - e.pos.z);
-    if (dd < radius + e.r) G.damageEnemy(e, dmg * (1 - 0.5 * dd / (radius + e.r)), e.pos.x, e.cy, e.pos.z, color, true);
+    if (e.dead || e.hidden) continue;
+    const ey = e.aimY(y);
+    const dd = Math.hypot(x - e.pos.x, y - ey, z - e.pos.z);
+    if (dd < radius + e.r) G.damageEnemy(e, dmg * (1 - 0.5 * dd / (radius + e.r)), e.pos.x, ey, e.pos.z, color, true);
   }
+  const p = G.player;
+  if (selfDmg && !p.dead) {
+    const pd = Math.hypot(x - p.pos.x, y - (p.pos.y + 0.9), z - p.pos.z);
+    if (pd < radius) {
+      const d = Math.round(selfDmg * (1 - 0.6 * pd / radius));
+      p.invuln = 0;
+      p.hurt(d, { x, z });
+      p.vel.x += (p.pos.x - x) / (pd || 1) * 8; p.vel.z += (p.pos.z - z) / (pd || 1) * 8; p.vel.y = Math.max(p.vel.y, 5);
+      UI.feed(`Caught in your own blast −${d}`, '#ff6b6b');
+    }
+  }
+}
+
+function dropSelected() {
+  const it = G.bar[G.sel];
+  if (!it) return;
+  if (it.t === 'weapon' && it.id === 'blaster') { UI.feed('Your Pulse Blaster stays with you — store it at home instead', '#9fb3c8'); return; }
+  const p = G.player;
+  G.bar[G.sel] = null;
+  G.checkWeapon();
+  G.dropItem(it, p.pos.x, p.pos.y + 1.2, p.pos.z);
+  UI.hotbarDirty = true;
+  Sound.play('throw', null, 0.5);
 }
 
 function updateBullets(dt) {
@@ -633,23 +912,24 @@ function updateBullets(dt) {
       b.vel.y -= 22 * dt;
       b.pos.addScaledVector(b.vel, dt);
       b.mesh.position.copy(b.pos);
-      Fx.trail(b.pos.x, b.pos.y, b.pos.z, '#b98cff', 0.5, 0.3, 3);
+      Fx.trail(b.pos.x, b.pos.y, b.pos.z, b.color, 0.5, 0.3, 3);
       b.life -= dt;
       let hitE = false;
-      for (const e of G.enemies) if (!e.dead && Math.hypot(e.pos.x - b.pos.x, e.cy - b.pos.y, e.pos.z - b.pos.z) < e.r + 0.3) hitE = true;
-      if (hitE || World.solidAt(b.pos.x, b.pos.y, b.pos.z) || b.life <= 0) {
+      for (const e of G.enemies) if (!e.dead && !e.hidden && Math.hypot(e.pos.x - b.pos.x, e.aimY(b.pos.y) - b.pos.y, e.pos.z - b.pos.z) < e.r + 0.3) hitE = true;
+      if (hitE || World.solidAt(b.pos.x, b.pos.y, b.pos.z) || b.life <= 0 || b.pos.y < World.hazardLevel) {
         b.dead = true;
         const gy = Math.max(b.pos.y, World.heightAt(b.pos.x, b.pos.z) + 0.3);
-        explodeAt(b.pos.x, gy, b.pos.z, 8, b.dmg, '#b98cff', 2.2);
-        Fx.shockRing(b.pos.x, gy, b.pos.z, '#e0ccff', 4, 50);
-        for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 10) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
+        const R = b.bomb ? 5 : 8;
+        explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 2.2, b.bomb ? 12 : 30);
+        Fx.shockRing(b.pos.x, gy, b.pos.z, b.bomb ? '#ffb38a' : '#e0ccff', R * 0.5, 50);
+        if (!b.bomb) for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 10) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
         Fx.addShake(0.5 * G.vol(b.pos) * 2);
         Sound.play('bomb', null, Math.min(1, G.vol(b.pos) * 2));
       }
       continue;
     }
     if (b.kind === 'missile') {
-      if (!b.target || b.target.dead) b.target = G.nearestEnemy(b.pos.x, b.pos.z, 60, null, true);
+      if (!b.target || b.target.dead || b.target.hidden) b.target = G.nearestEnemy(b.pos.x, b.pos.z, 60, null, true);
       const sp = b.vel.length();
       const ns = Math.min(45, sp + 50 * dt);
       if (b.target && b.life < 3.8) {
@@ -660,58 +940,115 @@ function updateBullets(dt) {
       Fx.smoke(b.pos.x, b.pos.y, b.pos.z, 0.35, 0.6, 0, 0.3, 0);
       Fx.trail(b.pos.x, b.pos.y, b.pos.z, '#ffcf4d', 0.35, 0.15, 3);
     }
+    if (b.kind === 'rocket') {
+      Fx.smoke(b.pos.x, b.pos.y, b.pos.z, 0.5, 0.8, 0, 0.3, 0);
+      Fx.trail(b.pos.x, b.pos.y, b.pos.z, '#ffcf4d', 0.5, 0.2, 3);
+    }
+    // aim assist: player shots curve gently toward the locked enemy
+    if (b.home) {
+      const T = b.home;
+      if (T.dead || T.hidden) b.home = null;
+      else {
+        const sp = b.vel.length();
+        _a.set(T.pos.x - b.pos.x, T.cy - b.pos.y, T.pos.z - b.pos.z);
+        const dist = _a.length();
+        _a.divideScalar(dist || 1);
+        _c3.copy(b.vel).divideScalar(sp || 1);
+        if (_c3.dot(_a) > 0.2) {
+          _c3.lerp(_a, Math.min(1, dt * (b.kind === 'rocket' ? 3 : 9))).normalize();
+          b.vel.copy(_c3).multiplyScalar(sp);
+        } else b.home = null;
+      }
+    }
     b.pos.addScaledVector(b.vel, dt);
     b.mesh.position.copy(b.pos);
-    if (b.kind === 'missile' || Math.random() < 0.3) { _a.copy(b.pos).add(b.vel); b.mesh.lookAt(_a); }
+    if (b.kind === 'missile' || b.kind === 'rocket' || b.home || Math.random() < 0.3) { _a.copy(b.pos).add(b.vel); b.mesh.lookAt(_a); }
     b.life -= dt;
     // collisions (swept against enemies)
     let hit = null, best = Infinity;
     for (const e of G.enemies) {
-      if (e.dead) continue;
+      if (e.dead || e.hidden) continue;
       const rr = e.r + 0.15;
       if (Math.abs(e.pos.x - b.pos.x) > rr + 6 || Math.abs(e.pos.z - b.pos.z) > rr + 6) continue;
-      const d = segPointDist(px, py, pz, b.pos.x, b.pos.y, b.pos.z, e.pos.x, e.cy, e.pos.z);
+      const ey = e.aimY(b.pos.y);
+      const d = segPointDist(px, py, pz, b.pos.x, b.pos.y, b.pos.z, e.pos.x, ey, e.pos.z);
       if (d < rr) {
-        const t = Math.hypot(e.pos.x - px, e.cy - py, e.pos.z - pz);
+        const t = Math.hypot(e.pos.x - px, ey - py, e.pos.z - pz);
         if (t < best) { best = t; hit = e; }
       }
     }
+    const boom = () => {
+      const selfDmg = b.kind === 'rocket' ? 35 : 0;
+      explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, b.kind === 'rocket' ? 1.4 : 0.7, selfDmg);
+      if (b.kind === 'rocket') { Fx.shockRing(b.pos.x, b.pos.y, b.pos.z, '#e8ffb0', 3, 40); Fx.addShake(0.4 * G.vol(b.pos) * 2); Sound.play('bomb', null, Math.min(1, G.vol(b.pos) * 2)); }
+      else Sound.play('explode', false, G.vol(b.pos));
+    };
     if (hit) {
       b.dead = true;
       if (hit.blocks(b.pos.x, b.pos.z)) {
         Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 8, '#ffd1f2', 8);
         Sound.play('block', null, G.vol(hit.pos));
         hit.flash = Math.max(hit.flash, 0.3);
-        if (b.kind === 'bolt' && b.color === '#3cf2ff') UI.hitmarker(false, true);
+        if (b.fromPlayer) UI.hitmarker(false, true);
         continue;
       }
-      if (b.kind === 'missile') { explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, 0.7); Sound.play('explode', false, G.vol(b.pos)); }
+      if (b.kind === 'missile' || b.kind === 'rocket') boom();
       else {
         G.damageEnemy(hit, b.dmg, b.pos.x, b.pos.y, b.pos.z, b.color);
-        if (b.color === '#3cf2ff') UI.hitmarker(false);
+        if (b.fromPlayer) UI.hitmarker(false);
       }
       continue;
     }
     if (b.life <= 0 || World.solidAt(b.pos.x, b.pos.y, b.pos.z)) {
       b.dead = true;
-      if (b.kind === 'missile') { explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, 0.7); Sound.play('explode', false, G.vol(b.pos)); }
+      if (b.kind === 'missile' || b.kind === 'rocket') boom();
       else if (b.life > 0) { Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 5); Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, b.color, 0.5, 0.12, 3); }
     }
   }
 }
 
+// what a biome shot does to you on a hit
+function applyShotEffect(p, eff) {
+  if (!eff || p.dead) return;
+  if (eff === 'frost') { p.slowT = Math.max(p.slowT, 1.6); Fx.tintFlash('#8ae9ff', 0.2); }
+  else if (eff === 'fire') { p.burnT = Math.max(p.burnT, 2.2); }
+  else if (eff === 'freeze') p.freeze(1.6);
+}
+
 function updateEnemyBullets(dt) {
   const p = G.player;
+  const HD = World.homeDome;
   for (const b of G.ebullets) {
     if (b.dead) continue;
+    if (b.grav) b.vel.y -= b.grav * dt;
     b.pos.addScaledVector(b.vel, dt);
-    if (b.hugH) b.pos.y = World.heightAt(b.pos.x, b.pos.z) + b.hugH;
+    if (b.hugH) b.pos.y = World.floorAt(b.pos.x, b.pos.z) + b.hugH;
     b.mesh.position.copy(b.pos);
+    if (b.grav) { b.mesh.rotation.x += dt * 3; b.mesh.rotation.z += dt * 2; if (b.meteor) Fx.trail(b.pos.x, b.pos.y, b.pos.z, '#ff8a3a', 1.6, 0.4, 3); }
     b.life -= dt;
-    if (b.life <= 0) { b.dead = true; continue; }
-    if (World.solidAt(b.pos.x, b.pos.y, b.pos.z)) { b.dead = true; Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4); continue; }
+    if (b.life <= 0) { b.dead = true; if (b.marker) scene.remove(b.marker); continue; }
+    // home shield dome blocks every shot from outside
+    if (HD && (b.pos.x - HD.x) ** 2 + (b.pos.y - HD.y) ** 2 + (b.pos.z - HD.z) ** 2 < HD.r * HD.r) {
+      b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, '#5ab8ff', 1.4, 0.3, 3); HD.flash = 1; Sound.play('block', null, 0.5);
+      continue;
+    }
+    const ground = b.grav ? World.floorAt(b.pos.x, b.pos.z) : -1e9;
+    if (World.solidAt(b.pos.x, b.pos.y, b.pos.z) || (b.grav && b.pos.y <= ground + 0.2)) {
+      b.dead = true;
+      if (b.marker) scene.remove(b.marker);
+      if (b.splash) {
+        // boulders & meteors burst where they land
+        Fx.explosion(b.pos.x, b.pos.y, b.pos.z, b.color, 1.3);
+        Fx.shockRing(b.pos.x, Math.max(b.pos.y, ground) + 0.2, b.pos.z, b.color, b.splash * 0.6, 30);
+        Sound.play('explode', false, G.vol(b.pos));
+        const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
+        if (pd < b.splash && !p.dead) { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); }
+        if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3 });
+      } else Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4);
+      continue;
+    }
     for (const c of G.companions) {
-      if (c.offline > 0) continue;
+      if (!c.active) continue;
       const pad = c.kind === 'shield' ? 0.5 : 0;
       if (b.pos.distanceToSquared(c.pos) < (c.r + b.r + pad) ** 2) {
         b.dead = true;
@@ -727,8 +1064,14 @@ function updateEnemyBullets(dt) {
       continue;
     }
     if (segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, b.pos.x, b.pos.y, b.pos.z) < 0.45 + b.r) {
+      if (b.hugH && b.life > 1 && b.vel.lengthSq() < 1) {
+        // lingering fire patch: burns while you stand in it
+        if (p.invuln <= 0) { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); }
+        continue;
+      }
       b.dead = true;
-      if (p.dashT <= 0) p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z });
+      if (b.marker) scene.remove(b.marker);
+      if (p.dashT <= 0) { p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); applyShotEffect(p, b.effect); }
     }
   }
 }
@@ -737,11 +1080,14 @@ function updatePickups(dt) {
   const p = G.player;
   const mag = p.magnet;
   const vacuum = G.objective === 'extract';
+  const full = G.freeSlots() === 0;
   for (const k of G.pickups) {
     k.t += dt;
+    const needsSlot = k.type !== 'health' && k.type !== 'bucks';
     const dx = p.pos.x - k.pos.x, dy = p.pos.y + 0.9 - k.pos.y, dz = p.pos.z - k.pos.z;
     const dd = Math.hypot(dx, dy, dz);
-    if (!p.dead && (dd < mag || (vacuum && k.t > 1))) k.pulled = true;
+    if (!p.dead && (dd < mag || (vacuum && k.t > 1)) && !(needsSlot && full) && k.t > 0) k.pulled = true;
+    if (needsSlot && full) k.pulled = false;
     if (k.pulled && !p.dead && k.t > 0.35) {
       const sp = 14 + k.t * 4 + (vacuum ? 20 : 0);
       const kk = 1 - Math.exp(-7 * dt);
@@ -752,20 +1098,25 @@ function updatePickups(dt) {
       k.pos.addScaledVector(k.vel, dt);
       const gy = Math.max(World.groundAt(k.pos.x, k.pos.z, k.pos.y), World.hazardLevel) + 0.45;
       if (k.pos.y < gy) { k.pos.y = gy; k.vel.y = Math.abs(k.vel.y) * 0.3; k.vel.x *= 0.7; k.vel.z *= 0.7; }
+      if (World.sky && k.pos.y < World.hazardLevel + 1) { k.dead = true; scene.remove(k.model); continue; }
     }
     k.model.position.set(k.pos.x, k.pos.y + Math.sin(G.time * 3 + k.bob) * 0.1, k.pos.z);
     k.model.rotation.y += dt * 2;
-    if (!p.dead && dd < 1.3) {
-      k.dead = true;
-      scene.remove(k.model);
+    if (!p.dead && dd < 1.3 && k.t > 0) {
       if (k.type === 'health') { p.heal(15); UI.feed('+15 hull', '#6bff9e'); Sound.play('heal'); }
+      else if (k.type === 'bucks') { G.bucks += k.value; G.stats.bucks = (G.stats.bucks || 0) + k.value; UI.feed(`+${k.value} Botbucks`, '#ffd23f'); UI.bump('bucks'); Sound.play('coin'); }
       else {
-        G.inv[k.type]++;
-        G.stats.parts++;
-        UI.feed(`+1 ${PARTS[k.type].name}`, PARTS[k.type].color, k.type);
-        UI.bump(k.type);
+        const it = k.item || { t: 'part', id: k.type };
+        if (!G.addItem(it)) {
+          if (!G.fullWarnT || G.time - G.fullWarnT > 4) { G.fullWarnT = G.time; UI.feed('Hotbar full — sell or store items (X drops the selected one)', '#ff9f43'); Sound.play('deny'); }
+          continue;
+        }
+        if (it.t === 'part') { G.stats.parts++; UI.feed(`+1 ${PARTS[it.id].name}`, PARTS[it.id].color, it.id); }
+        else UI.feed(`Picked up ${UI.itemName(it)}`, '#dfe8f4');
         Sound.play('pickup');
       }
+      k.dead = true;
+      scene.remove(k.model);
     }
     if (k.t > 90 && !k.pulled) { k.dead = true; scene.remove(k.model); }
   }
@@ -787,6 +1138,11 @@ camera.add(G.fpGlider);
 G.avatar = buildAvatarModel();
 G.avatar.visible = false;
 scene.add(G.avatar);
+// Shield Bot bubble & freeze ice block around the player
+G.bubble = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 2), Mat.glowT('#5ab8ff', 0.8, 0.07));
+G.bubble.visible = false; scene.add(G.bubble);
+G.iceBlock = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.1, 1.3), new THREE.MeshStandardMaterial({ color: '#cdefff', emissive: '#4ab8ff', emissiveIntensity: 0.3, transparent: true, opacity: 0.55, roughness: 0.1, flatShading: true }));
+G.iceBlock.visible = false; scene.add(G.iceBlock);
 let swayX = 0, swayY = 0, camDist = 4.2;
 
 // ─────────── Procedural animation for the articulated mech ───────────
@@ -963,7 +1319,7 @@ function updateAvatar(dt) {
   rot(J.root, 0, 0, riding ? 0 : bank, 8, dt);
 
   U.glider.visible = gliding;
-  const thrust = air || p.dashT > 0 || gliding ? 1.4 : 0.5;
+  const thrust = p.jetting ? 3 + Math.random() : air || p.dashT > 0 || gliding ? 1.4 : 0.5;
   for (const tr of U.thrusters) tr.scale.setScalar(thrust * (0.9 + Math.random() * 0.2));
   if (U.flashT > 0) { U.flashT -= dt; U.flash.visible = U.flashT > 0; } else U.flash.visible = false;
 }
@@ -972,6 +1328,10 @@ function updateCamera(dt) {
   const p = G.player;
   const shake = Fx.shake * Fx.shake;
   updateAvatar(dt);
+  G.bubble.visible = p.shield > 0 && !p.dead && !G.riding;
+  if (G.bubble.visible) { G.bubble.position.set(p.pos.x, p.pos.y + 1, p.pos.z); G.bubble.rotation.y += dt; G.bubble.scale.setScalar(1 + 0.03 * Math.sin(G.time * 6)); }
+  G.iceBlock.visible = p.frozenT > 0 && G.thirdPerson && !p.dead;
+  if (G.iceBlock.visible) G.iceBlock.position.set(p.pos.x, p.pos.y + 1, p.pos.z);
   if (p.dead) {
     const k = Math.min(1, (2.4 - G.dying) / 1.5);
     camera.position.set(p.pos.x, p.pos.y + lerp(p.eye, 0.4, k), p.pos.z);
@@ -1030,7 +1390,7 @@ function frame(now) {
   lastT = Math.max(lastT, now);
 
   if (G.state === 'playing') {
-    if (Input.hit('Tab') || Input.hit('KeyI')) UI.openWorkshop('field');
+    if (Input.hit('Tab') || Input.hit('KeyI')) UI.openStation('field');
     else if (Input.hit('Escape') || Input.hit('KeyP')) UI.pause();
     else {
       const tsTarget = G.focus && G.dying <= 0 ? 0.4 : 1;
@@ -1046,11 +1406,10 @@ function frame(now) {
     menuT += dt;
     G.time += dt;
     const a = menuT * 0.05;
-    camera.position.set(Math.sin(a) * 70, World.arena.y + 22 + Math.sin(menuT * 0.2) * 4, Math.cos(a) * 70);
-    camera.lookAt(0, World.arena.y + 4, 0);
+    camera.position.set(Math.sin(a) * 62, World.arena.y + 20 + Math.sin(menuT * 0.2) * 4, Math.cos(a) * 62);
+    camera.lookAt(0, World.arena.y + 3, 0);
     World.followSun(0, World.arena.y, 0);
     Fx.update(dt, (x, z) => World.heightAt(x, z));
-    if (Math.random() < dt * 0.8) Fx.explosion(rand(-40, 40), World.arena.y + rand(2, 12), rand(-40, 40), pick(['#ff4d6d', '#ff8c42', '#3cf2ff', '#6bff9e']), rand(0.5, 1.2));
   } else if (G.state === 'workshop' || G.state === 'paused') {
     if (Input.hit('Escape') || ((Input.hit('Tab') || Input.hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
   }
@@ -1075,11 +1434,11 @@ function initMenuScene() {
   if (G.fpGlider) G.fpGlider.visible = false;
   clearEntities();
   World.dispose();
-  G.level = 0;
-  G.up = { armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 };
+  G.level = 0; G.where = 'hub';
+  G.up = NEW_UP();
   G.player = new Player(); G.player.dead = true;
-  World.build(scene, ZONES[0], 0);
-  Weather.init(scene, 'dust', '#3cf2ff');
+  World.build(scene, HUB, 99);
+  Weather.init(scene, HUB.ambient, HUB.ambientColor);
   G.vm.visible = false;
   camera.rotation.set(0, 0, 0);
   camera.fov = 60; camera.updateProjectionMatrix();

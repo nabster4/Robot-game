@@ -72,12 +72,12 @@ function buildEnemyModel(type, elite) {
   const d = ENEMY_TYPES[type];
   const c = d.color;
   const g = new THREE.Group();
-  const body = Mat.std(elite ? '#4a3a1a' : '#2c2832', { metal: 0.7, rough: 0.4 }).clone();
+  const body = Mat.std(elite ? '#4a3a1a' : d.body || '#2c2832', { metal: 0.7, rough: 0.4 }).clone();
   body.emissive = new THREE.Color(c); body.emissiveIntensity = 0;
   const dark = Mat.std('#16141a', { metal: 0.6, rough: 0.6 });
   const glowM = Mat.glow(elite ? '#ffd700' : c, 4);
   const parts = {};
-  switch (type) {
+  switch (d.model || type) {
     case 'drone': {
       const b = mesh(Geo.oct(0.6), body, 0, 0, 0, g); b.scale.set(1, 0.55, 1.2);
       mesh(Geo.sphere(0.16, 0), glowM, 0, 0, 0.62, g);
@@ -87,6 +87,16 @@ function buildEnemyModel(type, elite) {
         const ring = mesh(Geo.torus(0.3, 0.04), dark, s * 0.85, 0.12, -0.1, g); ring.rotation.x = Math.PI / 2;
         const blade = mesh(Geo.box(0.55, 0.02, 0.08), Mat.glowT(c, 1.5, 0.6), s * 0.85, 0.12, -0.1, g);
         parts.rotors.push(blade);
+      }
+      if (type === 'hawk') {
+        parts.wings = [];
+        for (const s of [-1, 1]) {
+          const w = new THREE.Group(); w.position.set(s * 0.4, 0.1, 0); g.add(w);
+          const f = mesh(Geo.box(1.6, 0.05, 0.6), body, s * 0.8, 0, -0.1, w); f.rotation.y = s * 0.25;
+          mesh(Geo.box(1.2, 0.06, 0.08), glowM, s * 0.8, 0.02, 0.18, w);
+          parts.wings.push(w);
+        }
+        mesh(Geo.cyl(0, 0.14, 0.4, 4), Mat.std('#ffb347'), 0, -0.05, 0.85, g).rotation.x = Math.PI / 2;
       }
       break;
     }
@@ -180,35 +190,191 @@ function buildEnemyModel(type, elite) {
   return g;
 }
 
-// ═════════════════════════ Boss ═════════════════════════
-function buildBossModel(hex) {
+// ═════════════════════════ Bosses ═════════════════════════
+// One distinct machine per biome. All face +Z. Ground bosses (beast, titan) have their feet at y=0;
+// flying bosses are centred on their body.
+function buildBossModel(kind, hex) {
   const g = new THREE.Group();
   const body = Mat.std('#2a2230', { metal: 0.8, rough: 0.35 }).clone();
   body.emissive = new THREE.Color(hex); body.emissiveIntensity = 0;
   const dark = Mat.std('#141018', { metal: 0.7, rough: 0.5 });
   const glowM = Mat.glow(hex, 4);
-  mesh(Geo.sphere(2.3, 1), body, 0, 0, 0, g);
-  const ring = new THREE.Group(); g.add(ring);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * TAU;
-    const p = new THREE.Group(); p.rotation.y = a; ring.add(p);
-    mesh(Geo.box(1.5, 2.6, 0.55), dark, 0, 0, 3.4, p);
-    mesh(Geo.box(0.12, 1.8, 0.1), glowM, 0, 0, 3.7, p);
-    mesh(Geo.cyl(0, 0.35, 1.0, 4), dark, 0, 1.7, 3.4, p);
+  const node = (parent, x, y, z) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
+  const parts = {};
+  switch (kind) {
+    case 'beast': {
+      // BRAMBLEBACK — a hulking iron boar
+      body.color.set('#6a4a34');
+      const hide = Mat.std('#3a2a20', { metal: 0.5, rough: 0.6 });
+      const torso = node(g, 0, 3.6, 0); parts.torso = torso;
+      mesh(Geo.box(3.4, 2.6, 6.2), body, 0, 0, 0, torso);
+      mesh(Geo.box(3.0, 1.1, 4.8), hide, 0, 1.6, -0.3, torso);
+      for (let i = 0; i < 7; i++) {
+        const sp = mesh(Geo.cyl(0, 0.35, 1.4, 4), dark, 0, 2.6, -2.4 + i * 0.75, torso); sp.rotation.x = -0.4;
+        mesh(Geo.sphere(0.12, 0), glowM, 0, 3.25, -2.7 + i * 0.75, torso);
+      }
+      for (const s of [-1, 1]) mesh(Geo.box(0.08, 0.3, 4.6), glowM, s * 1.72, 0.2, 0, torso);
+      const head = node(torso, 0, 0.2, 3.3); parts.head = head;
+      mesh(Geo.box(2.5, 2.1, 2.2), body, 0, 0, 0.4, head);
+      mesh(Geo.box(1.7, 1.2, 1.6), hide, 0, -0.35, 1.9, head);
+      for (const s of [-1, 1]) {
+        mesh(Geo.box(0.45, 0.3, 0.12), glowM, s * 0.7, 0.45, 1.52, head);
+        const tusk = mesh(Geo.cyl(0, 0.2, 1.4, 5), Mat.std('#f0e8d8', { metal: 0.3, rough: 0.4 }), s * 0.85, -0.4, 2.5, head); tusk.rotation.set(-1.1, 0, s * 0.3);
+        const ear = mesh(Geo.box(0.2, 0.9, 0.6), hide, s * 1.2, 1.2, 0, head); ear.rotation.z = s * 0.5;
+      }
+      parts.jaw = node(head, 0, -0.9, 1.2);
+      mesh(Geo.box(1.4, 0.35, 1.5), dark, 0, 0, 0.5, parts.jaw);
+      parts.legs = [];
+      for (const [x, z] of [[-1.4, 2.1], [1.4, 2.1], [-1.4, -2.2], [1.4, -2.2]]) {
+        const hip = node(torso, x, -1.0, z);
+        mesh(Geo.box(0.95, 1.5, 1.1), body, 0, -0.7, 0, hip);
+        const knee = node(hip, 0, -1.4, 0);
+        mesh(Geo.box(0.75, 1.3, 0.85), dark, 0, -0.6, 0, knee);
+        mesh(Geo.box(1.0, 0.3, 1.2), hide, 0, -1.15, 0.15, knee);
+        parts.legs.push({ hip, knee });
+      }
+      const tail = mesh(Geo.cyl(0.1, 0.25, 2, 5), dark, 0, 0.6, -3.8, torso); tail.rotation.x = -0.9; parts.tail = tail;
+      break;
+    }
+    case 'frost': {
+      // GLACIEROS — a floating ice golem
+      const ice = new THREE.MeshStandardMaterial({ color: '#cdefff', emissive: new THREE.Color('#4ab8ff'), emissiveIntensity: 0.25, roughness: 0.12, metalness: 0.1, flatShading: true, transparent: true, opacity: 0.9 });
+      body.color.set('#9fd8f5'); body.metalness = 0.2; body.roughness = 0.2;
+      mesh(new THREE.IcosahedronGeometry(2.2, 0), body, 0, 0, 0, g);
+      const core = mesh(Geo.sphere(0.9, 1), Mat.glow(hex, 4), 0, 0, 0.8, g); parts.core = core;
+      const head = node(g, 0, 2.9, 0); parts.head = head;
+      mesh(Geo.oct(1.15), ice, 0, 0, 0, head);
+      for (const s of [-1, 1]) mesh(Geo.box(0.35, 0.14, 0.1), Mat.glow('#ffffff', 5), s * 0.38, 0.1, 0.8, head);
+      const crown = mesh(Geo.cyl(0, 0.5, 1.6, 4), ice, 0, 1.3, 0, head); void crown;
+      parts.arms = [];
+      for (const s of [-1, 1]) {
+        const arm = node(g, s * 3.2, 0.6, 0.3);
+        mesh(Geo.oct(0.9), ice, 0, 0, 0, arm);
+        mesh(Geo.oct(0.75), ice, s * 0.2, -1.4, 0.2, arm);
+        const fist = mesh(Geo.oct(1.0), body, s * 0.3, -2.8, 0.4, arm); fist.scale.set(1, 1.2, 1);
+        parts.arms.push(arm);
+      }
+      const ring = node(g, 0, 0, 0); parts.ring = ring;
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        const sh = mesh(Geo.oct(0.45), ice, Math.cos(a) * 4.4, Math.sin(i * 1.7) * 0.8, Math.sin(a) * 4.4, ring); sh.scale.y = 2.2;
+      }
+      g.add(glowSprite(hex, 10, 0.8));
+      break;
+    }
+    case 'titan': {
+      // COLOSSUS — a walker as tall as a building
+      body.color.set('#7a7064');
+      const plate = Mat.std('#4a443c', { metal: 0.7, rough: 0.45 });
+      parts.legs = [];
+      for (const s of [-1, 1]) {
+        const hip = node(g, s * 2.3, 11, 0);
+        mesh(Geo.sphere(1.1, 1), plate, 0, 0, 0, hip);
+        mesh(Geo.box(1.7, 5.5, 1.9), body, 0, -2.75, 0, hip);
+        mesh(Geo.box(0.12, 3.5, 0.12), glowM, s * 0.9, -2.8, 0.96, hip);
+        const knee = node(hip, 0, -5.5, 0);
+        mesh(Geo.sphere(0.95, 1), plate, 0, 0, 0, knee);
+        mesh(Geo.box(1.5, 5.1, 1.7), plate, 0, -2.6, 0, knee);
+        mesh(Geo.box(2.8, 0.9, 3.8), body, 0, -5.1, 0.5, knee);
+        parts.legs.push({ hip, knee, side: s });
+      }
+      mesh(Geo.box(5.4, 1.8, 2.8), plate, 0, 11.2, 0, g);
+      const torso = node(g, 0, 14.6, 0); parts.torso = torso;
+      mesh(Geo.box(6.2, 5, 4.2), body, 0, 0, 0, torso);
+      mesh(Geo.box(4.4, 0.3, 0.2), glowM, 0, 1, 2.15, torso);
+      mesh(Geo.box(3.2, 0.3, 0.2), glowM, 0, 0, 2.15, torso);
+      mesh(Geo.sphere(0.9, 1), Mat.glow(hex, 5), 0, -1, 2.2, torso);
+      for (const s of [-1, 1]) { const pa = mesh(Geo.box(2.4, 1.2, 3.4), plate, s * 3.8, 2.4, 0, torso); pa.rotation.z = -s * 0.25; }
+      const head = node(torso, 0, 3.3, 0.2); parts.head = head;
+      mesh(Geo.box(2.4, 2, 2.4), plate, 0, 0, 0, head);
+      parts.eye = mesh(Geo.box(1.9, 0.45, 0.2), Mat.glow(hex, 6), 0, 0.15, 1.25, head);
+      mesh(Geo.cyl(0.06, 0.06, 2.2, 4), dark, 0.8, 2, -0.5, head);
+      parts.arms = [];
+      for (const s of [-1, 1]) {
+        const sh = node(torso, s * 3.9, 1.4, 0);
+        mesh(Geo.box(1.3, 4.6, 1.3), body, 0, -2.3, 0, sh);
+        const el = node(sh, 0, -4.6, 0);
+        mesh(Geo.box(1.4, 3.8, 1.4), plate, 0, -1.9, 0, el);
+        mesh(Geo.cyl(0.45, 0.55, 1.2, 8), dark, 0, -4.1, 0, el);
+        mesh(Geo.torus(0.42, 0.1, 16), glowM, 0, -4.7, 0, el).rotation.x = Math.PI / 2;
+        parts.arms.push({ sh, el, side: s });
+      }
+      break;
+    }
+    case 'fire': {
+      // INFERNUS — a magma demon wreathed in flame
+      body.color.set('#2c1410'); body.emissive.set('#ff4a0a'); body.metalness = 0.3; body.roughness = 0.8;
+      const basalt = Mat.std('#1c0e0a', { rough: 0.9, metal: 0.2 });
+      mesh(Geo.sphere(2.4, 1), body, 0, 0, 0, g);
+      for (let i = 0; i < 8; i++) { const c = mesh(Geo.box(0.14, rand(1, 2.2), 0.14), Mat.glow('#ffb347', 3), 0, 0, 0, g); const a = rand(0, TAU), b = rand(-0.8, 0.8); c.position.set(Math.cos(a) * 2.3 * Math.cos(b), Math.sin(b) * 2.3, Math.sin(a) * 2.3 * Math.cos(b)); c.lookAt(0, 0, 0); }
+      const belt = mesh(Geo.torus(2.4, 0.22, 36), Mat.glow(hex, 4), 0, -0.6, 0, g); belt.rotation.x = Math.PI / 2;
+      const head = node(g, 0, 3.0, 0.3); parts.head = head;
+      mesh(Geo.sphere(1.2, 1), basalt, 0, 0, 0, head);
+      for (const s of [-1, 1]) {
+        const horn = mesh(Geo.cyl(0, 0.35, 1.8, 5), basalt, s * 0.9, 1.0, -0.2, head); horn.rotation.z = -s * 0.6;
+        mesh(Geo.box(0.35, 0.15, 0.1), Mat.glow('#ffe14d', 6), s * 0.4, 0.15, 1.12, head);
+      }
+      mesh(Geo.box(0.8, 0.14, 0.1), Mat.glow('#ff7a1a', 5), 0, -0.4, 1.12, head);
+      parts.arms = [];
+      for (const s of [-1, 1]) {
+        const arm = node(g, s * 3.0, 0.8, 0.2);
+        mesh(Geo.sphere(0.9, 0), basalt, 0, 0, 0, arm);
+        mesh(Geo.box(0.9, 2.2, 0.9), body, s * 0.2, -1.4, 0.3, arm);
+        const fist = mesh(Geo.sphere(0.8, 0), Mat.glow(hex, 3), s * 0.3, -2.8, 0.5, arm); void fist;
+        parts.arms.push(arm);
+      }
+      const tailFlame = mesh(new THREE.ConeGeometry(2, 5, 12, 1, true), Mat.glowT('#ff6a1a', 1.2, 0.55), 0, -4.3, 0, g); tailFlame.rotation.x = Math.PI; tailFlame.castShadow = false;
+      parts.tail = tailFlame;
+      parts.flames = [];
+      for (let i = 0; i < 9; i++) {
+        const f = glowSprite(i % 3 ? '#ff6a1a' : '#ffd23f', rand(2, 3.5), 2.4);
+        const a = (i / 9) * TAU;
+        f.position.set(Math.cos(a) * 2.2, rand(0.5, 3.2), Math.sin(a) * 2.2);
+        g.add(f); parts.flames.push(f);
+      }
+      break;
+    }
+    case 'bird': {
+      // STORMWING — a mechanical bird of prey
+      body.color.set('#3a3a48');
+      const gold = Mat.std('#ffcf3a', { metal: 0.9, rough: 0.25 });
+      const b = mesh(Geo.oct(1.6), body, 0, 0, 0, g); b.scale.set(1, 0.85, 2.3);
+      mesh(Geo.box(0.3, 0.2, 3), glowM, 0, 0.9, 0, g);
+      const head = node(g, 0, 0.8, 3.1); parts.head = head;
+      mesh(Geo.sphere(0.95, 1), body, 0, 0, 0, head);
+      const beak = mesh(Geo.cyl(0, 0.45, 1.4, 5), gold, 0, -0.15, 1.2, head); beak.rotation.x = Math.PI / 2;
+      for (const s of [-1, 1]) mesh(Geo.box(0.3, 0.16, 0.1), Mat.glow(hex, 6), s * 0.45, 0.2, 0.82, head);
+      mesh(Geo.cyl(0, 0.3, 1.2, 4), gold, 0, 0.9, -0.3, head).rotation.x = -0.8;
+      parts.wings = [];
+      for (const s of [-1, 1]) {
+        const inner = node(g, s * 1.1, 0.4, 0.2);
+        mesh(Geo.box(4.2, 0.22, 2.6), body, s * 2.1, 0, 0, inner);
+        mesh(Geo.box(4.0, 0.08, 0.2), glowM, s * 2.1, 0.12, 1.25, inner);
+        const outer = node(inner, s * 4.2, 0, 0);
+        mesh(Geo.box(4.4, 0.16, 2.0), gold, s * 2.2, 0, -0.2, outer);
+        for (let k = 0; k < 4; k++) mesh(Geo.box(0.5, 0.08, 1.8), body, s * (2.5 + k * 0.6), -0.02, -1.4, outer);
+        mesh(Geo.box(4.0, 0.08, 0.16), glowM, s * 2.2, 0.1, 0.8, outer);
+        parts.wings.push({ inner, outer, side: s });
+      }
+      const tail = node(g, 0, 0.1, -3.4); parts.tail = tail;
+      for (let k = -2; k <= 2; k++) { const f = mesh(Geo.box(0.5, 0.1, 2.6), k % 2 ? gold : body, k * 0.45, 0, -1.2, tail); f.rotation.y = k * 0.18; }
+      for (const s of [-1, 1]) { const t = mesh(Geo.cyl(0.12, 0.2, 1.4, 5), gold, s * 0.6, -1.4, 0.6, g); t.rotation.x = 0.3; }
+      break;
+    }
+    default: {
+      // the original orb overseer
+      mesh(Geo.sphere(2.3, 1), body, 0, 0, 0, g);
+      const ring = new THREE.Group(); g.add(ring);
+      for (let i = 0; i < 8; i++) {
+        const p = new THREE.Group(); p.rotation.y = (i / 8) * TAU; ring.add(p);
+        mesh(Geo.box(1.5, 2.6, 0.55), dark, 0, 0, 3.4, p);
+        mesh(Geo.box(0.12, 1.8, 0.1), glowM, 0, 0, 3.7, p);
+      }
+      parts.ring = ring;
+    }
   }
-  const inner = mesh(Geo.torus(2.9, 0.12, 40), glowM, 0, 0, 0, g); inner.rotation.x = Math.PI / 2;
-  const lower = mesh(Geo.torus(1.6, 0.2, 30), glowM, 0, -2.3, 0, g); lower.rotation.x = Math.PI / 2;
-  const eye = new THREE.Group(); g.add(eye);
-  mesh(Geo.sphere(1.05, 1), Mat.std('#050305', { metal: 0.2, rough: 0.2 }), 0, 0, 1.55, eye);
-  const pupil = mesh(Geo.sphere(0.55, 1), Mat.glow(hex, 7), 0, 0, 2.3, eye);
-  const halo = glowSprite(hex, 9, 2); halo.position.set(0, 0, 2.6); eye.add(halo);
-  const crown = new THREE.Group(); g.add(crown);
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * TAU;
-    const sp = mesh(Geo.cyl(0, 0.3, 1.6, 4), dark, Math.cos(a) * 1.5, 2.3, Math.sin(a) * 1.5, crown);
-    sp.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4);
-  }
-  g.userData.parts = { ring, inner, lower, eye, pupil, crown };
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.userData.parts = parts;
   g.userData.bodyMat = body;
   return g;
 }
@@ -270,6 +436,36 @@ function buildCompanionModel(kind) {
       parts.thrust = glowSprite(c, 0.9, 2); parts.thrust.position.y = -0.35; g.add(parts.thrust);
       break;
     }
+    case 'scout': {
+      const b = mesh(Geo.oct(0.28), body, 0, 0, 0, g); b.scale.set(0.8, 0.5, 1.4);
+      mesh(Geo.sphere(0.09, 1), Mat.glow('#ffffff', 4), 0, 0.05, 0.36, g);
+      const dish = mesh(Geo.cyl(0.2, 0.05, 0.08, 10), glowM, 0, 0.25, -0.05, g); dish.rotation.x = -0.4;
+      parts.dish = dish;
+      parts.rotors = [];
+      for (const s of [-1, 1]) {
+        mesh(Geo.box(0.36, 0.03, 0.06), dark, s * 0.3, 0.05, -0.05, g);
+        parts.rotors.push(mesh(Geo.box(0.34, 0.01, 0.05), Mat.glowT(c, 1, 0.6), s * 0.5, 0.08, -0.05, g));
+      }
+      break;
+    }
+    case 'bomber': {
+      const b = mesh(Geo.cyl(0.35, 0.45, 0.5, 8), body, 0, 0, 0, g); void b;
+      mesh(Geo.cyl(0.46, 0.46, 0.06, 12), glowM, 0, -0.26, 0, g);
+      for (let i = 0; i < 3; i++) mesh(Geo.sphere(0.13, 0), Mat.std('#222228', { metal: 0.6 }), Math.cos(i * 2.1) * 0.22, -0.34, Math.sin(i * 2.1) * 0.22, g);
+      parts.rotors = [];
+      for (const s of [-1, 1]) for (const z of [-1, 1]) {
+        mesh(Geo.box(0.06, 0.06, 0.5), dark, s * 0.45, 0.15, z * 0.25, g);
+        parts.rotors.push(mesh(Geo.box(0.42, 0.01, 0.06), Mat.glowT(c, 1, 0.6), s * 0.55, 0.2, z * 0.45, g));
+      }
+      break;
+    }
+    case 'bubble': {
+      mesh(Geo.sphere(0.3, 1), body, 0, 0, 0, g);
+      for (let i = 0; i < 3; i++) { const r = mesh(Geo.torus(0.42 + i * 0.07, 0.025, 24), glowM, 0, 0, 0, g); r.rotation.set(i * 1.1, i * 0.7, 0); }
+      g.add(new THREE.Mesh(Geo.sphere(0.62, 1), Mat.glowT(c, 0.7, 0.16)));
+      parts.arcs = g.children[g.children.length - 2];
+      break;
+    }
     case 'laser': {
       const b = mesh(Geo.oct(0.35), body, 0, 0, 0, g); b.scale.set(0.8, 0.6, 1.5);
       mesh(Geo.sphere(0.12, 1), Mat.glow('#ffffff', 5), 0, 0, 0.5, g);
@@ -294,15 +490,42 @@ function buildViewModel() {
   mesh(Geo.box(0.12, 0.13, 0.5), shell, 0, 0, 0, g);
   mesh(Geo.box(0.09, 0.2, 0.1), dark, 0, -0.14, 0.12, g).rotation.x = -0.3;
   mesh(Geo.box(0.05, 0.03, 0.34), dark, 0, 0.08, -0.02, g);
-  mesh(Geo.box(0.125, 0.02, 0.3), cyan, 0, 0.03, -0.02, g);
+  const stripe = mesh(Geo.box(0.125, 0.02, 0.3), cyan, 0, 0.03, -0.02, g);
   const cell = mesh(Geo.cyl(0.035, 0.035, 0.16, 8), Mat.glow('#b98cff', 4), 0.07, -0.02, 0.08, g); cell.rotation.x = Math.PI / 2;
   const barrels = new THREE.Group(); barrels.position.z = -0.3; g.add(barrels);
   const muzzle = new THREE.Object3D(); muzzle.position.z = -0.52; g.add(muzzle);
   const flash = glowSprite('#3cf2ff', 0.35, 4); flash.position.z = -0.55; flash.visible = false; g.add(flash);
-  g.userData = { barrels, muzzle, flash, shell, dark };
+  g.userData = { barrels, muzzle, flash, shell, dark, stripe };
   setViewModelBarrels(g, 1);
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 20; } });
   return g;
+}
+// Swap the barrel assembly & glow colour to match the weapon in hand.
+function setViewModelWeapon(g, id, n = 1) {
+  const W = WEAPONS[id] || WEAPONS.blaster;
+  const { barrels, dark, stripe, flash } = g.userData;
+  stripe.material = Mat.glow(W.color, 2);
+  flash.material.color.set(W.color).multiplyScalar(4);
+  if (id === 'blaster' || !WEAPONS[id]) { setViewModelBarrels(g, n); }
+  else {
+    barrels.clear();
+    const ring = Mat.glow(W.color, 2.5);
+    if (id === 'scatter') {
+      for (let i = 0; i < 3; i++) { const b = mesh(Geo.cyl(0.028, 0.03, 0.18, 8), dark, (i - 1) * 0.05, 0.01, -0.04, barrels); b.rotation.x = Math.PI / 2; }
+      const drum = mesh(Geo.cyl(0.07, 0.07, 0.1, 10), dark, 0, -0.07, 0.05, barrels); drum.rotation.z = Math.PI / 2;
+      mesh(Geo.box(0.17, 0.02, 0.02), ring, 0, 0.01, -0.13, barrels);
+    } else if (id === 'rifle') {
+      const b = mesh(Geo.cyl(0.016, 0.02, 0.46, 8), dark, 0, 0.01, -0.17, barrels); b.rotation.x = Math.PI / 2;
+      for (const z of [-0.1, -0.22, -0.34]) mesh(Geo.torus(0.022, 0.006, 10), ring, 0, 0.01, z, barrels);
+      mesh(Geo.box(0.04, 0.05, 0.16), dark, 0, 0.1, 0.06, barrels);
+      mesh(Geo.sphere(0.02, 0), ring, 0, 0.1, -0.03, barrels);
+    } else if (id === 'launcher') {
+      const b = mesh(Geo.cyl(0.06, 0.06, 0.36, 10), dark, 0, 0.03, -0.06, barrels); b.rotation.x = Math.PI / 2;
+      mesh(Geo.torus(0.06, 0.012, 12), ring, 0, 0.03, -0.24, barrels);
+      mesh(Geo.box(0.02, 0.06, 0.02), ring, 0, 0.1, -0.1, barrels);
+    }
+    barrels.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 20; } });
+  }
 }
 function setViewModelBarrels(g, n) {
   const { barrels, dark } = g.userData;
@@ -312,14 +535,21 @@ function setViewModelBarrels(g, n) {
     const b = mesh(Geo.cyl(0.02, 0.025, 0.28, 8), dark, x, 0.01, -0.08, barrels); b.rotation.x = Math.PI / 2;
     mesh(Geo.torus(0.024, 0.008, 10), Mat.glow('#3cf2ff', 2.5), x, 0.01, -0.22, barrels);
   }
+  barrels.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.renderOrder = 20; } });
 }
 
 // ═════════════════════════ Pickups ═════════════════════════
 function buildPickupModel(type) {
   const g = new THREE.Group();
-  const c = type === 'health' ? '#6bff9e' : PARTS[type].color;
+  const c = type === 'health' ? '#6bff9e' : type === 'bucks' ? '#ffd23f' : type === 'item' ? '#ffffff' : PARTS[type].color;
   const m = Mat.std(c, { metal: 0.6, rough: 0.35, emissive: c, ei: 0.6 });
   switch (type) {
+    case 'bucks': {
+      const coin = mesh(Geo.cyl(0.22, 0.22, 0.06, 14), Mat.std('#ffcf3a', { metal: 0.9, rough: 0.25, emissive: '#ffb300', ei: 0.7 }), 0, 0, 0, g); coin.rotation.x = Math.PI / 2;
+      mesh(Geo.box(0.06, 0.24, 0.08), Mat.glow('#fff2b0', 2), 0, 0, 0, g);
+      break;
+    }
+    case 'item': mesh(Geo.box(0.34, 0.34, 0.34), Mat.std('#dfe8f4', { metal: 0.5, rough: 0.3, emissive: '#8ab4ff', ei: 0.5 }), 0, 0, 0, g).rotation.set(0.4, 0.4, 0); break;
     case 'scrap': mesh(Geo.box(0.36, 0.08, 0.28), m, 0, 0, 0, g).rotation.set(0.3, 0, 0.2); break;
     case 'wire': mesh(Geo.torus(0.14, 0.05, 12), m, 0, 0, 0, g); break;
     case 'servo': mesh(Geo.cyl(0.16, 0.16, 0.1, 8), m, 0, 0, 0, g).rotation.x = Math.PI / 2; break;

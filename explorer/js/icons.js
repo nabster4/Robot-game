@@ -217,6 +217,30 @@ function drawCompanionShape(ctx, kind, x, y, s, t, aim, offline = false) {
       ctx.fillStyle = c; ctx.fillRect(-6, -4, 12, 3);
       break;
     }
+    case 'scout': {
+      ctx.rotate(aim);
+      poly(ctx, [[1.2, 0], [0, -0.55], [-0.9, 0], [0, 0.55]], 12); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-4, -6); ctx.lineTo(-6, -15); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-6, -16, 4, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(6, 0, 2.5, 0, TAU); ctx.fill();
+      break;
+    }
+    case 'bomber': {
+      roundRect(ctx, -11, -8, 22, 14, 5); ctx.fill(); ctx.stroke();
+      for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sgn * 9, -6); ctx.lineTo(sgn * 15, -12); ctx.stroke(); ctx.globalAlpha = 0.5; ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(sgn * 15, -12, 6, 1.8, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = body; }
+      ctx.fillStyle = c;
+      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(i * 6, 10, 3, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'bubble': {
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 0.5; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, 13, 5, t, 0, TAU); ctx.stroke();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, TAU); ctx.fill();
+      break;
+    }
     case 'laser': {
       ctx.rotate(aim);
       poly(ctx, [[1.3, 0], [0, -0.8], [-1, 0], [0, 0.8]], 13); ctx.fill(); ctx.stroke();
@@ -284,6 +308,46 @@ function drawUpgradeIcon(ctx, id, x, y, s, color) {
       ctx.fillStyle = color; ctx.fillRect(-0.2 * s, -1 * s, 0.4 * s, 0.2 * s);
       ctx.fillRect(-0.28 * s, 0.1 * s, 0.56 * s, 0.6 * s);
       break;
+    case 'jetpack':
+      for (const k of [-1, 1]) { roundRect(ctx, (k * 0.45 - 0.35) * s, -0.8 * s, 0.7 * s, 1.3 * s, 0.25 * s); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = '#ffb347';
+      for (const k of [-1, 1]) { ctx.beginPath(); ctx.moveTo((k * 0.45 - 0.25) * s, 0.55 * s); ctx.lineTo(k * 0.45 * s, 1.05 * s); ctx.lineTo((k * 0.45 + 0.25) * s, 0.55 * s); ctx.fill(); }
+      break;
+    case 'fireboots':
+      poly(ctx, [[-0.5, -0.9], [0.1, -0.9], [0.1, 0.2], [0.9, 0.35], [0.9, 0.8], [-0.5, 0.8]], s); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ff6a1a'; ctx.beginPath(); ctx.moveTo(-0.3 * s, 0.1 * s); ctx.quadraticCurveTo(-0.2 * s, -0.5 * s, -0.05 * s, -0.2 * s); ctx.quadraticCurveTo(0.05 * s, -0.6 * s, 0.0 * s, 0.4 * s); ctx.fill();
+      break;
+    case 'backpack':
+      roundRect(ctx, -0.7 * s, -0.7 * s, 1.4 * s, 1.6 * s, 0.35 * s); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -0.7 * s, 0.35 * s, Math.PI, 0); ctx.stroke();
+      ctx.strokeRect(-0.45 * s, 0.05 * s, 0.9 * s, 0.5 * s);
+      break;
+    case 'shieldgen':
+      ctx.beginPath(); ctx.arc(0, 0.5 * s, 0.95 * s, Math.PI, 0); ctx.fill(); ctx.stroke();
+      poly(ctx, [[-0.35, 0.5], [-0.35, 0.05], [0, -0.2], [0.35, 0.05], [0.35, 0.5]], s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-1 * s, 0.5 * s); ctx.lineTo(1 * s, 0.5 * s); ctx.stroke();
+      break;
+    case 'charger':
+      roundRect(ctx, -0.8 * s, -0.5 * s, 1.5 * s, 1 * s, 0.15 * s); ctx.fill(); ctx.stroke();
+      ctx.fillRect(0.7 * s, -0.2 * s, 0.2 * s, 0.4 * s);
+      ctx.fillStyle = color; poly(ctx, [[0.05, -0.4], [-0.3, 0.05], [-0.02, 0.05], [-0.1, 0.4], [0.3, -0.05], [0.02, -0.05]], s); ctx.fill();
+      break;
+    case 'bucks':
+      ctx.beginPath(); ctx.arc(0, 0, 0.9 * s, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.font = `900 ${Math.round(s * 1.1)}px Orbitron, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = color; ctx.fillText('B', 0, s * 0.06);
+      break;
+    case 'blaster': case 'scatter': case 'rifle': case 'launcher': {
+      const len = id === 'rifle' ? 1.9 : id === 'launcher' ? 1.5 : 1.4, th = id === 'launcher' ? 0.5 : 0.34;
+      ctx.rotate(-0.5);
+      roundRect(ctx, -0.9 * s, -th * s, len * s, th * 2 * s, 0.12 * s); ctx.fill(); ctx.stroke();
+      ctx.fillRect(-0.55 * s, th * s, 0.3 * s, 0.55 * s); ctx.strokeRect(-0.55 * s, th * s, 0.3 * s, 0.55 * s);
+      ctx.fillStyle = color;
+      if (id === 'scatter') for (const k of [-1, 0, 1]) ctx.fillRect((len - 0.9) * s, (k * 0.2 - 0.06) * s, 0.35 * s, 0.12 * s);
+      else if (id === 'launcher') { ctx.beginPath(); ctx.arc((len - 0.9) * s, 0, 0.32 * s, 0, TAU); ctx.fill(); }
+      else ctx.fillRect((len - 0.9) * s, -0.08 * s, (id === 'rifle' ? 0.6 : 0.4) * s, 0.16 * s);
+      break;
+    }
   }
   ctx.restore();
 }
@@ -301,7 +365,8 @@ function iconURL(key, size, drawFn) {
 }
 const partIconURL = (type) => iconURL('p_' + type, 48, (g, s) => { glow(g, s / 2, s / 2, s * 0.6, PARTS[type].color, 0.45); drawPartIcon(g, type, s / 2, s / 2, s * 0.3, 0.4); });
 const compIconURL = (kind) => iconURL('c_' + kind, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.55, COMP_DEFS[kind].color, 0.5); drawCompanionShape(g, kind, s / 2, s / 2 + 2, 1.35, 0.3, -Math.PI / 4); });
-const upgIconURL = (id, color) => iconURL('u_' + id, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.5, color, 0.35); drawUpgradeIcon(g, id, s / 2, s / 2, s * 0.28, color); });
+const weapIconURL = (id) => iconURL('w_' + id, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.5, WEAPONS[id].color, 0.35); drawUpgradeIcon(g, id, s / 2, s / 2, s * 0.28, WEAPONS[id].color); });
+const upgIconURL = (id, color) => iconURL('u_' + id + color, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.5, color, 0.35); drawUpgradeIcon(g, id, s / 2, s / 2, s * 0.28, color); });
 
 
 // Skyrider & Scrap Sprite icons for the workshop

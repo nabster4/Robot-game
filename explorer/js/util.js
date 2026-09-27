@@ -87,10 +87,11 @@ const Input = {
   keys: {},
   pressed: {},
   mouse: { down: false, right: false, rightPressed: false, dx: 0, dy: 0 },
+  wheel: 0,
   locked: false,
   key(c) { return !!this.keys[c]; },
   hit(c) { return !!this.pressed[c]; },
-  endFrame() { this.pressed = {}; this.mouse.rightPressed = false; this.mouse.dx = 0; this.mouse.dy = 0; },
+  endFrame() { this.pressed = {}; this.mouse.rightPressed = false; this.mouse.dx = 0; this.mouse.dy = 0; this.wheel = 0; },
   init(canvas) {
     window.addEventListener('keydown', (e) => {
       if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && e.target === document.body) e.preventDefault();
@@ -113,6 +114,7 @@ const Input = {
       if (e.button === 2) this.mouse.right = false;
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
     window.addEventListener('blur', () => { this.keys = {}; this.mouse.down = false; this.mouse.right = false; });
     document.addEventListener('pointerlockerror', () => { this.fallback = true; });
     document.addEventListener('pointerlockchange', () => {

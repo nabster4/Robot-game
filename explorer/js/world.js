@@ -24,11 +24,24 @@ const World = {
     this.islands = [];
     this.braziers = [];
     this.sprites = [];
+    this.terminals = [];
+    this.hubPortals = [];
+    this.chargePads = [];
+    this.updraftCols = [];
+    this.volcanoes = [];
+    this.shop = null; this.homePortal = null; this.homeDome = null; this.portal = null;
+    this.domeSealed = false; this.domeTrap = false; this.domeOpening = false; this.dome = null;
+    this.hub = !!zone.hub;
+    this.sky = !!zone.sky3;
+    this.hazardLevel = zone.hazardLevel ?? -3;
+    this.T = zone.terrain || { amp: 1, ridge: 1 };
+    if (this.hub) return this.buildHubWorld();
+    if (this.sky) return this.buildSkyWorld(idx);
 
     // key locations
     this.arena = { x: 0, z: 0, r: 30 };
     this.spawn = { x: 0, z: 165 };
-    const flats = [{ x: this.arena.x, z: this.arena.z, r: 34 }, { x: this.spawn.x, z: this.spawn.z, r: 12 }];
+    const flats = [{ x: this.arena.x, z: this.arena.z, r: 34 }, { x: this.spawn.x, z: this.spawn.z, r: 19 }];
     const nb = zone.beacons;
     const baseA = rand(0, TAU);
     for (let i = 0; i < nb; i++) {
@@ -48,11 +61,31 @@ const World = {
     this.buildArena();
     for (const f of flats) if (f.beacon) this.buildBeacon(f.x, f.z);
     this.buildSpawnPad();
+    this.buildHomePortal(this.spawn.x - 13, this.spawn.z + 2);
+    this.buildShop(this.spawn.x + 13, this.spawn.z + 1);
     this.scatterProps();
+    this.scatterFlora();
+    if (zone.volcanoes) this.buildVolcanoes();
     this.placeCaches(10 + idx);
-    this.buildIslands(idx >= 3 ? 3 : 2);
+    this.buildIslands(idx >= 2 ? 3 : 2);
     this.placeSprites(8 + Math.floor(idx / 2));
     return this;
+  },
+
+  // floor height used for placing things: island tops in the sky biome, terrain elsewhere
+  surf(x, z) {
+    if (this.sky) { const is = this.islandAt(x, z); return is ? is.top : this.hazardLevel; }
+    return this.heightAt(x, z);
+  },
+  islandAt(x, z, pad = 0) {
+    let best = null;
+    for (const is of this.islands) if ((x - is.x) ** 2 + (z - is.z) ** 2 < (is.r + pad) ** 2 && (!best || is.top > best.top)) best = is;
+    return best;
+  },
+  // walkable floor for ground robots (they never walk off sky islands)
+  floorAt(x, z, y = 1e9) {
+    if (this.sky) { const is = this.islandAt(x, z); return is ? is.top : this.hazardLevel; }
+    return this.heightAt(x, z);
   },
 
   dispose() {
@@ -68,12 +101,13 @@ const World = {
 
   // ─────────── Height field ───────────
   rawHeight(x, z) {
-    const n = this.noise;
+    if (this.sky) return -40;
+    const n = this.noise, T = this.T;
     let h = 0, amp = 1, f = 0.0055;
     for (let o = 0; o < 5; o++) { h += n(x * f + o * 17.3, z * f - o * 9.1) * amp; amp *= 0.5; f *= 2.03; }
-    h *= 15;
+    h *= 15 * T.amp;
     const r = 1 - Math.abs(n(x * 0.004 + 50, z * 0.004 - 20));
-    h += r * r * 9 - 3;
+    h += r * r * 9 * T.ridge - 3;
     const e = Math.max(Math.abs(x), Math.abs(z)) / this.half;
     if (e > 0.76) h += Math.pow((e - 0.76) / 0.24, 2) * 55;
     return h;
@@ -118,6 +152,8 @@ const World = {
     geo.computeVertexNormals();
     const G = this.zone.ground;
     const cLow = new THREE.Color(G.low), cMid = new THREE.Color(G.mid), cHigh = new THREE.Color(G.high), cRock = new THREE.Color(G.rock);
+    const cP1 = G.patch ? new THREE.Color(G.patch) : null, cP2 = G.patch2 ? new THREE.Color(G.patch2) : null, cCap = G.cap ? new THREE.Color(G.cap) : null;
+    const sector = this.hub ? ZONES.map((z) => [new THREE.Color(z.ground.mid), new THREE.Color(z.ground.high)]) : null;
     const cols = new Float32Array(pos.count * 3);
     const nrm = geo.attributes.normal;
     const tmp = new THREE.Color();
@@ -127,6 +163,16 @@ const World = {
       tmp.copy(cLow).lerp(cMid, Math.min(1, t * 1.6));
       if (t > 0.6) tmp.lerp(cHigh, (t - 0.6) / 0.4);
       const slope = 1 - nrm.getY(i);
+      // colour variety: meadow/dirt patches, darker clumps, snow caps on peaks
+      if (cP1) tmp.lerp(cP1, smoothstep(0.22, 0.42, this.noise(x * 0.018 + 100, z * 0.018 - 40)) * 0.55);
+      if (cP2) tmp.lerp(cP2, smoothstep(0.18, 0.38, this.noise(x * 0.04 - 70, z * 0.04 + 30)) * 0.5);
+      if (cCap) tmp.lerp(cCap, smoothstep(17, 25, h + this.noise(x * 0.05, z * 0.05) * 4) * (1 - smoothstep(0.3, 0.55, slope)));
+      if (sector) {
+        // the meadow around home base takes on each biome's colours toward its portal
+        const k = Math.round(((Math.atan2(x, z) / TAU) * 5 + 5)) % 5;
+        const w = smoothstep(80, 190, Math.hypot(x, z)) * 0.75;
+        if (w > 0) tmp.lerp(t > 0.6 ? sector[k][1] : sector[k][0], w);
+      }
       tmp.lerp(cRock, smoothstep(0.12, 0.35, slope));
       const v = 0.9 + this.noise(x * 0.08, z * 0.08) * 0.2;
       tmp.multiplyScalar(v);
@@ -176,10 +222,10 @@ const World = {
           gl_FragColor = vec4(c, 1.0); }`,
       side: THREE.BackSide, depthWrite: false, fog: false,
     });
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), mat);
-    this.sky.renderOrder = -10;
-    this.sky.frustumCulled = false;
-    this.group.add(this.sky);
+    this.skyMesh = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), mat);
+    this.skyMesh.renderOrder = -10;
+    this.skyMesh.frustumCulled = false;
+    this.group.add(this.skyMesh);
     this.scene.fog = new THREE.FogExp2(new THREE.Color(Z.fog), Z.fogDensity);
     this.scene.background = null;
   },
@@ -250,6 +296,11 @@ const World = {
         hit = c;
       }
     }
+    // boss dome: once the fight starts nobody gets out until the boss is down
+    if (this.domeTrap) {
+      const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 1.2 - r;
+      if (d > R) { p.x = this.arena.x + (dx / d) * R; p.z = this.arena.z + (dz / d) * R; hit = hit || { dome: true }; }
+    }
     // sealed arena dome
     if (this.domeSealed) {
       const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 2;
@@ -262,6 +313,7 @@ const World = {
 
   solidAt(x, y, z) {
     if (y < this.heightAt(x, z)) return true;
+    for (const is of this.islands) if (y < is.top && y > is.top - 2.4 && (x - is.x) ** 2 + (z - is.z) ** 2 < is.r * is.r) return true;
     for (const c of this.near(x, z)) {
       if (y < c.top && y >= c.bottom && (x - c.x) ** 2 + (z - c.z) ** 2 < c.r * c.r) return true;
     }
@@ -397,7 +449,7 @@ const World = {
   },
 
   buildCache(x, z, golden, yOverride) {
-    const y = yOverride ?? this.heightAt(x, z);
+    const y = yOverride ?? this.surf(x, z);
     const c = golden ? '#ffd23f' : '#3cf2ff';
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rand(0, TAU);
     this.group.add(g);
@@ -415,7 +467,7 @@ const World = {
   },
 
   buildBeacon(x, z) {
-    const y = this.heightAt(x, z);
+    const y = this.surf(x, z);
     const g = new THREE.Group(); g.position.set(x, y, z);
     this.group.add(g);
     const metal = Mat.std('#2a2e38', { metal: 0.8, rough: 0.35 });
@@ -452,7 +504,7 @@ const World = {
 
   buildSpawnPad() {
     const { x, z } = this.spawn;
-    const y = this.heightAt(x, z);
+    const y = this.surf(x, z);
     mesh(Geo.cyl(5, 5.4, 0.4, 12), Mat.std('#22303c', { metal: 0.8, rough: 0.3 }), x, y + 0.1, z, this.group).receiveShadow = true;
     const r = new THREE.Mesh(Geo.torus(4.4, 0.05, 40), Mat.glow('#3cf2ff', 1.3)); r.rotation.x = Math.PI / 2; r.position.set(x, y + 0.35, z);
     this.group.add(r);
@@ -460,7 +512,7 @@ const World = {
 
   buildArena() {
     const A = this.arena;
-    const y = this.heightAt(A.x, A.z);
+    const y = this.surf(A.x, A.z);
     A.y = y;
     const accent = this.zone.boss.color;
     const floor = mesh(new THREE.CylinderGeometry(A.r, A.r + 1, 0.6, 48), Mat.std('#1c1c24', { metal: 0.7, rough: 0.4 }), A.x, y + 0.05, A.z, this.group);
@@ -478,10 +530,10 @@ const World = {
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * TAU;
       const px = A.x + Math.cos(a) * (A.r + 3), pz = A.z + Math.sin(a) * (A.r + 3);
-      const py = this.heightAt(px, pz);
+      const py = this.sky ? y : this.heightAt(px, pz);
       mesh(Geo.box(1.8, 9, 1.8), concrete, px, py + 4.2, pz, this.group);
       mesh(Geo.sphere(0.45, 1), Mat.glow(accent, 5), px, py + 9.2, pz, this.group).castShadow = false;
-      this.addCollider(px, pz, 1.3, py + 9);
+      this.addCollider(px, pz, 1.3, py + 9, 'pillar', this.sky ? py - 1 : -Infinity);
     }
     // sealed dome
     const dome = new THREE.Mesh(new THREE.SphereGeometry(A.r + 2, 40, 20, 0, TAU, 0, Math.PI / 2),
@@ -491,11 +543,28 @@ const World = {
     wire.position.set(A.x, y, A.z);
     this.group.add(dome, wire);
     this.dome = dome; this.domeWire = wire; this.domeSealed = true; this.domeFade = 1;
+    this.domeMat = dome.material; this.domeWireMat = wire.material;
   },
 
   openDome() {
-    this.domeSealed = false;
+    this.domeSealed = false; this.domeTrap = false;
     this.domeOpening = true;
+  },
+
+  // the dome snaps shut behind the player when the boss fight begins
+  trapDome() {
+    this.domeTrap = true; this.domeOpening = false; this.domeFade = 1;
+    this.dome.visible = this.domeWire.visible = true;
+    this.domeWire.scale.setScalar(1);
+    this.dome.material.color.set(this.zone.boss.color).multiplyScalar(0.8);
+    this.domeWire.material.color.set(this.zone.boss.color).multiplyScalar(1.4);
+  },
+  keepInside(p, r = 0.5) {
+    if (!this.domeTrap) return;
+    const A = this.arena, dx = p.x - A.x, dz = p.z - A.z, d = Math.hypot(dx, dz), R = A.r + 1.2 - r;
+    if (d > R) { p.x = A.x + (dx / d) * R; p.z = A.z + (dz / d) * R; }
+    const R2 = A.r + 2 - r, cap = A.y + Math.sqrt(Math.max(0, R2 * R2 - Math.min(d, R2) ** 2)) - 0.5;
+    if (p.y > cap) p.y = cap;
   },
 
   buildPortal() {
@@ -568,7 +637,7 @@ const World = {
 
   // ─────────── Enemy camps ───────────
   buildBrazier(x, z) {
-    const y = this.heightAt(x, z);
+    const y = this.surf(x, z);
     const g = new THREE.Group(); g.position.set(x, y, z); this.group.add(g);
     const dark = Mat.std('#1c1a1e', { metal: 0.7, rough: 0.5 });
     mesh(Geo.cyl(0.25, 0.45, 0.9, 6), dark, 0, 0.45, 0, g);
@@ -585,10 +654,10 @@ const World = {
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * TAU + rand(-0.2, 0.2);
       const sx = Math.cos(a) * 4.2, sz = Math.sin(a) * 4.2;
-      const seat = mesh(Geo.box(rand(0.8, 1.4), 0.4, rand(0.5, 0.8)), Mat.std('#4a3e38', { metal: 0.5, rough: 0.7 }), sx, this.heightAt(x + sx, z + sz) - y + 0.15, sz, g);
+      const seat = mesh(Geo.box(rand(0.8, 1.4), 0.4, rand(0.5, 0.8)), Mat.std('#4a3e38', { metal: 0.5, rough: 0.7 }), sx, this.surf(x + sx, z + sz) - y + 0.15, sz, g);
       seat.rotation.y = -a + rand(-0.3, 0.3);
     }
-    this.addCollider(x, z, 0.9, y + 1.3, 'brazier');
+    this.addCollider(x, z, 0.9, y + 1.3, 'brazier', this.sky ? y - 1 : -Infinity);
     const camp = { x, z, y, r: 6, flames, alerted: false };
     this.braziers.push(camp);
     return camp;
@@ -597,12 +666,12 @@ const World = {
   // ─────────── Scrap Sprites (hidden collectibles, like Koroks) ───────────
   placeSprites(n) {
     const spots = [];
-    for (const is of this.islands) spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
+    for (const is of this.islands.slice().sort(() => Math.random() - 0.5)) if (is.kind !== 'spawn') spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
     const tall = this.colliders.filter((c) => (c.kind === 'pillar' && c.top - this.heightAt(c.x, c.z) > 6 && c.bottom === -Infinity) || (c.kind === 'rock' && c.top - this.heightAt(c.x, c.z) > 3.2));
     tall.sort(() => Math.random() - 0.5);
     for (const c of tall) { if (spots.length >= n - 1) break; spots.push([c.x, c.top + 0.6, c.z]); }
     // one hidden in a quiet corner of the map
-    const hid = this.randomClear(1, 40);
+    const hid = this.sky ? null : this.randomClear(1, 40);
     if (hid) spots.push([hid[0], this.heightAt(hid[0], hid[1]) + 0.6, hid[1]]);
     for (const [x, y, z] of spots.slice(0, n)) {
       const m = buildSpriteModel(); m.position.set(x, y, z); this.group.add(m);
@@ -610,8 +679,581 @@ const World = {
     }
   },
 
+  // ─────────── Trees, flowers & grass (instanced for speed) ───────────
+  scatterFlora() {
+    const F = this.zone.flora;
+    if (!F) return;
+    const trees = [];
+    for (let i = 0; i < F.trees; i++) {
+      const at = this.randomClear(1.6, 12);
+      if (!at) continue;
+      // clumps: most trees grow near another tree
+      let [x, z] = at;
+      if (trees.length && Math.random() < 0.55) {
+        const o = pick(trees), a = rand(0, TAU), d = rand(3.5, 7);
+        const nx = o.x + Math.cos(a) * d, nz = o.z + Math.sin(a) * d;
+        if (this.isClear(nx, nz, 1.2)) { x = nx; z = nz; }
+      }
+      const tr = { x, z, y: this.heightAt(x, z), s: rand(0.8, 1.4) };
+      trees.push(tr);
+      this.addCollider(x, z, 0.42 * tr.s, tr.y + this.treeHeight(F.kind, tr.s) * 0.92, 'tree');
+    }
+    this.plantTrees(trees, F);
+    const spots = [];
+    for (let i = 0; i < 160; i++) {
+      const at = this.randomClear(0.5, 6);
+      if (at) spots.push({ x: at[0], z: at[1], y: this.heightAt(at[0], at[1]), r: rand(2, 5) });
+    }
+    this.plantGround(spots, F);
+    if (this.zone.id === 'snow') this.buildSnowmen(9);
+  },
+
+  treeHeight(kind, s) { return (kind === 'pine' ? 6.2 : kind === 'dead' ? 4.8 : 5) * s; },
+
+  // Low-poly trees: brown trunks with leafy green canopies (or snowy pines / charred husks).
+  plantTrees(list, F) {
+    if (!list.length) return;
+    const col = new THREE.Color(), d = new THREE.Object3D();
+    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 0.85, metalness: 0 });
+    const inst = (geo, n) => {
+      const m = new THREE.InstancedMesh(geo, mat, n);
+      m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+      this.group.add(m);
+      return m;
+    };
+    const set = (m, i, x, y, z, sx, sy, sz, ry, hex, jitter = 0.06, rx = 0, rz = 0) => {
+      d.position.set(x, y, z); d.rotation.set(rx, ry, rz); d.scale.set(sx, sy, sz); d.updateMatrix();
+      m.setMatrixAt(i, d.matrix);
+      col.set(hex); col.offsetHSL(rand(-jitter, jitter) * 0.3, rand(-jitter, jitter), rand(-jitter, jitter));
+      m.setColorAt(i, col);
+    };
+    const n = list.length;
+    const trunkGeo = new THREE.CylinderGeometry(0.2, 0.32, 1, 6); trunkGeo.translate(0, 0.5, 0);
+    const trunks = inst(trunkGeo, n);
+    if (F.kind === 'pine') {
+      const cone = new THREE.ConeGeometry(1, 1, 7); cone.translate(0, 0.5, 0);
+      const tiers = inst(cone, n * 3);
+      const caps = F.snowy ? inst(cone, n * 3) : null;
+      list.forEach((t, i) => {
+        const s = t.s;
+        set(trunks, i, t.x, t.y - 0.2, t.z, s * 0.9, 1.6 * s, s * 0.9, 0, F.trunk);
+        const leaf = pick(F.leaves);
+        for (let k = 0; k < 3; k++) {
+          const w = (1.9 - k * 0.5) * s, h = (2.4 - k * 0.35) * s, y = t.y + (1.2 + k * 1.45) * s;
+          set(tiers, i * 3 + k, t.x, y, t.z, w, h, w, rand(0, TAU), leaf);
+          if (caps) set(caps, i * 3 + k, t.x, y + h * 0.45, t.z, w * 0.62, h * 0.55, w * 0.62, rand(0, TAU), '#f4faff', 0.02);
+        }
+      });
+    } else if (F.kind === 'dead') {
+      const branchGeo = new THREE.BoxGeometry(0.16, 1, 0.16); branchGeo.translate(0, 0.5, 0);
+      const branches = inst(branchGeo, n * 3);
+      const emberMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff7a2a').multiplyScalar(3) });
+      const embers = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.16, 0), emberMat, n * 3);
+      embers.frustumCulled = false; this.group.add(embers);
+      list.forEach((t, i) => {
+        const s = t.s;
+        set(trunks, i, t.x, t.y - 0.2, t.z, s * 0.8, 4.4 * s, s * 0.8, rand(0, TAU), F.trunk, 0.02, rand(-0.12, 0.12), rand(-0.12, 0.12));
+        for (let k = 0; k < 3; k++) {
+          const a = rand(0, TAU), y = t.y + (1.8 + k * 0.9) * s, len = rand(1, 1.8) * s, tilt = rand(0.7, 1.1);
+          set(branches, i * 3 + k, t.x, y, t.z, s, len, s, a, F.trunk, 0.02, 0, tilt);
+          const tip = new THREE.Vector3(0, len, 0).applyEuler(new THREE.Euler(0, a, tilt));
+          d.position.set(t.x + tip.x, y + tip.y, t.z + tip.z); d.rotation.set(0, 0, 0); d.scale.setScalar(rand(0.6, 1.2)); d.updateMatrix();
+          embers.setMatrixAt(i * 3 + k, d.matrix);
+        }
+      });
+    } else {
+      // round broadleaf trees: 3 leafy blobs per tree
+      const blob = new THREE.IcosahedronGeometry(1, 1);
+      const canopy = inst(blob, n * 3);
+      list.forEach((t, i) => {
+        const s = t.s;
+        set(trunks, i, t.x, t.y - 0.2, t.z, s, 3 * s, s, 0, F.trunk);
+        const leaf = pick(F.leaves);
+        const top = t.y + 3.2 * s;
+        set(canopy, i * 3, t.x, top, t.z, 1.8 * s, 1.5 * s, 1.8 * s, rand(0, TAU), leaf);
+        for (let k = 1; k < 3; k++) {
+          const a = rand(0, TAU);
+          set(canopy, i * 3 + k, t.x + Math.cos(a) * 1.1 * s, top + rand(-0.6, 0.5) * s, t.z + Math.sin(a) * 1.1 * s, 1.2 * s, 1.05 * s, 1.2 * s, rand(0, TAU), leaf);
+        }
+      });
+    }
+  },
+
+  // Flower meadows and grass tufts around the given spots ({x, z, y, r}).
+  plantGround(spots, F) {
+    const col = new THREE.Color(), d = new THREE.Object3D();
+    const nG = F.grass && F.grass.length ? spots.length * 9 : 0;
+    const nF = F.flowers && F.flowers.length ? spots.length * 7 : 0;
+    const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 0.8, metalness: 0 });
+    const place = (m, i, s, h, hex, sy = 1) => {
+      let x = s.x, z = s.z, y = s.y;
+      for (let t = 0; t < 4; t++) {
+        const a = rand(0, TAU), r = Math.sqrt(Math.random()) * s.r;
+        x = s.x + Math.cos(a) * r; z = s.z + Math.sin(a) * r;
+        y = this.sky ? s.y : this.heightAt(x, z);
+        if (y > this.hazardLevel + 0.3) break;
+      }
+      d.position.set(x, y + h, z); d.rotation.set(rand(-0.2, 0.2), rand(0, TAU), rand(-0.2, 0.2)); d.scale.set(1, sy, 1); d.updateMatrix();
+      m.setMatrixAt(i, d.matrix);
+      col.set(hex); col.offsetHSL(0, rand(-0.05, 0.05), rand(-0.06, 0.06));
+      m.setColorAt(i, col);
+    };
+    if (nG) {
+      const g = new THREE.ConeGeometry(0.09, 0.5, 3); g.translate(0, 0.05, 0);
+      const m = new THREE.InstancedMesh(g, mat, nG); m.frustumCulled = false; m.receiveShadow = true; this.group.add(m);
+      for (let i = 0; i < nG; i++) place(m, i, spots[i % spots.length], 0.1, pick(F.grass), rand(0.7, 1.4));
+    }
+    if (nF) {
+      const stem = new THREE.CylinderGeometry(0.02, 0.02, 0.4, 3); stem.translate(0, -0.2, 0);
+      const stems = new THREE.InstancedMesh(stem, mat, nF); stems.frustumCulled = false; this.group.add(stems);
+      const head = new THREE.IcosahedronGeometry(0.11, 0); head.scale(1, 0.55, 1);
+      const heads = new THREE.InstancedMesh(head, new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 0.5, emissive: '#222222' }), nF);
+      heads.frustumCulled = false; this.group.add(heads);
+      for (let i = 0; i < nF; i++) {
+        const s = spots[i % spots.length];
+        const hex = pick(F.flowers);
+        place(heads, i, s, 0.42, hex);
+        heads.getMatrixAt(i, d.matrix);
+        stems.setMatrixAt(i, d.matrix); stems.setColorAt(i, col.set('#3f8a2a'));
+      }
+    }
+  },
+
+  buildSnowmen(n) {
+    const snow = Mat.std('#f4f8ff', { rough: 0.9, metal: 0 });
+    for (let i = 0; i < n; i++) {
+      const at = this.randomClear(1.2, 20);
+      if (!at) continue;
+      const [x, z] = at, y = this.heightAt(x, z);
+      const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rand(0, TAU); this.group.add(g);
+      mesh(Geo.sphere(0.8, 1), snow, 0, 0.7, 0, g);
+      mesh(Geo.sphere(0.55, 1), snow, 0, 1.75, 0, g);
+      mesh(Geo.sphere(0.38, 1), snow, 0, 2.5, 0, g);
+      const nose = mesh(Geo.cyl(0, 0.07, 0.4, 5), Mat.std('#ff8a2a', { rough: 0.6, metal: 0 }), 0, 2.5, 0.52, g); nose.rotation.x = Math.PI / 2;
+      for (const s of [-1, 1]) mesh(Geo.sphere(0.05, 0), Mat.std('#111111'), s * 0.13, 2.62, 0.33, g);
+      mesh(Geo.cyl(0.26, 0.3, 0.35, 8), Mat.std('#2a2a34', { metal: 0.3 }), 0, 2.9, 0, g);
+      this.addCollider(x, z, 0.8, y + 3, 'rock');
+    }
+  },
+
+  buildVolcanoes() {
+    const rock = Mat.std('#2a1410', { rough: 0.95, metal: 0.05 });
+    const lava = Mat.glow('#ff6a1a', 2.6);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * TAU + rand(-0.3, 0.3), r = rand(250, 290);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r, h = rand(90, 130), w = rand(70, 95);
+      const cone = mesh(new THREE.CylinderGeometry(w * 0.16, w, h, 14, 1, true), rock, x, h / 2 - 10, z, this.group);
+      cone.castShadow = false;
+      const top = mesh(new THREE.CircleGeometry(w * 0.16, 14), lava, x, h - 10.5, z, this.group); top.rotation.x = -Math.PI / 2;
+      const glow = glowSprite('#ff5a1a', w * 0.9, 1.4); glow.position.set(x, h - 4, z); this.group.add(glow);
+      this.volcanoes.push({ x, y: h - 10, z, w });
+    }
+  },
+
+  // ─────────── Text signs ───────────
+  makeLabel(text, color = '#ffffff', w = 512, h = 96) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const tex = new THREE.CanvasTexture(c);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    s.userData.canvas = c; s.userData.tex = tex;
+    this.setLabel(s, text, color);
+    s.scale.set(w / h * 1.1, 1.1, 1);
+    return s;
+  },
+  setLabel(s, text, color, sub) {
+    const c = s.userData.canvas, g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = 'rgba(8,14,26,0.72)';
+    roundRect(g, 6, 6, c.width - 12, c.height - 12, 22); g.fill();
+    g.strokeStyle = color; g.lineWidth = 5; g.stroke();
+    g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `900 ${sub ? 34 : 44}px Orbitron, sans-serif`;
+    g.fillText(text, c.width / 2, sub ? c.height * 0.38 : c.height / 2 + 2);
+    if (sub) { g.font = '700 26px Rajdhani, sans-serif'; g.fillStyle = '#dfe8f4'; g.fillText(sub, c.width / 2, c.height * 0.74); }
+    s.userData.tex.needsUpdate = true;
+  },
+
+  // ─────────── Portals ───────────
+  buildPortalFrame(x, z, face, color, label, sub) {
+    const y = this.surf(x, z);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = face; this.group.add(g);
+    const stone = Mat.std('#8a8478', { rough: 0.85, metal: 0.1 });
+    const dark = Mat.std('#3a3a44', { rough: 0.6, metal: 0.4 });
+    mesh(Geo.cyl(3.8, 4.2, 0.6, 10), stone, 0, 0.3, 0, g).receiveShadow = true;
+    for (const s of [-1, 1]) {
+      mesh(Geo.box(0.9, 7.2, 0.9), stone, s * 3.6, 3.6, 0, g);
+      mesh(Geo.box(1.2, 0.5, 1.2), dark, s * 3.6, 7.3, 0, g);
+    }
+    const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(4) });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.26, 8, 48), ringMat); ring.position.y = 3.9; g.add(ring);
+    const innerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.4), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(2.75, 40), innerMat); inner.position.y = 3.9; g.add(inner);
+    const glow = glowSprite(color, 6.5, 0.7); glow.position.y = 3.9; g.add(glow);
+    const lbl = this.makeLabel(label, color, 512, 128); lbl.position.y = 8.6; lbl.scale.set(6, 1.5, 1); g.add(lbl);
+    if (sub) this.setLabel(lbl, label, color, sub);
+    for (const s of [-1, 1]) this.addCollider(x + Math.cos(face) * s * 3.6, z - Math.sin(face) * s * 3.6, 0.7, y + 7.5, 'wall');
+    return { x, z, y, group: g, ring, ringMat, inner, innerMat, glow, label: lbl, color };
+  },
+
+  buildHomePortal(x, z) {
+    const face = Math.atan2(this.spawn.x - x, this.spawn.z - z);
+    this.homePortal = this.buildPortalFrame(x, z, face, '#3cf2ff', 'HOME BASE', 'Press E to return home');
+  },
+
+  // ─────────── Shops ───────────
+  buildShop(x, z) {
+    const S = this.zone.shop;
+    if (!S) return;
+    const y = this.surf(x, z);
+    const face = Math.atan2(this.spawn.x - x, this.spawn.z - z);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = face; this.group.add(g);
+    const wood = Mat.std('#8a5a32', { rough: 0.8, metal: 0.05 });
+    const woodD = Mat.std('#5a3a22', { rough: 0.8, metal: 0.05 });
+    mesh(Geo.box(6, 0.3, 4.4), woodD, 0, 0.15, 0, g).receiveShadow = true;
+    mesh(Geo.box(5.2, 1.2, 0.9), wood, 0, 0.9, 1.3, g);                        // counter
+    mesh(Geo.box(5.4, 0.12, 1.1), woodD, 0, 1.55, 1.3, g);
+    for (const s of [-1, 1]) for (const zz of [-1.9, 1.9]) mesh(Geo.box(0.22, 3.6, 0.22), woodD, s * 2.8, 1.8, zz, g);
+    // striped awning in the biome colour
+    for (let i = 0; i < 6; i++) {
+      const st = mesh(Geo.box(1, 0.12, 4.8), Mat.std(i % 2 ? '#fff6e8' : S.color, { rough: 0.7, metal: 0 }), -2.5 + i, 3.75, 0.3, g);
+      st.rotation.x = -0.2;
+    }
+    // goods on the shelves
+    const goods = ['#ff5a7a', '#ffd23f', '#3cf2ff', '#b98cff', '#6bff9e'];
+    for (let i = 0; i < 7; i++) mesh(Geo.box(0.4, 0.4, 0.4), Mat.std(pick(goods), { rough: 0.4, metal: 0.4, emissive: pick(goods), ei: 0.3 }), -2.2 + i * 0.72, 1.82, 1.25, g).rotation.y = rand(0, 1);
+    mesh(Geo.box(5.2, 2.2, 0.3), woodD, 0, 1.4, -1.9, g);
+    // merchant bot
+    const bot = new THREE.Group(); bot.position.set(0, 0.3, -0.4); g.add(bot);
+    const shell = Mat.std('#e8e0d0', { metal: 0.5, rough: 0.35 });
+    mesh(Geo.box(0.9, 1.1, 0.7), shell, 0, 1.2, 0, bot);
+    const head = new THREE.Group(); head.position.y = 2.1; bot.add(head);
+    mesh(Geo.box(0.8, 0.6, 0.6), shell, 0, 0, 0, head);
+    mesh(Geo.box(0.6, 0.18, 0.05), Mat.glow(S.color, 3), 0, 0.03, 0.31, head);
+    mesh(Geo.cyl(0.4, 0.45, 0.12, 10), Mat.std('#3a2a1a'), 0, 0.36, 0, head);   // hat brim
+    mesh(Geo.cyl(0.28, 0.3, 0.4, 10), Mat.std('#3a2a1a'), 0, 0.56, 0, head);
+    for (const s of [-1, 1]) { const arm = mesh(Geo.box(0.2, 0.8, 0.2), shell, s * 0.6, 1.2, 0.1, bot); arm.rotation.x = -0.5; }
+    const sign = this.makeLabel(S.name, S.color, 640, 128); sign.position.set(0, 5, 0.5); sign.scale.set(6, 1.2, 1); g.add(sign);
+    const icon = this.makeLabel('SHOP', '#ffd23f', 256, 96); icon.position.set(0, 6.3, 0.5); icon.scale.set(2.4, 0.9, 1); g.add(icon);
+    const fwd = new THREE.Vector3(0, 0, 1.3).applyAxisAngle(new THREE.Vector3(0, 1, 0), face);
+    this.shop = { x: x + fwd.x * 1.6, z: z + fwd.z * 1.6, y, head, t: 0, color: S.color };
+    for (const s of [-2, 0, 2]) {
+      const w = new THREE.Vector3(s, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), face);
+      this.addCollider(x + w.x, z + w.z, 1.2, y + 1.6, 'wall', this.sky ? y - 1 : -Infinity);
+    }
+  },
+
+  // ─────────── Home base ───────────
+  buildHubWorld() {
+    this.arena = { x: 0, z: 0, r: 0 };
+    this.spawn = { x: 0, z: 17 };
+    this.flats = [{ x: 0, z: 0, r: 62 }];
+    for (const f of this.flats) f.h = Math.max(this.hazardLevel + 3, this.rawHeight(f.x, f.z) * 0.4 + 2);
+    this.buildTerrain();
+    this.buildSky();
+    this.buildHazard();
+    this.buildLights();
+    this.arena.y = this.heightAt(0, 0);
+    this.buildHouse(0, -2);
+    for (let i = 0; i < ZONES.length; i++) this.buildHubPortal(i);
+    this.buildSpawnPad();
+    this.scatterProps();
+    this.scatterFlora();
+    // a ring of flowers and bushes right around the house
+    const spots = [];
+    for (let i = 0; i < 26; i++) { const a = (i / 26) * TAU, r = rand(20, 30); const x = Math.sin(a) * r, z = Math.cos(a) * r - 2; spots.push({ x, z, y: this.heightAt(x, z), r: 2.2 }); }
+    this.plantGround(spots, this.zone.flora);
+    this.placeSprites(3);
+    if (G.base && G.base.shield) this.buildHomeDome();
+    this.refreshPortals();
+    return this;
+  },
+
+  // A cosy house with three rooms side by side: Mechanic · Charging · Storage.
+  buildHouse(cx, cz) {
+    const y0 = this.heightAt(cx, cz);
+    this.house = { x: cx, z: cz, y: y0, w: 24, d: 16 };
+    const g = new THREE.Group(); g.position.set(cx, y0, cz); this.group.add(g);
+    const wall = Mat.std('#efe2c4', { rough: 0.85, metal: 0 });
+    const trim = Mat.std('#7a4a2a', { rough: 0.75, metal: 0.05 });
+    const floorM = Mat.std('#b98a5a', { rough: 0.8, metal: 0.05 });
+    const roofM = Mat.std('#b8442e', { rough: 0.8, metal: 0.05 });
+    const glass = Mat.glow('#ffe7a0', 1.6);
+    const W = 12, D = 8, H = 4.6, T = 0.35;
+    mesh(Geo.box(W * 2 + 0.6, 0.4, D * 2 + 0.6), Mat.std('#8a8478', { rough: 0.9 }), 0, -0.15, 0, g).receiveShadow = true;
+    const fl = mesh(Geo.box(W * 2, 0.1, D * 2), floorM, 0, 0.06, 0, g); fl.receiveShadow = true;
+    const wallSeg = (x1, z1, x2, z2, h = H, y = 0) => {
+      const len = Math.hypot(x2 - x1, z2 - z1);
+      const m = mesh(Geo.box(len, h, T), wall, (x1 + x2) / 2, y + h / 2, (z1 + z2) / 2, g);
+      m.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+      m.receiveShadow = true;
+      if (y === 0) {
+        for (let t = 0; t <= len; t += 0.55) {
+          const k = t / len;
+          this.addCollider(cx + lerp(x1, x2, k), cz + lerp(z1, z2, k), 0.33, y0 + h, 'wall');
+        }
+      }
+      return m;
+    };
+    // outer shell (back, sides) and the front with three doors
+    wallSeg(-W, -D, W, -D); wallSeg(-W, -D, -W, D); wallSeg(W, -D, W, D);
+    const doors = [-8, 0, 8], dw = 1.4;
+    let x = -W;
+    for (const dx of doors) { wallSeg(x, D, dx - dw, D); wallSeg(dx - dw, D, dx + dw, D, H - 3.2, 3.2); x = dx + dw; }
+    wallSeg(x, D, W, D);
+    // inner walls with a doorway between rooms
+    for (const ix of [-4, 4]) { wallSeg(ix, -D, ix, -1.2); wallSeg(ix, 1.2, ix, D); wallSeg(ix, -1.2, ix, 1.2, H - 3.2, 3.2); }
+    // trims, door frames, windows
+    for (const dx of doors) {
+      for (const s of [-1, 1]) mesh(Geo.box(0.25, 3.3, 0.5), trim, dx + s * dw, 1.65, D, g);
+      mesh(Geo.box(dw * 2 + 0.5, 0.3, 0.5), trim, dx, 3.3, D, g);
+    }
+    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, D, g);
+    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, -D, g);
+    for (const s of [-1, 1]) {
+      for (const wz of [-4, 3]) mesh(Geo.box(0.1, 1.2, 1.6), glass, s * (W + 0.14), 2.4, wz, g);
+      for (const wx of [-8, 0, 8]) mesh(Geo.box(1.6, 1.2, 0.1), glass, wx + s * 0, 2.4, -D - 0.14, g);
+    }
+    for (const wx of [-10.5, -5.5, 5.5, 10.5]) mesh(Geo.box(1.2, 1.1, 0.1), glass, wx, 2.5, D + 0.14, g);
+    // pitched roof (no shadow, so the rooms stay bright inside)
+    const pitch = Math.atan2(2.6, D + 0.8);
+    for (const s of [-1, 1]) {
+      const r = mesh(Geo.box(W * 2 + 1.4, 0.35, Math.hypot(2.6, D + 0.8) + 0.3), roofM, 0, H + 1.3, s * (D + 0.8) / 2, g);
+      r.rotation.x = s * pitch; r.castShadow = false;
+    }
+    for (const s of [-1, 1]) {
+      const gable = new THREE.Shape([new THREE.Vector2(-D, 0), new THREE.Vector2(D, 0), new THREE.Vector2(0, 2.6)]);
+      const gm = mesh(new THREE.ShapeGeometry(gable), wall, s * W, H, 0, g); gm.rotation.y = s * Math.PI / 2; gm.castShadow = false;
+      gm.material = Mat.std('#efe2c4', { rough: 0.85, metal: 0, flat: true });
+    }
+    mesh(Geo.box(1.2, 2.4, 1.2), Mat.std('#9a5a3a', { rough: 0.9 }), 7, H + 2.4, -3, g).castShadow = false;   // chimney
+    // porch path
+    for (const dx of doors) mesh(Geo.box(2.6, 0.08, 5), Mat.std('#c9b08a', { rough: 0.9 }), dx, 0.02, D + 2.8, g).receiveShadow = true;
+
+    // room signs over the doors
+    const rooms = [['MECHANIC', '#ffb347', -8], ['CHARGING', '#6bff9e', 0], ['STORAGE', '#3cf2ff', 8]];
+    for (const [name, c, dx] of rooms) { const l = this.makeLabel(name, c, 512, 110); l.position.set(dx, H + 0.9, D + 0.7); l.scale.set(4.2, 0.9, 1); g.add(l); }
+
+    const console = (lx, lz, color, kind, label) => {
+      const t = new THREE.Group(); t.position.set(lx, 0, lz); g.add(t);
+      mesh(Geo.box(1.6, 1.1, 0.8), Mat.std('#2a3444', { metal: 0.6, rough: 0.4 }), 0, 0.55, 0, t);
+      const scr = mesh(Geo.box(1.4, 0.9, 0.08), Mat.glow(color, 1.1), 0, 1.6, -0.2, t); scr.rotation.x = -0.25;
+      mesh(Geo.box(1.5, 0.08, 0.5), Mat.glow(color, 2.4), 0, 1.12, 0.1, t);
+      const sp = glowSprite(color, 1.3, 0.6); sp.position.y = 1.7; t.add(sp);
+      const l = this.makeLabel(label, color, 512, 96); l.position.set(0, 2.7, 0); l.scale.set(2.8, 0.55, 1); t.add(l);
+      this.addCollider(cx + lx, cz + lz, 0.8, y0 + 1.2, 'wall');
+      this.terminals.push({ kind, x: cx + lx, z: cz + lz + 1.2, y: y0, color, sprite: sp });
+    };
+    // ── Mechanic room: workbench, bot on the bench, robot arm, tool wall
+    console(-8, -6.6, '#ffb347', 'mechanic', 'MECHANIC');
+    mesh(Geo.box(3.4, 1, 1.4), trim, -10.2, 0.5, -1.5, g); mesh(Geo.box(3.6, 0.12, 1.6), Mat.std('#5a3a22'), -10.2, 1.05, -1.5, g);
+    this.addCollider(cx - 10.2, cz - 1.5, 1.3, y0 + 1.1, 'wall');
+    const benchBot = buildCompanionModel('gunner'); benchBot.position.set(-10.2, 1.5, -1.5); benchBot.scale.setScalar(1.2); g.add(benchBot);
+    const arm = new THREE.Group(); arm.position.set(-11.3, 0, -5.5); g.add(arm);
+    mesh(Geo.cyl(0.35, 0.45, 0.4, 8), Mat.std('#ffb347', { metal: 0.6 }), 0, 0.2, 0, arm);
+    const a1 = mesh(Geo.box(0.25, 2, 0.25), Mat.std('#ffb347', { metal: 0.6 }), 0.3, 1.2, 0, arm); a1.rotation.z = -0.3;
+    const a2 = mesh(Geo.box(0.2, 1.4, 0.2), Mat.std('#333844', { metal: 0.7 }), 1, 2.3, 0, arm); a2.rotation.z = -1.1;
+    this.addCollider(cx - 11.3, cz - 5.5, 0.6, y0 + 2, 'wall');
+    for (let i = 0; i < 5; i++) mesh(Geo.box(0.12, 0.7, 0.12), Mat.std(pick(['#c8c8d0', '#ff6b6b', '#ffd23f']), { metal: 0.8 }), -W + 0.3, 2 + (i % 2) * 0.3, -3 + i * 0.9, g);
+    this.mechanicSpot = { x: cx - 6, z: cz - 3.5, y: y0 };
+    // ── Charging room: glowing pads for docked bots
+    console(0, -6.6, '#6bff9e', 'charging', 'CHARGING');
+    for (const pz of [-3.6, -0.2]) for (const px of [-2.4, 0, 2.4]) {
+      mesh(Geo.cyl(0.8, 0.9, 0.18, 12), Mat.std('#2a3444', { metal: 0.7 }), px, 0.15, pz, g);
+      const ring = new THREE.Mesh(Geo.torus(0.62, 0.05, 24), Mat.glow('#6bff9e', 2.2)); ring.rotation.x = Math.PI / 2; ring.position.set(px, 0.26, pz); g.add(ring);
+      this.chargePads.push({ x: cx + px, z: cz + pz, y: y0 + 1.25, ring });
+    }
+    // ── Storage room: shelves and crates
+    console(8, -6.6, '#3cf2ff', 'storage', 'STORAGE');
+    const crate = Mat.std('#9a6a3a', { rough: 0.85 }), crateB = Mat.std('#4a6a8a', { rough: 0.6, metal: 0.4 });
+    for (const sx of [W - 0.9]) for (let i = 0; i < 4; i++) {
+      mesh(Geo.box(1.2, 3.2, 3), trim, sx, 1.6, -5.5 + i * 3.4, g);
+      for (let k = 0; k < 3; k++) mesh(Geo.box(0.8, 0.7, 0.8), pick([crate, crateB]), sx - 0.1, 0.5 + k * 1, -6 + i * 3.4 + rand(-0.4, 0.4), g);
+      this.addCollider(cx + sx, cz - 5.5 + i * 3.4, 1.3, y0 + 3.2, 'wall');
+    }
+    for (let i = 0; i < 4; i++) mesh(Geo.box(1, 1, 1), pick([crate, crateB]), 5.6 + (i % 2) * 1.1, 0.5 + Math.floor(i / 2) * 1, 3.6, g);
+    this.addCollider(cx + 6.2, cz + 3.6, 1.3, y0 + 2, 'wall');
+
+    // mailbox & lanterns outside
+    for (const s of [-1, 1]) {
+      mesh(Geo.cyl(0.08, 0.1, 2.4, 6), Mat.std('#2a2a30', { metal: 0.7 }), s * 13.5, 1.2, D + 2, g);
+      mesh(Geo.sphere(0.25, 1), Mat.glow('#ffd88a', 4), s * 13.5, 2.5, D + 2, g).castShadow = false;
+    }
+  },
+
+  buildHubPortal(i) {
+    const Z = ZONES[i], a = (i / ZONES.length) * TAU, R = 44;
+    const x = Math.sin(a) * R, z = Math.cos(a) * R;
+    const P = this.buildPortalFrame(x, z, a + Math.PI, Z.accent, Z.name.toUpperCase(), '');
+    P.i = i;
+    // a patch of the biome's own ground in front of the portal
+    const swatch = mesh(new THREE.CircleGeometry(3.6, 24), Mat.std(Z.ground.mid, { rough: 0.9, metal: 0 }), x - Math.sin(a) * 4.2, P.y + 0.08, z - Math.cos(a) * 4.2, this.group);
+    swatch.rotation.x = -Math.PI / 2; swatch.receiveShadow = true;
+    this.hubPortals.push(P);
+  },
+
+  // grey out locked portals; unlocked ones glow in the biome colour
+  refreshPortals() {
+    for (const P of this.hubPortals) {
+      const Z = ZONES[P.i];
+      const lock = G.portalLock ? G.portalLock(P.i) : null;
+      const open = !lock;
+      P.ringMat.color.set(open ? Z.accent : '#5a6070').multiplyScalar(open ? 4 : 1.2);
+      P.innerMat.opacity = open ? 0.5 : 0.08;
+      P.glow.visible = open;
+      P.open = open;
+      const beaten = G.progress && G.progress.beaten[P.i];
+      this.setLabel(P.label, Z.name.toUpperCase(), open ? Z.accent : '#8a94a8', lock ? 'LOCKED · ' + lock : beaten ? 'Boss defeated · Press E to enter' : 'Press E to enter');
+    }
+  },
+
+  buildHomeDome() {
+    if (this.homeDome || !this.house) return;
+    const H = this.house, R = 21;
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(1.1), transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 20, 0, TAU, 0, Math.PI / 2), mat);
+    dome.position.set(H.x, H.y, H.z);
+    const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(R + 0.05, 3), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(2), wireframe: true, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+    wire.position.copy(dome.position);
+    // generator pylon in the mechanic room corner
+    const py = new THREE.Group(); py.position.set(H.x - 5.2, H.y, H.z + 6.6); this.group.add(py);
+    mesh(Geo.cyl(0.5, 0.7, 0.4, 8), Mat.std('#2a3444', { metal: 0.7 }), 0, 0.2, 0, py);
+    mesh(Geo.cyl(0.15, 0.2, 2.6, 6), Mat.std('#8aa0b8', { metal: 0.8 }), 0, 1.5, 0, py);
+    const orb = mesh(Geo.sphere(0.4, 1), Mat.glow('#5ab8ff', 4), 0, 3, 0, py); orb.castShadow = false;
+    this.group.add(dome, wire);
+    this.homeDome = { x: H.x, z: H.z, y: H.y, r: R, dome, wire, orb };
+  },
+
+  // ─────────── Sky Islands biome ───────────
+  buildSkyWorld(idx) {
+    this.arena = { x: 0, z: 0, r: 30 };
+    this.spawn = { x: 0, z: 165 };
+    this.flats = [];
+    this.buildTerrain();
+    this.buildSky();
+    this.buildHazard();
+    this.buildLights();
+    // soft cloud puffs floating on the cloud sea
+    const puff = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#dfeeff', emissiveIntensity: 0.35, flatShading: true, roughness: 1 });
+    const cloudGeo = new THREE.IcosahedronGeometry(1, 1);
+    const clouds = new THREE.InstancedMesh(cloudGeo, puff, 160); clouds.frustumCulled = false; this.group.add(clouds);
+    const d = new THREE.Object3D();
+    for (let i = 0; i < 160; i++) {
+      d.position.set(rand(-260, 260), this.hazardLevel + rand(-1, 3), rand(-260, 260));
+      d.scale.set(rand(8, 22), rand(3, 7), rand(8, 22)); d.rotation.y = rand(0, TAU); d.updateMatrix();
+      clouds.setMatrixAt(i, d.matrix);
+    }
+
+    const isl = (x, z, r, top, kind) => {
+      if (this.islands.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r + 7)) return null;
+      return this.makeIsland(x, z, r, top, kind);
+    };
+    const spawnI = isl(0, 165, 22, 22, 'spawn');
+    const arenaI = isl(0, 0, 40, 38, 'arena');
+    const beaconI = [];
+    const baseA = rand(0, TAU);
+    for (let i = 0; i < this.zone.beacons; i++) {
+      const a = baseA + (i / this.zone.beacons) * TAU;
+      let x = Math.cos(a) * 125, z = Math.sin(a) * 125;
+      if (Math.hypot(x - 0, z - 165) < 60) { x *= 0.8; z = -Math.abs(z); }
+      const b = isl(x, z, 15, rand(26, 50), 'beacon');
+      if (b) beaconI.push(b);
+    }
+    for (let t = 0, n = 0; t < 80 && n < 8; t++) {
+      const x = rand(-175, 175), z = rand(-175, 175);
+      if (isl(x, z, rand(10, 14), rand(14, 56), 'camp')) n++;
+    }
+    // stepping-stone islands along the routes — the gaps need the jetpack (or a long glide down)
+    const link = (A, B) => {
+      const dx = B.x - A.x, dz = B.z - A.z, L = Math.hypot(dx, dz);
+      const start = A.r + 9, end = L - B.r - 9;
+      for (let s = start; s < end; s += rand(19, 25)) {
+        const k = s / L;
+        const x = A.x + dx * k + rand(-6, 6), z = A.z + dz * k + rand(-6, 6);
+        isl(x, z, rand(5, 7.5), lerp(A.top, B.top, k) + rand(-7, 7), 'step');
+      }
+    };
+    const hubs = [spawnI, arenaI, ...beaconI].filter(Boolean);
+    link(spawnI, arenaI);
+    for (let i = 0; i < beaconI.length; i++) { link(beaconI[i], arenaI); link(beaconI[i], beaconI[(i + 1) % beaconI.length]); }
+    const camps = this.islands.filter((i) => i.kind === 'camp');
+    for (const c of camps) { let best = null, bd = 1e9; for (const h of hubs) { const dd = Math.hypot(h.x - c.x, h.z - c.z); if (dd < bd) { bd = dd; best = h; } } if (best) link(best, c); }
+    // spawn pad, home portal & shop on the spawn island
+    this.buildSpawnPad();
+    this.buildHomePortal(this.spawn.x - 13, this.spawn.z + 2);
+    this.buildShop(this.spawn.x + 13, this.spawn.z + 1);
+    this.buildArena();
+    for (const b of beaconI) this.buildBeacon(b.x, b.z);
+    // decorate: trees, flowers & rocks
+    const F = this.zone.flora, trees = [], ground = [];
+    const rockM = Mat.std('#9a8a78', { rough: 0.95, metal: 0.05 });
+    for (const is of this.islands) {
+      const busy = [];
+      if (is.kind === 'spawn') busy.push([this.spawn.x, this.spawn.z, 7], [this.spawn.x - 13, this.spawn.z + 2, 5], [this.spawn.x + 13, this.spawn.z + 1, 5]);
+      if (is.kind === 'arena') continue;
+      if (is.kind === 'beacon') busy.push([is.x, is.z, 5]);
+      if (is.kind === 'camp') busy.push([is.x, is.z, 7.5]);
+      const nt = is.kind === 'step' ? randi(0, 1) : Math.round(is.r / 3.2);
+      for (let k = 0; k < nt; k++) {
+        const a = rand(0, TAU), r = rand(0.3, 0.8) * is.r, x = is.x + Math.cos(a) * r, z = is.z + Math.sin(a) * r;
+        if (busy.some(([bx, bz, br]) => Math.hypot(x - bx, z - bz) < br)) continue;
+        const tr = { x, z, y: is.top, s: rand(0.75, 1.2) };
+        trees.push(tr); busy.push([x, z, 3]);
+        this.addCollider(x, z, 0.4 * tr.s, is.top + this.treeHeight('round', tr.s) * 0.92, 'tree', is.top - 1);
+      }
+      ground.push({ x: is.x, z: is.z, y: is.top, r: is.r * 0.85 });
+      if (is.r > 8 && Math.random() < 0.7) {
+        const a = rand(0, TAU), r = is.r * 0.6, x = is.x + Math.cos(a) * r, z = is.z + Math.sin(a) * r;
+        if (!busy.some(([bx, bz, br]) => Math.hypot(x - bx, z - bz) < br)) {
+          const s = rand(1, 1.8), m = mesh(Geo.sphere(1, 0), rockM, x, is.top + s * 0.4, z, this.group);
+          m.scale.set(s, s * 0.8, s); this.addCollider(x, z, s * 0.9, is.top + s * 1.1, 'rock', is.top - 1);
+        }
+      }
+    }
+    this.plantTrees(trees, F);
+    this.plantGround(ground, F);
+    // caches, sprites & updraft columns
+    const spots = this.islands.filter((i) => i.kind === 'step' || i.kind === 'camp');
+    spots.sort(() => Math.random() - 0.5);
+    spots.slice(0, 12 + idx).forEach((is, i) => this.buildCache(is.x + rand(-1, 1), is.z + rand(-1, 1), i < 2, is.top));
+    this.placeSprites(9);
+    for (let i = 0; i < 7; i++) {
+      const a = rand(0, TAU), r = rand(40, 150), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (this.islandAt(x, z, 6)) continue;
+      const col = { x, z, y: 18, r: 4, top: 70 };
+      const ring = new THREE.Mesh(Geo.torus(4, 0.12, 32), Mat.glow('#bff0ff', 1.6)); ring.rotation.x = Math.PI / 2; ring.position.set(x, this.hazardLevel + 1, z); this.group.add(ring);
+      col.ring = ring;
+      this.updraftCols.push(col);
+    }
+    return this;
+  },
+
+  makeIsland(x, z, r, top, kind) {
+    const Z = this.zone;
+    const g = new THREE.Group(); g.position.set(x, top, z); this.group.add(g);
+    const grass = Mat.std(pick([Z.ground.mid, Z.ground.low, Z.ground.high]), { rough: 0.9, metal: 0 });
+    const dirt = Mat.std('#8a5a34', { rough: 0.95, metal: 0 });
+    const rock = Mat.std('#9a8a78', { rough: 0.95, metal: 0.05 });
+    const disc = mesh(new THREE.CylinderGeometry(r, r * 0.97, 1.2, Math.max(12, Math.round(r * 1.6))), grass, 0, -0.6, 0, g); disc.receiveShadow = true;
+    mesh(new THREE.CylinderGeometry(r * 0.97, r * 0.9, 1.6, Math.max(12, Math.round(r * 1.6))), dirt, 0, -2, 0, g);
+    const under = mesh(new THREE.ConeGeometry(r * 0.9, r * 1.35, 12), rock, 0, -2.8 - r * 0.675, 0, g); under.rotation.x = Math.PI; under.castShadow = false;
+    for (let k = 0; k < Math.min(6, 2 + r / 4); k++) {
+      const a = rand(0, TAU), rr = rand(0.3, 0.8) * r;
+      const chunk = mesh(Geo.sphere(1, 0), rock, Math.cos(a) * rr, -3 - rand(0, r * 0.8), Math.sin(a) * rr, g);
+      chunk.scale.setScalar(rand(0.6, 1.6)); chunk.castShadow = false;
+    }
+    // dangling vines
+    const vine = Mat.std('#3f8a2a', { rough: 0.9, metal: 0 });
+    for (let k = 0; k < Math.round(r / 2); k++) {
+      const a = rand(0, TAU), L = rand(2, 6);
+      const v = mesh(Geo.cyl(0.05, 0.05, L, 3), vine, Math.cos(a) * r * 0.95, -1.2 - L / 2, Math.sin(a) * r * 0.95, g); v.castShadow = false;
+    }
+    const is = { x, z, r, top, group: g, kind };
+    this.islands.push(is);
+    return is;
+  },
+
   update(dt, time, cam) {
-    if (this.sky) this.sky.position.copy(cam.position);
+    if (this.skyMesh) this.skyMesh.position.copy(cam.position);
     // hazard shimmer
     const p = this.hazard.geometry.attributes.position, base = this.hazardBase;
     if (this.zone.hazard.dmg) {
@@ -643,9 +1285,39 @@ const World = {
       this.domeWire.material.opacity = 0.25 * this.domeFade;
       this.domeWire.scale.setScalar(1 + (1 - this.domeFade) * 0.2);
       if (this.domeFade <= 0) { this.dome.visible = this.domeWire.visible = false; this.domeOpening = false; }
-    } else if (this.domeSealed) {
-      this.domeWire.rotation.y += dt * 0.05;
-      this.dome.material.opacity = 0.1 + 0.04 * Math.sin(time * 2);
+    } else if (this.domeSealed || this.domeTrap) {
+      this.domeWire.rotation.y += dt * (this.domeTrap ? 0.3 : 0.05);
+      this.dome.material.opacity = this.domeTrap ? 0.035 + 0.015 * Math.sin(time * 5) : 0.1 + 0.04 * Math.sin(time * 2);
+      this.domeWire.material.opacity = this.domeTrap ? 0.2 : 0.25;
+    }
+    // portals, shop keeper, charging pads, home shield
+    for (const P of this.hubPortals.concat(this.homePortal ? [this.homePortal] : [])) {
+      if (P.open === false) continue;
+      P.ring.rotation.z += dt * 0.8;
+      P.innerMat.opacity = 0.38 + 0.14 * Math.sin(time * 3 + P.x);
+      if (Math.random() < dt * 6 && Math.abs(P.x - cam.position.x) < 60 && Math.abs(P.z - cam.position.z) < 60) {
+        const a = rand(0, TAU);
+        Fx.glow.emit(P.x + Math.cos(a) * 2.8 * Math.cos(P.group.rotation.y), P.y + 3.9 + Math.sin(a) * 2.8, P.z - Math.cos(a) * 2.8 * Math.sin(P.group.rotation.y), 0, rand(0.3, 1), 0, rand(1, 2), 0.12, new THREE.Color(P.color), 2.5, 0.2, 0, 1);
+      }
+    }
+    if (this.shop) this.shop.head.rotation.y = Math.sin(time * 0.8) * 0.5;
+    for (const pad of this.chargePads) pad.ring.material === pad.ring.material && (pad.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + pad.x)));
+    if (this.homeDome) {
+      const D = this.homeDome;
+      D.wire.rotation.y += dt * 0.04;
+      D.dome.material.opacity = 0.04 + 0.015 * Math.sin(time * 1.6);
+      D.orb.position.y = 3 + Math.sin(time * 2) * 0.15;
+      if (D.flash > 0) { D.flash -= dt * 2; D.dome.material.opacity += D.flash * 0.3; }
+    }
+    for (const u of this.updraftCols) {
+      if (Math.abs(u.x - cam.position.x) > 120 || Math.abs(u.z - cam.position.z) > 120) continue;
+      if (Math.random() < dt * 16) {
+        const a = rand(0, TAU), r = rand(0, u.r);
+        Fx.glow.emit(u.x + Math.cos(a) * r, this.hazardLevel + rand(0, 30), u.z + Math.sin(a) * r, 0, rand(8, 14), 0, rand(2, 3.5), 0.18, new THREE.Color('#dff6ff'), 1.4, 0.2, 0, 1);
+      }
+    }
+    for (const v of this.volcanoes) {
+      if (Math.random() < dt * 3) Fx.smoke(v.x + rand(-4, 4), v.y + 4, v.z + rand(-4, 4), 6, 8, rand(-1, 1), rand(4, 7), rand(-1, 1), '#3a2a26');
     }
     for (const b of this.braziers) {
       b.flames.forEach((f, i) => { const k = 1 + Math.sin(time * (9 + i * 3) + b.x) * 0.12 + Math.random() * 0.08; f.scale.setScalar([2.6, 1.6, 0.8][i] * k); });

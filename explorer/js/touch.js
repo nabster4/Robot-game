@@ -165,12 +165,12 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', home: 'HOME', portal: 'ENTER' })[it.kind] : 'USE';
     const ride = document.getElementById('tb-ride');
     ride.classList.toggle('avail', !!G.vehicle);
     ride.classList.toggle('on', G.riding);
     ride.querySelector('span').textContent = G.riding ? 'EXIT' : 'RIDE';
-    document.getElementById('tb-jump').querySelector('span').textContent = G.riding ? 'UP' : p.grounded || p.climbing ? 'JUMP' : p.gliding ? 'DROP' : 'GLIDE';
+    document.getElementById('tb-jump').querySelector('span').textContent = G.riding ? 'UP' : p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };
 

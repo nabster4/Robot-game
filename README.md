@@ -11,15 +11,37 @@ Both use the same concept: destroy robots, salvage their parts, and craft compan
 
 ## Scrapforge: Outlands (3D first-person)
 
-Explore six open alien zones on foot. Each zone has a sky, fog, weather, and a hazard (oil slicks,
-lava, corrupted data, freezing water, acid, plasma).
+**Home base** sits in the middle of the world: a house with three rooms, surrounded by five biome portals.
+- **Mechanic Room:** build simple bots (Gunner, Medic, Scout) from scrap, the **Shield Generator** (a dome around the house that blocks raiders and their shots), **Fast Chargers**, and the **Skyrider**.
+- **Charging Room:** bots dock on glowing pads here to recharge.
+- **Storage Room:** deposit and withdraw anything. Storage is unlimited.
+- Progress saves every time you get home (**Continue** on the main menu). Once you've beaten a boss, robots sometimes raid the base.
 
-**Each zone plays out like this**
-1. **Explore.** Find the zone's **signal beacons** by following their light pillars, using the compass and radar. Open hidden **salvage caches** (one per zone is golden and holds Quantum Chips).
+**Five biomes**, unlocked in order by beating each boss: **Green Plains → Snowy Plains → Mountains → Fiery Volcano → Sky Islands**.
+Each has its own colour palette (green meadows with leafy trees and flowers, white and blue snow with snowy pines and snowmen,
+grey and brown peaks with snow caps, red and orange lava fields, and sky-blue floating green islands over a cloud sea), its own
+robot variants (frost shots slow you, fire shots set you burning), its own **shop** by the spawn point, and a **home portal**.
+The Volcano portal needs **Fire Boots** and the Sky Islands portal needs the **Jetpack** (both sold in the Mountains shop).
+In the Sky Islands, falling into the clouds drops you back on the last island you stood on, for some damage.
+
+**Economy and inventory**
+- **Hotbar:** 9 slots (more with Backpacks), one item per slot, no stacking. Parts, weapons and supplies each take a slot. Select with `1`–`9`, `0` or the mouse wheel (tap a slot on touch), and drop with `X`. When the hotbar is full, pickups stay on the ground.
+- **Botbucks:** sell materials at any shop. Coins also drop from robots, caches, beacons and bosses.
+- **Shops** sell weapons (**Scatter Blaster, Laser Rifle, Rocket Launcher**), gear (**Jetpack, Fire Boots, Backpack**), supplies (repair kits, plasma cells), upgrades, and premium bots (Aegis Orb, **Shield Bot**, Tesla Bot, Rocket Mech, **Bomber Bot**, Laser Sentinel).
+
+**Companion batteries:** bots drain their battery out in the biomes. As it drains they take more damage and aim worse. Below 15% a bot flies home, recharges in the Charging Room, and comes back to you on its own. Bots are weaker overall and the Medic heals at half its old rate, so you do most of the fighting.
+
+**Player:** fall damage grows with the height of the drop (short drops, gliding, jetpacking and water landings are safe). Aim assist curves your shots into nearby enemies. Your plasma bombs and rockets hurt you too if you're in the blast. Hold `Space` (or **JUMP**) in mid-air to fly with the jetpack; its fuel refills on the ground, and a quick tap still opens the glider.
+
+**Each biome plays out like this**
+1. **Explore.** Find the **signal beacons** by following their light pillars, using the compass and radar. Open hidden **salvage caches**.
 2. **Uplink.** Activate a beacon and stay inside its ring for 22 seconds while machines warp in to stop you.
-3. **Core Gate.** When every beacon is online, the force-field dome over the central arena drops.
-4. **Boss.** Step in to face the zone's boss. Attacks include ground-hugging bullet rings, spirals, aimed fans, charges, summons, **rotating lasers and shockwave slams you have to jump over**, and an enraged Overdrive phase.
-5. **Extract.** Walk into the portal to reach the Workshop, then deploy to the next zone.
+3. **Core Gate.** When every beacon is online, the dome over the central arena drops.
+4. **Boss.** Step in and the dome **seals behind you and your bots**. No one gets out until the boss is destroyed. Five distinct bosses, each harder than the last:
+   **Brambleback** (an iron boar that charges, pounces and stomps), **Glacieros** (an ice golem whose frost waves and beams **freeze you solid**, then it attacks),
+   **Colossus** (a 20 m walker that hurls boulders and stomps shockwaves), **Infernus** (a flaming magma demon with flamethrowers, meteor rain and burning ground) and
+   **Stormwing** (a mechanical bird that **vanishes, reappears behind you** and dives, with feather volleys and wind gusts). Each has an enraged Overdrive phase.
+5. **Home.** Beating the boss opens the next biome's portal. Step into the portal to go home.
 
 **Open-world systems (inspired by *Zelda: Tears of the Kingdom*)**
 - **Robot camps:** robots hang out around scrap braziers. Come within range and a Zelda-style alarm meter ("?") fills over their heads, faster the closer you are. When it tops out, the whole camp attacks. Shooting one or starting a beacon uplink sets them off instantly, and hostile robots give up if you get far enough away.
@@ -33,19 +55,19 @@ lava, corrupted data, freezing water, acid, plasma).
 - **Articulated mech:** in third person the player mech has a full joint chain: hips, knees, ankles and toes; a two-part spine, neck and head; shoulders, elbows and wrists. Procedural animation gives it walk and sprint gaits with stride-matched hip bob, pelvis sway and twist, counter-rotating chest, opposite arm swing and toe push-off. It leans into acceleration and turns, crouches on landing, and has distinct jump, fall, dash, glide, climb and riding poses. It brings up a two-handed aim when you fire, and its head tracks the camera. Every joint eases toward its target pose, so state changes blend smoothly, and footsteps are synced to the stride.
 - **Third-person view:** press `V` (or use the pause menu, or the VIEW touch button) to see your mech in an over-the-shoulder camera that avoids walls.
 
-**Skyrider:** craft a jet glider in the workshop's Vehicles tab. Press `F` to deploy it or dock it anywhere. It flies where you look (`Space` climbs, `C` dives, `Shift` boosts), and its twin cannons fire at the crosshair. It takes the hits meant for you and repairs itself while docked. If it's destroyed, you're thrown clear and can glide down.
+**Skyrider:** build a jet glider in the Mechanic Room's Vehicle tab. Press `F` to deploy it or dock it anywhere. It flies where you look (`Space` climbs, `C` dives, `Shift` boosts), and its twin cannons fire at the crosshair. It takes the hits meant for you and repairs itself while docked. If it's destroyed, you're thrown clear and can glide down.
 
-**Music:** three composed themes (an exploration theme, a combat chorus hook and a boss theme) with drum fills and echo on the lead. Each zone plays them in its own key and tempo.
+**Music:** three composed themes (an exploration theme, a combat chorus hook and a boss theme) with drum fills and echo on the lead. Each biome and home base plays them in its own key and tempo.
 
-**Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump, and glide in mid-air · `Q` dash ·
-right-click or `G` plasma grenade · `E` interact or launch · `F` Skyrider · `V` camera view · `R` repair kit · `Tab` workshop ·
+**Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump, tap in mid-air to glide, hold for jetpack · `Q` dash ·
+`1`–`9` / wheel hotbar · `X` drop item · right-click or `G` plasma bomb · `E` interact (rooms, portals, shops, caches, beacons) · `F` Skyrider · `V` camera view · `R` repair kit · `Tab` field kit (build simple bots) ·
 `Esc` pause and settings (sensitivity, third-person, invert Y, performance mode) · `M` mute.
 
 **On a phone or tablet** (landscape): touch controls turn on automatically.
 - Left thumb: floating move stick (push to the rim to sprint). Right side: drag to look.
 - **FIRE**: hold to shoot, and drag it to aim at the same time. **JUMP** (tap it again in mid-air to glide), **DASH** and **BOMB** show cooldown rings.
 - **RIDE** deploys or docks the Skyrider (hold **UP**/**DIVE** while flying), and **VIEW** switches between first and third person.
-- **USE** lights up next to caches and beacons. **FIX** uses a repair kit, **CRAFT** opens the workshop, and **❚❚** pauses.
+- **USE** lights up next to rooms, portals, shops, caches and beacons. Tap a hotbar slot to hold that item. Hold **JUMP** in mid-air for the jetpack. **FIX** uses a repair kit, **CRAFT** opens the field kit, and **❚❚** pauses.
 - Light aim assist is on, and performance mode is on by default (no shadows, lower resolution, no MSAA).
 - The game asks you to rotate to landscape, goes fullscreen where the browser allows it, and pauses when you switch apps.
 - Add `?touch=1` or `?touch=0` to the URL to force touch controls on or off.
@@ -68,13 +90,13 @@ music that gets more intense when machines are hunting you. Everything is proced
 texture or audio files, and it still runs from `file://` without a build step.
 
 ```
-explorer/js/world.js     terrain, sky, hazards, props, beacons, caches, arena dome, portal
+explorer/js/world.js     home base (house, rooms, portals, shield), biome terrain, trees, sky islands, shops, arena dome
 explorer/js/models.js    low-poly robot, boss, companion, weapon and pickup models
 explorer/js/entities.js  Player controller, Enemy AI, Boss patterns, Companions
 explorer/js/post.js      bloom and tone-mapping post-processing
 explorer/js/fx.js        particles, debris, lights, lightning, weather
-explorer/js/game.js      zone flow, projectiles, collisions, camera, main loop
-explorer/js/ui.js        HUD (compass, radar, objectives, feed) and workshop
+explorer/js/game.js      hub/biome flow, hotbar & storage, saves, raids, projectiles, camera, main loop
+explorer/js/ui.js        HUD (hotbar, compass, radar, objectives) and the Mechanic/Charging/Storage/Shop screens
 ```
 
 ---

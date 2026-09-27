@@ -267,7 +267,7 @@ const Weather = {
   init(scene, type, hex) {
     if (this.points) { scene.remove(this.points); this.points.geometry.dispose(); }
     this.type = type;
-    const n = Math.round((type === 'data' ? 300 : 700) * (G.settings.quality === 'low' ? 0.45 : 1));
+    const n = Math.round((type === 'data' ? 300 : type === 'pollen' ? 220 : 700) * (G.settings.quality === 'low' ? 0.45 : 1));
     this.n = n; this.box = 60;
     const pos = new Float32Array(n * 3);
     this.vel = new Float32Array(n);
@@ -281,8 +281,8 @@ const Weather = {
     const color = type === 'snow' ? '#ffffff' : type === 'embers' ? '#ff7a2a' : hex;
     const size = type === 'snow' ? 0.18 : type === 'data' ? 0.16 : type === 'embers' ? 0.14 : 0.08;
     const m = new THREE.PointsMaterial({
-      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : 3),
-      size, transparent: true, opacity: type === 'dust' ? 0.5 : 0.85, depthWrite: false,
+      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : type === 'pollen' ? 1.1 : 3),
+      size: type === 'pollen' ? 0.07 : size, transparent: true, opacity: type === 'dust' || type === 'pollen' ? 0.55 : 0.85, depthWrite: false,
       blending: type === 'snow' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
     this.points = new THREE.Points(g, m);
