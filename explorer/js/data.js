@@ -203,7 +203,7 @@ const WEAPONS = {
 };
 
 // ───────────────────────── Crafting (Mechanic Room & field) ─────────────────────────
-// Only simple bots can be built in the field. The Mechanic Room also builds base systems and the Skyrider.
+// Only simple bots can be built in the field. The Mechanic Room also builds base systems.
 const RECIPES = [
   { id: 'gunner', kind: 'companion', name: 'Gunner Drone', desc: COMP_DESC.gunner, cost: { scrap: 3, wire: 2 } },
   { id: 'medic',  kind: 'companion', name: 'Medic Bot',    desc: COMP_DESC.medic,  cost: { scrap: 3, circuit: 2 } },
@@ -211,7 +211,6 @@ const RECIPES = [
 
   { id: 'shieldgen', kind: 'base', name: 'Shield Generator', desc: 'Raises an energy dome around the house. Enemy shots and raiders cannot get through.', cost: { scrap: 12, circuit: 4, core: 2 } },
   { id: 'charger',   kind: 'base', name: 'Fast Chargers', desc: 'Upgrades the Charging Room: bots recharge 60% faster.', max: 2, cost: { wire: 5, circuit: 3, core: 1 } },
-  { id: 'skyrider',  kind: 'vehicle', name: 'Skyrider', desc: 'Jet glider with twin plasma cannons. Press F (or RIDE) to deploy and fly; it takes the hits for you. If it is destroyed you are thrown clear.', cost: { scrap: 10, servo: 4, wire: 4, core: 3 } },
 ];
 
 // Upgrades are only sold in shops (the price rises with each level)

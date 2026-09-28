@@ -12,8 +12,8 @@ Both use the same concept: destroy robots, salvage their parts, and craft compan
 ## Scrapforge: Outlands (3D first-person)
 
 **Home base** sits in the middle of the world: a house with three rooms, surrounded by five biome portals.
-- **Mechanic Room:** build simple bots (Gunner, Medic, Scout) from scrap, the **Shield Generator** (a dome around the house that blocks raiders and their shots), **Fast Chargers**, and the **Skyrider**.
-- **Charging Room:** bots dock on glowing pads here to recharge.
+- **Mechanic Room:** build simple bots (Gunner, Medic, Scout) from scrap, the **Shield Generator** (a dome around the house that blocks raiders and their shots), and **Fast Chargers**.
+- **Charging Room:** bots dock on glowing pads here to recharge. Bots you're not using wait here too.
 - **Storage Room:** deposit and withdraw anything. Storage is unlimited.
 - Progress saves every time you get home (**Continue** on the main menu). Once you've beaten a boss, robots sometimes raid the base.
 
@@ -25,13 +25,16 @@ The Volcano portal needs **Fire Boots** and the Sky Islands portal needs the **J
 In the Sky Islands, falling into the clouds drops you back on the last island you stood on, for some damage.
 
 **Economy and inventory**
-- **Hotbar:** 9 slots (more with Backpacks), one item per slot, no stacking. Parts, weapons and supplies each take a slot. Select with `1`–`9`, `0` or the mouse wheel (tap a slot on touch), and drop with `X`. When the hotbar is full, pickups stay on the ground.
+- **Hotbar:** 9 slots (more with Backpacks). Parts and supplies stack up to 20 per slot; weapons take a slot each. Select with `1`–`9`, `0` or the mouse wheel (tap a slot on touch), and drop one with `X`. When the hotbar is full, pickups stay on the ground.
+- **Selling:** in a shop, drag the slider on any stack to choose how many to sell. Storage lets you take items back one at a time or 20 at once.
 - **Botbucks:** sell materials at any shop. Coins also drop from robots, caches, beacons and bosses.
 - **Shops** sell weapons (**Scatter Blaster, Laser Rifle, Rocket Launcher**), gear (**Jetpack, Fire Boots, Backpack**), supplies (repair kits, plasma cells), upgrades, and premium bots (Aegis Orb, **Shield Bot**, Tesla Bot, Rocket Mech, **Bomber Bot**, Laser Sentinel).
 
-**Companion batteries:** bots drain their battery out in the biomes. As it drains they take more damage and aim worse. Below 15% a bot flies home, recharges in the Charging Room, and comes back to you on its own. Bots are weaker overall and the Medic heals at half its old rate, so you do most of the fighting.
+**Companion batteries:** bots drain their battery out in the biomes. As it drains they take more damage and aim worse. Below 15% a bot flies all the way back to the biome's home portal, travels through it (about 8 s), recharges in the Charging Room, travels back out through the portal, and flies to you. Bots are weaker overall and the Medic heals at half its old rate, so you do most of the fighting.
 
-**Player:** fall damage grows with the height of the drop (short drops, gliding, jetpacking and water landings are safe). Aim assist curves your shots into nearby enemies. Your plasma bombs and rockets hurt you too if you're in the blast. Hold `Space` (or **JUMP**) in mid-air to fly with the jetpack; its fuel refills on the ground, and a quick tap still opens the glider.
+**Bots at home & swapping:** when your squad is full, new bots wait at home base. From the field kit (`Tab`) or any room, pick a squad bot to swap out: it flies home through the portal first, and only then does the other bot set off and travel out to you. **Home** sends a bot back to rest; **Send out** calls one from home when you have a free slot.
+
+**Player:** climbing works on rocks, pillars and cliffs (not building walls or trees) and is slower than walking. Fall damage grows with the height of the drop (short drops, gliding, jetpacking and water landings are safe). Aim assist curves your shots into nearby enemies. Your plasma bombs and rockets hurt you too if you're in the blast. The plasma bomb is a small blast that softens a group rather than wiping it out, and takes about 17 s to recharge. Hold `Space` (or **JUMP**) in mid-air to fly with the jetpack; its fuel refills on the ground, and a quick tap still opens the glider.
 
 **Each biome plays out like this**
 1. **Explore.** Find the **signal beacons** by following their light pillars, using the compass and radar. Open hidden **salvage caches**.
@@ -43,30 +46,30 @@ In the Sky Islands, falling into the clouds drops you back on the last island yo
    **Stormwing** (a mechanical bird that **vanishes, reappears behind you** and dives, with feather volleys and wind gusts). Each has an enraged Overdrive phase.
 5. **Home.** Beating the boss opens the next biome's portal. Step into the portal to go home.
 
+**Portals:** just walk into a portal to travel. Locked portals tell you what they need.
+
 **Open-world systems (inspired by *Zelda: Tears of the Kingdom*)**
 - **Robot camps:** robots hang out around scrap braziers. Come within range and a Zelda-style alarm meter ("?") fills over their heads, faster the closer you are. When it tops out, the whole camp attacks. Shooting one or starting a beacon uplink sets them off instantly, and hostile robots give up if you get far enough away.
 - **Stamina wheel:** a Zelda-style ring by the crosshair. Sprinting, climbing and gliding use stamina, and running out leaves you exhausted until it refills.
-- **Climbing:** walk into rocks, pillars and beacons to climb them, stand on top, and leap off.
+- **Climbing:** walk into rocks, pillars and beacons to climb them (slower than walking), stand on top, and leap off. Building walls and trees can't be climbed.
 - **Paraglider:** press Space in mid-air to glide, and ride the hot-air updrafts over camp braziers.
 - **Sky launch:** activated beacons work like Skyview Towers. They launch you high into the sky and reveal nearby caches on your compass.
-- **Sky islands:** floating ruins with golden caches, reached by launching and gliding (or by Skyrider).
+- **Sky islands:** floating ruins with golden caches, reached by launching and gliding (or with the jetpack).
 - **Scrap Sprites:** hidden Korok-like collectibles on pillar tops, rocks and islands. Every 3 you find adds a stamina vessel.
 - **Focus:** shooting while gliding or falling slows time.
 - **Articulated mech:** in third person the player mech has a full joint chain: hips, knees, ankles and toes; a two-part spine, neck and head; shoulders, elbows and wrists. Procedural animation gives it walk and sprint gaits with stride-matched hip bob, pelvis sway and twist, counter-rotating chest, opposite arm swing and toe push-off. It leans into acceleration and turns, crouches on landing, and has distinct jump, fall, dash, glide, climb and riding poses. It brings up a two-handed aim when you fire, and its head tracks the camera. Every joint eases toward its target pose, so state changes blend smoothly, and footsteps are synced to the stride.
 - **Third-person view:** press `V` (or use the pause menu, or the VIEW touch button) to see your mech in an over-the-shoulder camera that avoids walls.
 
-**Skyrider:** build a jet glider in the Mechanic Room's Vehicle tab. Press `F` to deploy it or dock it anywhere. It flies where you look (`Space` climbs, `C` dives, `Shift` boosts), and its twin cannons fire at the crosshair. It takes the hits meant for you and repairs itself while docked. If it's destroyed, you're thrown clear and can glide down.
-
-**Music:** three composed themes (an exploration theme, a combat chorus hook and a boss theme) with drum fills and echo on the lead. Each biome and home base plays them in its own key and tempo.
+**Music:** home base and every biome have their own theme song, each with its own melody, tempo, lead instrument and groove: a bouncy bell tune at home, a skipping whistle tune in the Plains, music-box bells in the snow, a brass march in the Mountains, driving chiptune rock in the Volcano, and floating arpeggios in the Sky Islands. Combat and boss fights switch to shared action themes.
 
 **Controls:** `WASD` move · `Shift` sprint · mouse look / left-click fire · `Space` jump, tap in mid-air to glide, hold for jetpack · `Q` dash ·
-`1`–`9` / wheel hotbar · `X` drop item · right-click or `G` plasma bomb · `E` interact (rooms, portals, shops, caches, beacons) · `F` Skyrider · `V` camera view · `R` repair kit · `Tab` field kit (build simple bots) ·
+`1`–`9` / wheel hotbar · `X` drop item · right-click or `G` plasma bomb · `E` interact (rooms, shops, caches, beacons) · walk into portals to travel · `V` camera view · `R` repair kit · `Tab` field kit (build simple bots) ·
 `Esc` pause and settings (sensitivity, third-person, invert Y, performance mode) · `M` mute.
 
 **On a phone or tablet** (landscape): touch controls turn on automatically.
 - Left thumb: floating move stick (push to the rim to sprint). Right side: drag to look.
 - **FIRE**: hold to shoot, and drag it to aim at the same time. **JUMP** (tap it again in mid-air to glide), **DASH** and **BOMB** show cooldown rings.
-- **RIDE** deploys or docks the Skyrider (hold **UP**/**DIVE** while flying), and **VIEW** switches between first and third person.
+- **VIEW** switches between first and third person.
 - **USE** lights up next to rooms, portals, shops, caches and beacons. Tap a hotbar slot to hold that item. Hold **JUMP** in mid-air for the jetpack. **FIX** uses a repair kit, **CRAFT** opens the field kit, and **❚❚** pauses.
 - Light aim assist is on, and performance mode is on by default (no shadows, lower resolution, no MSAA).
 - The game asks you to rotate to landscape, goes fullscreen where the browser allows it, and pauses when you switch apps.

@@ -677,32 +677,6 @@ function buildAvatarModel() {
   return g;
 }
 
-// ═════════════════════════ Skyrider (craftable flying vehicle) ═════════════════════════
-function buildSkyriderModel() {
-  const g = new THREE.Group();
-  const body = Mat.std('#2c3e52', { metal: 0.85, rough: 0.28 }).clone();
-  body.emissive = new THREE.Color('#ff5533'); body.emissiveIntensity = 0;
-  const dark = Mat.std('#111a24', { metal: 0.7, rough: 0.4 });
-  const orange = Mat.glow('#ffb347', 4), cyan = Mat.glow('#3cf2ff', 4);
-  const fus = mesh(Geo.cyl(0.42, 0.5, 3.2, 10), body, 0, 0, 0, g); fus.rotation.x = Math.PI / 2;
-  const nose = mesh(Geo.cyl(0.02, 0.42, 1.2, 10), body, 0, 0, 2.2, g); nose.rotation.x = Math.PI / 2;
-  const canopy = mesh(Geo.sphere(0.5, 1), Mat.glowT('#3cf2ff', 0.8, 0.5, THREE.FrontSide), 0, 0.35, 0.7, g); canopy.scale.set(0.75, 0.6, 1.5);
-  for (const s of [-1, 1]) {
-    const w = mesh(Geo.box(2.4, 0.08, 1.3), body, s * 1.45, -0.05, -0.2, g); w.rotation.y = s * 0.28;
-    mesh(Geo.box(0.08, 0.1, 0.9), orange, s * 2.6, -0.02, -0.6, g).rotation.y = s * 0.28;
-    const eng = mesh(Geo.cyl(0.28, 0.32, 1.4, 10), dark, s * 0.95, -0.25, -0.6, g); eng.rotation.x = Math.PI / 2;
-    mesh(Geo.torus(0.26, 0.05, 16), orange, s * 0.95, -0.25, -1.32, g);
-    mesh(Geo.cyl(0.04, 0.05, 1.0, 6), dark, s * 1.35, -0.18, 1.0, g).rotation.x = Math.PI / 2;
-    const fin = mesh(Geo.box(0.06, 0.7, 0.7), body, s * 0.35, 0.45, -1.35, g); fin.rotation.z = s * -0.35;
-  }
-  mesh(Geo.box(0.9, 0.04, 0.05), cyan, 0, 0.02, 1.4, g);
-  const thrusters = [];
-  for (const s of [-1, 1]) { const t = glowSprite('#ffb347', 1.4, 2.5); t.position.set(s * 0.95, -0.25, -1.45); g.add(t); thrusters.push(t); }
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.userData = { bodyMat: body, thrusters };
-  return g;
-}
-
 // ═════════════════════════ Scrap Sprite (hidden collectible) ═════════════════════════
 function buildSpriteModel() {
   const g = new THREE.Group();

@@ -63,9 +63,8 @@ const Touch = {
         } else {
           this.roles.set(t.identifier, { role: 'btn', el: btn, k });
           this.press(k);
-          // held buttons: climb/ascend and dive while flying
+          // held jump: hold for the jetpack
           if (k === 'jump') Input.keys.Space = true;
-          if (k === 'descend') Input.keys.KeyC = true;
         }
         continue;
       }
@@ -124,7 +123,6 @@ const Touch = {
       else if (r.role === 'btn') {
         r.el.classList.remove('down');
         if (r.k === 'jump') Input.keys.Space = false;
-        if (r.k === 'descend') Input.keys.KeyC = false;
       }
     }
   },
@@ -140,14 +138,14 @@ const Touch = {
     this.roles.clear();
     this.releaseStick();
     Input.mouse.down = false;
-    Input.keys.Space = false; Input.keys.KeyC = false;
+    Input.keys.Space = false;
     this.layer.querySelectorAll('.down').forEach((b) => b.classList.remove('down'));
   },
 
   press(k) {
     if (k === 'pause') { UI.pause(); return; }
     if (k === 'view') { UI.toggleView(); return; }
-    const map = { jump: 'Space', dash: 'KeyQ', grenade: 'KeyG', use: 'KeyE', repair: 'KeyR', workshop: 'Tab', ride: 'KeyF' };
+    const map = { jump: 'Space', dash: 'KeyQ', grenade: 'KeyG', use: 'KeyE', repair: 'KeyR', workshop: 'Tab' };
     if (map[k]) Input.pressed[map[k]] = true;
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) { /* ignore */ }
   },
@@ -166,11 +164,7 @@ const Touch = {
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
     use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', home: 'HOME', portal: 'ENTER' })[it.kind] : 'USE';
-    const ride = document.getElementById('tb-ride');
-    ride.classList.toggle('avail', !!G.vehicle);
-    ride.classList.toggle('on', G.riding);
-    ride.querySelector('span').textContent = G.riding ? 'EXIT' : 'RIDE';
-    document.getElementById('tb-jump').querySelector('span').textContent = G.riding ? 'UP' : p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
+    document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };
 

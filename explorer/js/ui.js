@@ -162,7 +162,7 @@ const UI = {
   // ═════════════════════════ Stations: field kit · Mechanic · Charging · Storage · Shop ═════════════════════════
   openStation(mode) {
     this.mode = mode;
-    const tabs = { field: ['bots'], mechanic: ['bots', 'base', 'vehicle'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'] }[mode];
+    const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'] }[mode];
     if (!tabs.includes(this.tab)) this.tab = tabs[0];
     this.tabs = tabs;
     G.state = 'workshop';
@@ -217,8 +217,6 @@ const UI = {
 
   // ── crafting ──
   recipeState(r, useStorage) {
-    if (r.kind === 'companion' && G.companions.length >= G.slots) return { ok: false, why: 'SQUAD FULL' };
-    if (r.kind === 'vehicle' && G.vehicle) return { ok: false, why: 'OWNED' };
     if (r.id === 'shieldgen' && G.base.shield) return { ok: false, why: 'BUILT' };
     if (r.id === 'charger' && G.base.charger >= r.max) return { ok: false, why: 'MAXED' };
     if (!G.canAfford(r.cost, useStorage)) return { ok: false, why: 'NEED PARTS' };
@@ -231,8 +229,7 @@ const UI = {
     const st = this.recipeState(r, useStorage);
     if (!st.ok) { Sound.play('deny'); this.toast(st.why === 'NEED PARTS' ? 'Not enough parts' : st.why === 'SQUAD FULL' ? 'Squad is full — scrap a bot or buy a Command Uplink' : 'Already done', true); return; }
     G.consume(r.cost, useStorage);
-    if (r.kind === 'companion') { G.companions.push(new Companion(r.id)); this.toast(`${r.name} online!`); }
-    else if (r.kind === 'vehicle') { G.vehicle = new Vehicle(); this.toast(`${r.name} built! Press ${Touch.enabled ? 'RIDE' : 'F'} to fly`); }
+    if (r.kind === 'companion') { const w = G.addBot(r.id); this.toast(w === 'squad' ? `${r.name} online!` : `Squad is full — ${r.name} is waiting at home base`); }
     else if (r.id === 'shieldgen') { G.base.shield = true; World.buildHomeDome(); this.toast('Shield Generator online — the house is protected'); }
     else if (r.id === 'charger') { G.base.charger++; this.toast(`Fast Chargers installed (${G.base.charger}/${r.max})`); }
     G.total.crafted = (G.total.crafted || 0) + 1;
@@ -252,6 +249,7 @@ const UI = {
     const i = G.companions.findIndex((c) => c.id === cid);
     if (i < 0) return;
     const c = G.companions[i];
+    if (c.swapTo && !c.swapTo.home) c.swapTo.pending = false;
     const r = RECIPES.find((x) => x.id === c.kind);
     if (r) for (const [k, v] of Object.entries(r.cost)) G.store({ t: 'part', id: k }, Math.floor(v / 2));
     else { const it = Object.values(SHOP_ITEMS).find((x) => x.bot === c.kind); if (it) G.bucks += Math.round(it.price * 0.3); }
@@ -270,8 +268,7 @@ const UI = {
     if (S.kind === 'gear' && id !== 'backpack' && G.gear[id]) return { ok: false, why: 'OWNED' };
     if (id === 'backpack' && G.gear.backpack >= S.max) return { ok: false, why: 'MAXED' };
     if (S.kind === 'upgrade' && G.up[S.up] >= UPGRADES[S.up].max) return { ok: false, why: 'MAXED' };
-    if (S.kind === 'bot' && G.companions.length >= G.slots) return { ok: false, why: 'SQUAD FULL' };
-    if ((S.kind === 'supply' || S.kind === 'weapon') && G.freeSlots() === 0) return { ok: false, why: 'HOTBAR FULL' };
+    if ((S.kind === 'supply' || S.kind === 'weapon') && !G.canAdd({ t: S.kind, id })) return { ok: false, why: 'HOTBAR FULL' };
     if (G.bucks < this.price(id)) return { ok: false, why: 'NEED BOTBUCKS' };
     return { ok: true };
   },
@@ -291,7 +288,7 @@ const UI = {
     else if (S.kind === 'gear') {
       if (id === 'backpack') { G.gear.backpack++; msg = `Backpack upgraded — ${G.barSize} hotbar slots`; }
       else { G.gear[id] = true; msg = id === 'jetpack' ? 'Jetpack equipped! Hold Space / JUMP in mid-air to fly' : 'Fire Boots equipped — the Volcano portal will open for you'; }
-    } else if (S.kind === 'bot') { G.companions.push(new Companion(S.bot)); msg = `${COMP_DEFS[S.bot].name} joins your squad!`; }
+    } else if (S.kind === 'bot') { const w = G.addBot(S.bot); msg = w === 'squad' ? `${COMP_DEFS[S.bot].name} joins your squad — it's coming through the portal!` : `Squad is full — ${COMP_DEFS[S.bot].name} was sent to home base`; }
     else if (S.kind === 'upgrade') {
       G.up[S.up]++;
       const p = G.player;
@@ -304,21 +301,24 @@ const UI = {
     this.toast(msg);
     this.afterAction(id);
   },
-  sell(slot) {
+  // sell `qty` from one hotbar stack
+  sell(slot, qty) {
     const it = G.bar[slot];
     if (!it) return;
     if (it.t === 'weapon' && it.id === 'blaster') { Sound.play('deny'); this.toast('The Pulse Blaster is not for sale', true); return; }
-    const v = this.itemValue(it);
-    G.bar[slot] = null; G.checkWeapon();
+    const n = clamp(Math.round(qty || 1), 1, it.n || 1);
+    const v = this.itemValue(it) * n;
+    it.n = (it.n || 1) - n;
+    if (it.n <= 0) { G.bar[slot] = null; G.checkWeapon(); }
     G.bucks += v;
     Sound.play('coin');
-    this.toast(`Sold ${this.itemName(it)} for ${v} Botbucks`);
+    this.toast(`Sold ${n} × ${this.itemName(it)} for ${v} Botbucks`);
     this.hotbarDirty = true;
     this.renderWorkshop(); this.refreshHUD(true);
   },
   sellAll() {
     let v = 0, n = 0;
-    G.bar.forEach((it, i) => { if (it && it.t === 'part') { v += this.itemValue(it); n++; G.bar[i] = null; } });
+    G.bar.forEach((it, i) => { if (it && it.t === 'part') { v += this.itemValue(it) * (it.n || 1); n += it.n || 1; G.bar[i] = null; } });
     if (!n) { Sound.play('deny'); this.toast('No materials in your hotbar', true); return; }
     G.bucks += v;
     Sound.play('buy');
@@ -333,25 +333,26 @@ const UI = {
     if (!it) return;
     if (it.t === 'weapon' && it.id === 'blaster') { Sound.play('deny'); this.toast('Keep your Pulse Blaster — you need at least one weapon', true); return; }
     G.bar[slot] = null; G.checkWeapon();
-    G.store(it);
+    G.store(it, it.n || 1);
     Sound.play('pickup');
     this.hotbarDirty = true;
     this.renderWorkshop(); this.refreshHUD(true);
   },
   depositAll() {
     let n = 0;
-    G.bar.forEach((it, i) => { if (it && it.t === 'part') { G.store(it); G.bar[i] = null; n++; } });
+    G.bar.forEach((it, i) => { if (it && it.t === 'part') { G.store(it, it.n || 1); G.bar[i] = null; n += it.n || 1; } });
     if (!n) { Sound.play('deny'); this.toast('No materials in your hotbar', true); return; }
     Sound.play('craft');
     this.toast(`Stored ${n} materials`);
     this.hotbarDirty = true;
     this.renderWorkshop(); this.refreshHUD(true);
   },
-  withdraw(key) {
+  withdraw(key, want = 1) {
     if (!G.storage[key]) return;
     const it = this.keyItem(key);
-    if (!G.addItem(it)) { Sound.play('deny'); this.toast('Hotbar full', true); return; }
-    G.storage[key]--;
+    let n = 0;
+    while (n < want && G.storage[key] > 0 && G.addItem(it)) { G.storage[key]--; n++; }
+    if (!n) { Sound.play('deny'); this.toast('Hotbar full', true); return; }
     if (!G.storage[key]) delete G.storage[key];
     Sound.play('pickup');
     this.hotbarDirty = true;
@@ -367,22 +368,25 @@ const UI = {
     for (let i = 0; i < G.barSize; i++) {
       const it = G.bar[i];
       if (!it) { left += `<div class="inv-item empty slotrow"><div class="empty-slot">${(i + 1) % 10 === 0 && i < 10 ? 0 : i + 1}</div><div class="inv-info"><div class="inv-desc">Empty slot</div></div></div>`; continue; }
-      const act = m === 'shop' ? `<button class="btn tiny" data-sell="${i}">Sell ${this.itemValue(it)}</button>` : m === 'storage' ? `<button class="btn tiny" data-dep="${i}">Store ▸</button>` : '';
-      left += `<div class="inv-item ${clickable ? 'click' : ''}" style="--c:${this.itemColor(it)}"><img src="${this.itemIcon(it)}" alt=""><div class="inv-info"><div class="inv-name">${this.itemName(it)}</div><div class="inv-desc">${it.t === 'weapon' ? (it.id === G.weapon ? 'In hand' : 'Weapon') : it.t === 'supply' ? SHOP_ITEMS[it.id].desc.split('.')[1] || 'Supply' : 'Material · ' + PARTS[it.id].value + ' BB'}</div></div>${act}</div>`;
+      const n = it.n || 1, v = this.itemValue(it);
+      // shop: pick how many of this stack to sell
+      const act = m === 'shop'
+        ? (it.t === 'weapon' && it.id === 'blaster' ? '' : `<div class="sell-box">${n > 1 ? `<input type="range" min="1" max="${n}" value="${n}" data-qty="${i}">` : ''}<button class="btn tiny" data-sell="${i}">Sell <b data-qlbl="${i}">${n}</b> · <span data-vlbl="${i}">${v * n}</span> BB</button></div>`)
+        : m === 'storage' ? `<button class="btn tiny" data-dep="${i}">Store ▸</button>` : '';
+      left += `<div class="inv-item ${clickable ? 'click' : ''} ${m === 'shop' ? 'sellrow' : ''}" style="--c:${this.itemColor(it)}"><img src="${this.itemIcon(it)}" alt=""><div class="inv-info"><div class="inv-name">${this.itemName(it)}${n > 1 ? ` <span class="stackn">×${n}</span>` : ''}</div><div class="inv-desc">${it.t === 'weapon' ? (it.id === G.weapon ? 'In hand' : 'Weapon') : it.t === 'supply' ? SHOP_ITEMS[it.id].desc.split('.')[1] || 'Supply' : 'Material · ' + PARTS[it.id].value + ' BB each'}</div></div>${act}</div>`;
     }
     left += '</div>';
     left += `<h3>Gear</h3><div class="inv-list">
       ${this.gearRow('jetpack', 'Jetpack', G.gear.jetpack ? 'Hold Space / JUMP in mid-air' : 'Sold in the Mountains', G.gear.jetpack)}
       ${this.gearRow('fireboots', 'Fire Boots', G.gear.fireboots ? 'Lava-proof · Volcano access' : 'Sold in the Mountains', G.gear.fireboots)}
       ${this.gearRow('backpack', 'Backpack', `${G.barSize} hotbar slots`, G.gear.backpack > 0)}
-      <div class="inv-item ${G.vehicle ? '' : 'empty'}" style="--c:#ffb347"><img src="${vehIconURL()}" alt=""><div class="inv-info"><div class="inv-name">Skyrider</div><div class="inv-desc">${G.vehicle ? `Hull ${Math.ceil(G.vehicle.hp)}/240 · ${Touch.enabled ? 'RIDE' : 'F'} to fly` : 'Build one in the Mechanic Room'}</div></div></div>
       <div class="inv-item" style="--c:#3aff9a"><img src="${spriteIconURL()}" alt=""><div class="inv-info"><div class="inv-name">Scrap Sprites</div><div class="inv-desc">Every 3 found = +20 max stamina</div></div><div class="inv-count">${G.spritesFound}</div></div>
     </div>`;
     $('ws-inv').innerHTML = left;
     $('ws-items').innerHTML = '';
 
     // middle: tabs + content
-    const tabNames = { bots: 'Bots', base: 'Base', vehicle: 'Vehicle', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies' };
+    const tabNames = { bots: 'Bots', base: 'Base', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies' };
     $('ws-tabs').innerHTML = this.tabs.map((t) => `<button class="tab ${t === this.tab ? 'active' : ''}" data-tab="${t}">${tabNames[t]}</button>`).join('');
     $('ws-tabs').querySelectorAll('.tab').forEach((t) => (t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); }));
     $('ws-tabs').style.display = this.tabs.length > 1 ? '' : 'none';
@@ -393,12 +397,11 @@ const UI = {
       const list = RECIPES.filter((r) => r.kind === kind);
       mid = list.map((r) => {
         const st = this.recipeState(r, useStorage);
-        const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.kind === 'vehicle' ? '#ffb347' : r.id === 'shieldgen' ? '#5ab8ff' : '#6bff9e';
-        const icon = r.kind === 'companion' ? compIconURL(r.id) : r.kind === 'vehicle' ? vehIconURL() : upgIconURL(r.id, color);
+        const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.id === 'shieldgen' ? '#5ab8ff' : '#6bff9e';
+        const icon = r.kind === 'companion' ? compIconURL(r.id) : upgIconURL(r.id, color);
         let meta = '';
         if (r.kind === 'companion') { const d = COMP_DEFS[r.id]; const owned = G.companions.filter((c) => c.kind === r.id).length; meta = `<div class="meta">SIMPLE BOT · HULL ${Math.round(d.hp * (1 + 0.3 * G.up.firmware))}${d.range ? ' · RANGE ' + d.range + 'M' : ''}${owned ? ` · <b>${owned} ACTIVE</b>` : ''}</div>`; }
         if (r.id === 'charger') meta = `<div class="pips">${Array.from({ length: r.max }, (_, i) => `<i class="${i < G.base.charger ? 'on' : ''}"></i>`).join('')}</div>`;
-        if (r.kind === 'vehicle') meta = `<div class="meta">HULL 240 · TWIN CANNONS${G.vehicle ? ' · <b>OWNED</b>' : ''}</div>`;
         return this.card({ id: r.id, ok: st.ok, why: st.why, color, icon, name: r.name, desc: r.desc, meta, cost: this.costHTML(r.cost, useStorage), act: 'craft', verb: 'Build' });
       }).join('');
       if (m === 'field') mid += `<div class="ws-note">Premium bots, weapons, gear, upgrades and supplies are sold in the biome shops. Base systems are built in the Mechanic Room at home.</div>`;
@@ -418,16 +421,17 @@ const UI = {
       const keys = Object.keys(G.storage).filter((k) => G.storage[k] > 0).sort();
       mid = `<div class="row-btns"><button class="btn primary" id="dep-all">Store all materials</button></div><div class="store-grid">${keys.length ? keys.map((k) => {
         const it = this.keyItem(k);
-        return `<button class="store-item" data-wd="${k}" style="--c:${this.itemColor(it)}" title="Withdraw one"><img src="${this.itemIcon(it)}" alt=""><span>${this.itemName(it)}</span><b>${G.storage[k]}</b></button>`;
-      }).join('') : '<div class="ws-note">Storage is empty. Deposit materials from your hotbar — there is no limit.</div>'}</div><div class="ws-note">Click a stored item to move one back to your hotbar.</div>`;
+        return `<div class="store-item" style="--c:${this.itemColor(it)}"><img src="${this.itemIcon(it)}" alt=""><span>${this.itemName(it)}</span><b>${G.storage[k]}</b>
+          <div class="wd-btns"><button class="btn tiny" data-wd="${k}" data-n="1">Take 1</button>${it.t !== 'weapon' ? `<button class="btn tiny" data-wd="${k}" data-n="20">Take 20</button>` : ''}</div></div>`;
+      }).join('') : '<div class="ws-note">Storage is empty. Deposit materials from your hotbar — there is no limit.</div>'}</div><div class="ws-note">Take items back into your hotbar one at a time or a full stack of 20.</div>`;
     } else if (m === 'shop') {
       const shop = G.where === 'biome' ? ZONES[G.level].shop : null;
       if (this.tab === 'sell') {
         const parts = G.bar.filter((it) => it && it.t === 'part');
-        const total = parts.reduce((n, it) => n + this.itemValue(it), 0);
+        const total = parts.reduce((n, it) => n + this.itemValue(it) * (it.n || 1), 0);
         mid = `<div class="row-btns"><button class="btn primary" id="sell-all">Sell all materials (${total} BB)</button></div>
           <div class="price-list">${PART_ORDER.map((k) => `<div class="price-row" style="--c:${PARTS[k].color}"><img src="${partIconURL(k)}" alt=""><span>${PARTS[k].name}</span><b>${PARTS[k].value} BB</b></div>`).join('')}</div>
-          <div class="ws-note">Use the <b>Sell</b> buttons in your hotbar list to sell single items. Weapons and supplies sell for 40% of their price.</div>`;
+          <div class="ws-note">To sell part of a stack, drag the slider in your hotbar list to pick how many, then press <b>Sell</b>. Weapons and supplies sell for 40% of their price.</div>`;
       } else {
         const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply'] }[this.tab];
         const ids = (shop ? shop.items : []).filter((id) => want.includes(SHOP_ITEMS[id].kind));
@@ -446,14 +450,23 @@ const UI = {
     const R = $('ws-recipes');
     R.querySelectorAll('[data-act="craft"]').forEach((b) => (b.onclick = () => this.craft(b.dataset.id)));
     R.querySelectorAll('[data-act="buy"]').forEach((b) => (b.onclick = () => this.buy(b.dataset.id)));
-    R.querySelectorAll('[data-wd]').forEach((b) => (b.onclick = () => this.withdraw(b.dataset.wd)));
+    R.querySelectorAll('[data-wd]').forEach((b) => (b.onclick = () => this.withdraw(b.dataset.wd, +b.dataset.n)));
     R.querySelectorAll('[data-recall]').forEach((b) => (b.onclick = () => { const c = G.companions.find((x) => x.id === +b.dataset.recall); if (c) { c.state = 'leaving'; c.stateT = 1.4; } this.renderWorkshop(); }));
     const da = $('dep-all'); if (da) da.onclick = () => this.depositAll();
     const sa = $('sell-all'); if (sa) sa.onclick = () => this.sellAll();
-    $('ws-inv').querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => this.sell(+b.dataset.sell)));
+    const inv = $('ws-inv');
+    inv.querySelectorAll('[data-qty]').forEach((r) => (r.oninput = () => {
+      const i = +r.dataset.qty, it = G.bar[i];
+      inv.querySelector(`[data-qlbl="${i}"]`).textContent = r.value;
+      inv.querySelector(`[data-vlbl="${i}"]`).textContent = this.itemValue(it) * r.value;
+    }));
+    inv.querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => {
+      const r = inv.querySelector(`[data-qty="${b.dataset.sell}"]`);
+      this.sell(+b.dataset.sell, r ? +r.value : 1);
+    }));
     $('ws-inv').querySelectorAll('[data-dep]').forEach((b) => (b.onclick = () => this.deposit(+b.dataset.dep)));
 
-    // right column: squad & pilot
+    // right column: squad (with swap controls) & the bots waiting at home
     $('ws-slots').textContent = `${G.companions.length}/${G.slots}`;
     let squad = G.companions.map((c) => `
       <div class="squad-item" style="--c:${c.d.color}">
@@ -462,11 +475,29 @@ const UI = {
           <div class="mini-bar batt"><i style="width:${c.battery}%"></i></div>
           <div class="mini-bar"><i style="width:${100 * c.hp / c.maxHp}%"></i></div>
           <div class="inv-desc">⚡${Math.floor(c.battery)}% · ${c.statusText}</div></div>
-        <button class="btn tiny" data-scrap="${c.id}" title="Dismantle">Scrap</button>
+        <div class="sq-btns">${c.swapTo ? '' : `<button class="btn tiny" data-home="${c.id}" title="Send this bot to rest at home base">Home</button>`}<button class="btn tiny" data-scrap="${c.id}" title="Dismantle">Scrap</button></div>
       </div>`).join('');
     for (let i = G.companions.length; i < G.slots; i++) squad += `<div class="squad-item empty"><div class="empty-slot">+</div><div class="inv-desc">Empty slot — build or buy a bot</div></div>`;
+    const full = G.companions.length >= G.slots;
+    const swappable = G.companions.filter((c) => !c.swapTo);
+    squad += `<h3>At home base <span class="muted">${G.reserve.length}</span></h3>`;
+    squad += G.reserve.length ? G.reserve.map((e, i) => {
+      const d = COMP_DEFS[e.kind], bat = Math.floor(G.reserveBattery(e));
+      const ctl = e.pending ? '<div class="inv-desc">Getting ready to leave…</div>'
+        : !full ? `<button class="btn tiny" data-deploy="${i}">Send out</button>`
+        : `<div class="swap-box"><select data-swapsel="${i}">${swappable.map((c) => `<option value="${c.id}">${c.d.name} ⚡${Math.floor(c.battery)}%</option>`).join('')}</select><button class="btn tiny" data-swap="${i}" ${swappable.length ? '' : 'disabled'}>Swap ⇄</button></div>`;
+      return `<div class="squad-item reserve" style="--c:${d.color}"><img src="${compIconURL(e.kind)}" alt=""><div class="inv-info"><div class="inv-name">${d.name}</div><div class="mini-bar batt"><i style="width:${bat}%"></i></div><div class="inv-desc">⚡${bat}% · waiting at home</div>${ctl}</div></div>`;
+    }).join('') : '<div class="inv-desc home-note">No bots at home. When your squad is full, new bots wait here and you can swap them in. The bot you swap out flies home first, then the other one travels out to you.</div>';
     $('ws-squad').innerHTML = squad;
-    $('ws-squad').querySelectorAll('[data-scrap]').forEach((b) => (b.onclick = () => this.scrapCompanion(+b.dataset.scrap)));
+    const SQ = $('ws-squad');
+    SQ.querySelectorAll('[data-scrap]').forEach((b) => (b.onclick = () => this.scrapCompanion(+b.dataset.scrap)));
+    SQ.querySelectorAll('[data-home]').forEach((b) => (b.onclick = () => { const c = G.companions.find((x) => x.id === +b.dataset.home); if (c && G.requestSwap(c, null)) { Sound.play('click'); this.renderWorkshop(); } }));
+    SQ.querySelectorAll('[data-deploy]').forEach((b) => (b.onclick = () => { G.deployReserve(G.reserve[+b.dataset.deploy]); Sound.play('online'); this.renderWorkshop(); this.refreshHUD(true); }));
+    SQ.querySelectorAll('[data-swap]').forEach((b) => (b.onclick = () => {
+      const e = G.reserve[+b.dataset.swap], sel = SQ.querySelector(`[data-swapsel="${b.dataset.swap}"]`);
+      const c = G.companions.find((x) => x.id === +sel.value);
+      if (c && e && G.requestSwap(c, e)) { Sound.play('click'); this.toast(`${c.d.name} is heading home — ${COMP_DEFS[e.kind].name} will set off when it arrives`); this.renderWorkshop(); }
+    }));
 
     const p = G.player, W = p.weapon;
     $('ws-player').innerHTML = `
@@ -549,11 +580,11 @@ const UI = {
     for (let i = 0; i < G.barSize; i++) {
       const it = G.bar[i];
       const key = i < 10 ? (i + 1) % 10 : '';
-      h += `<div class="hb ${i === G.sel ? 'sel' : ''} ${it ? '' : 'empty'} ${it && it.t === 'weapon' && it.id === G.weapon ? 'held' : ''}" data-slot="${i}" style="--c:${it ? this.itemColor(it) : '#ffffff'}" title="${it ? this.itemName(it) : 'Empty'}">${it ? `<img src="${this.itemIcon(it)}" alt="">` : ''}<em>${key}</em></div>`;
+      h += `<div class="hb ${i === G.sel ? 'sel' : ''} ${it ? '' : 'empty'} ${it && it.t === 'weapon' && it.id === G.weapon ? 'held' : ''}" data-slot="${i}" style="--c:${it ? this.itemColor(it) : '#ffffff'}" title="${it ? this.itemName(it) : 'Empty'}">${it ? `<img src="${this.itemIcon(it)}" alt="">` : ''}<em>${key}</em>${it && it.n > 1 ? `<u>${it.n}</u>` : ''}</div>`;
     }
     $('hud-parts').innerHTML = h;
     const it = G.bar[G.sel];
-    $('hb-name').textContent = it ? this.itemName(it) : '';
+    $('hb-name').textContent = it ? this.itemName(it) + (it.n > 1 ? ` ×${it.n}` : '') : '';
   },
 
   refreshHUD(force) {
@@ -570,16 +601,9 @@ const UI = {
     $('bar-dash').style.width = (100 * (1 - Math.max(0, p.dashCd) / p.dashMax)) + '%';
     $('val-repair').textContent = Touch.enabled ? `REPAIR ×${G.repairKits}` : `[R] REPAIR ×${G.repairKits}`;
     $('vitals').classList.toggle('low', hk < 0.3);
-    const vr = $('veh-row');
-    vr.classList.toggle('show', !!G.vehicle);
-    if (G.vehicle) {
-      $('bar-veh').style.width = (100 * G.vehicle.hp / G.vehicle.maxHp) + '%';
-      $('val-veh').textContent = G.riding ? 'FLYING' : Touch.enabled ? 'RIDE' : '[F] RIDE';
-    }
     $('fuel-row').classList.toggle('show', !!G.gear.jetpack);
     if (G.gear.jetpack) { $('bar-fuel').style.width = p.fuel + '%'; $('val-fuel').textContent = p.jetting ? 'BURN' : p.fuel >= 100 ? 'FULL' : ''; }
     $('hud-bucks').textContent = G.bucks;
-    document.body.classList.toggle('riding', G.riding);
     document.body.classList.toggle('frozen', p.frozenT > 0 && !p.dead);
     document.body.classList.toggle('burning', p.burnT > 0 && !p.dead);
     // stamina wheel (hidden while full)
@@ -589,11 +613,11 @@ const UI = {
     stEl.classList.toggle('extra', extraMax > 0);
     if (extraMax > 0) $('st-fill2').style.strokeDasharray = `${(extra / extraMax) * 100} 100`;
     if (p.stamina < p.maxStamina - 0.5 || p.exhausted) this.stShowT = 1.2; else this.stShowT = (this.stShowT || 0) - 1 / 60;
-    stEl.classList.toggle('show', this.stShowT > 0 && !G.riding);
+    stEl.classList.toggle('show', this.stShowT > 0);
     stEl.classList.toggle('exhausted', p.exhausted);
     $('focus-vignette').classList.toggle('on', G.focus);
 
-    const sig = G.bar.map((it) => (it ? it.t + it.id : '-')).join(',') + '|' + G.sel + '|' + G.weapon + '|' + G.barSize;
+    const sig = G.bar.map((it) => (it ? it.t + it.id + it.n : '-')).join(',') + '|' + G.sel + '|' + G.weapon + '|' + G.barSize;
     if (this.hotbarDirty || sig !== this.hotbarSig || force) { this.hotbarSig = sig; this.renderHotbar(); }
     // squad (battery + hull per bot)
     const ssig = G.companions.map((c) => c.id).join(',') + '|' + G.slots;

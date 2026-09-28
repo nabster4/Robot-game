@@ -35,10 +35,11 @@ const G = {
   state: 'menu',
   level: 0, time: 0, timeScale: 1,
   settings: { sens: 1, invert: false, quality: 'high', view: 'first' },
-  riding: false, vehicle: null, vessels: 0, spritesFound: 0, updrafts: [], focus: false,
+  vessels: 0, spritesFound: 0, updrafts: [], focus: false,
   where: 'hub',                 // 'hub' (home base) or 'biome'
   bar: [], sel: 0, weapon: 'blaster',   // Minecraft-style hotbar: one item per slot
   storage: {}, bucks: 0,        // unlimited storage at home · Botbucks
+  reserve: [],                  // bots waiting at home base: { kind, battery, hp, t }
   gear: { jetpack: false, fireboots: false, backpack: 0 },
   base: { shield: false, charger: 0 },
   progress: { unlocked: 0, beaten: [false, false, false, false, false] },
@@ -54,19 +55,44 @@ const G = {
   get slots() { return 3 + this.up.slot; },
   get barSize() { return 9 + 3 * this.gear.backpack; },
 
-  // ─── hotbar & storage helpers. Items: { t: 'part'|'weapon'|'supply', id } ───
+  // ─── hotbar & storage helpers. Items: { t: 'part'|'weapon'|'supply', id, n } ───
+  // parts and supplies stack up to 20 per slot; weapons take a slot each
+  MAX_STACK: 20,
   itemKey(it) { return it.t + ':' + it.id; },
-  countItem(t, id) { return this.bar.reduce((n, it) => n + (it && it.t === t && it.id === id ? 1 : 0), 0); },
+  stackable(it) { return it.t !== 'weapon'; },
+  countItem(t, id) { return this.bar.reduce((n, it) => n + (it && it.t === t && it.id === id ? it.n || 1 : 0), 0); },
   freeSlots() { let n = 0; for (let i = 0; i < this.barSize; i++) if (!this.bar[i]) n++; return n; },
+  // how many more of this item fit in the hotbar
+  room(it) {
+    let r = 0;
+    for (let i = 0; i < this.barSize; i++) {
+      const s = this.bar[i];
+      if (!s) r += this.stackable(it) ? this.MAX_STACK : 1;
+      else if (this.stackable(it) && s.t === it.t && s.id === it.id) r += this.MAX_STACK - (s.n || 1);
+    }
+    return r;
+  },
+  canAdd(it) { return this.room(it) > 0; },
   addItem(it) {
-    for (let i = 0; i < this.barSize; i++) if (!this.bar[i]) { this.bar[i] = { t: it.t, id: it.id }; UI.hotbarDirty = true; return true; }
+    if (this.stackable(it)) {
+      for (let i = 0; i < this.barSize; i++) {
+        const s = this.bar[i];
+        if (s && s.t === it.t && s.id === it.id && (s.n || 1) < this.MAX_STACK) { s.n = (s.n || 1) + 1; UI.hotbarDirty = true; return true; }
+      }
+    }
+    for (let i = 0; i < this.barSize; i++) if (!this.bar[i]) { this.bar[i] = { t: it.t, id: it.id, n: 1 }; UI.hotbarDirty = true; return true; }
     return false;
   },
   takeItem(t, id) {
     // take from the end so the weapons at the front stay put
     for (let i = this.barSize - 1; i >= 0; i--) {
       const it = this.bar[i];
-      if (it && it.t === t && it.id === id) { this.bar[i] = null; UI.hotbarDirty = true; this.checkWeapon(); return true; }
+      if (it && it.t === t && it.id === id) {
+        it.n = (it.n || 1) - 1;
+        if (it.n <= 0) { this.bar[i] = null; this.checkWeapon(); }
+        UI.hotbarDirty = true;
+        return true;
+      }
     }
     return false;
   },
@@ -108,6 +134,81 @@ const G = {
     if (ZONES[i].id === 'volcano' && !this.gear.fireboots) return 'Fire Boots required (Mountains shop)';
     if (ZONES[i].id === 'sky' && !this.gear.jetpack) return 'Jetpack required (Mountains shop)';
     return null;
+  },
+
+  // ─── squad & bots kept at home ───
+  get chargeRate() { return (100 / 32) * (1 + 0.6 * this.base.charger); },
+  reserveBattery(e) { return Math.min(100, e.battery + Math.max(0, this.time - (e.t || 0)) * this.chargeRate); },
+  // a new bot joins the squad, or waits at home base if the squad is full
+  addBot(kind) {
+    if (this.companions.length < this.slots) {
+      const c = new Companion(kind);
+      this.companions.push(c);
+      if (this.where === 'biome') { c.detach(); c.state = 'transitBack'; c.transitT = 8; }   // it comes out through the portal
+      this.refreshReserveModels();
+      return 'squad';
+    }
+    this.reserve.push({ kind, battery: 100, hp: null, t: this.time });
+    this.refreshReserveModels();
+    return 'home';
+  },
+  // send an active bot home; when it gets there, `e` (a bot at home) sets off to replace it
+  requestSwap(c, e) {
+    if (World.domeTrap) { UI.toast('Nobody can leave the boss dome until the boss is destroyed', true); return false; }
+    if (c.swapTo) return false;
+    if (e) e.pending = true;
+    c.swapTo = e || { home: true };
+    if (c.state === 'follow' || c.state === 'returning' || c.state === 'down') {
+      c.state = 'leaving'; c.target = null;
+      UI.feed(`${c.d.name} is heading home${e ? ` to swap with ${COMP_DEFS[e.kind].name}` : ''}`, c.d.color);
+    } else if (c.state === 'away' || c.state === 'charging') this.completeSwap(c);
+    else c.swapTo = c.swapTo;   // already in transit: it swaps once it reaches home
+    return true;
+  },
+  completeSwap(c) {
+    const e = c.swapTo && !c.swapTo.home ? c.swapTo : null;
+    const i = this.companions.indexOf(c);
+    c.swapTo = null;
+    c.destroy();
+    this.reserve.push({ kind: c.kind, battery: c.battery, hp: c.hp, t: this.time });
+    if (i >= 0) this.companions.splice(i, 1);
+    if (e) {
+      this.reserve.splice(this.reserve.indexOf(e), 1);
+      const nc = new Companion(e.kind, this.reserveBattery(e));
+      if (e.hp !== null && e.hp !== undefined) nc.hp = Math.min(nc.maxHp, e.hp + nc.maxHp * 0.5);
+      this.companions.splice(Math.max(0, i), 0, nc);
+      if (this.where === 'hub') { const pad = nc.pad(); nc.pos.set(pad.x, pad.y, pad.z); nc.state = 'follow'; }
+      else { nc.detach(); nc.state = 'transitBack'; nc.transitT = 8; }
+      UI.feed(`${nc.d.name} is on its way${this.where === 'hub' ? '' : ' through the portal'}`, nc.d.color);
+    } else UI.feed(`${c.d.name} is resting at home base`, c.d.color);
+    this.refreshReserveModels();
+    UI.squadSig = null;
+    if (this.state === 'workshop') UI.renderWorkshop();
+  },
+  deployReserve(e) {
+    if (this.companions.length >= this.slots) return;
+    this.reserve.splice(this.reserve.indexOf(e), 1);
+    const c = new Companion(e.kind, this.reserveBattery(e));
+    if (e.hp !== null && e.hp !== undefined) c.hp = Math.min(c.maxHp, e.hp + c.maxHp * 0.5);
+    this.companions.push(c);
+    if (this.where === 'hub') { const pad = c.pad(); c.pos.set(pad.x, pad.y, pad.z); }
+    else { c.detach(); c.state = 'transitBack'; c.transitT = 8; UI.feed(`${c.d.name} is on its way through the portal`, c.d.color); }
+    this.refreshReserveModels();
+  },
+  // bots kept at home sit on the far charging pads
+  refreshReserveModels() {
+    for (const m of this.reserveModels || []) scene.remove(m);
+    this.reserveModels = [];
+    if (this.where !== 'hub' || !World.chargePads.length) return;
+    const pads = World.chargePads;
+    this.reserve.slice(0, pads.length).forEach((e, k) => {
+      const pad = pads[pads.length - 1 - k];
+      const m = buildCompanionModel(e.kind);
+      m.position.set(pad.x, pad.y, pad.z);
+      m.rotation.y = Math.PI;
+      scene.add(m);
+      this.reserveModels.push(m);
+    });
   },
 
   // aim assist: the enemy closest to the aim ray (within a narrow cone) — player shots curve into it
@@ -242,7 +343,7 @@ const G = {
   spawnGrenade(pos, vel) {
     const m = new THREE.Mesh(bulletGeo, Mat.glow('#b98cff', 5));
     m.scale.setScalar(0.18); m.position.copy(pos); scene.add(m);
-    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 90 + this.level * 12, color: '#b98cff', life: 4, mesh: m });
+    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 40 + this.level * 8, color: '#b98cff', life: 4, mesh: m });
   },
 
   // opts: { effect: 'frost'|'fire'|'freeze', grav, splash, life, marker, big }
@@ -253,7 +354,7 @@ const G = {
     this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor });
   },
 
-  get thirdPerson() { return this.settings.view === 'third' || this.riding; },
+  get thirdPerson() { return this.settings.view === 'third'; },
   muzzleWorld() { return (this.thirdPerson ? this.avatar.userData.muzzle : this.vm.userData.muzzle).getWorldPosition(_b); },
 
   aimPoint() {
@@ -337,17 +438,16 @@ function clearEntities() {
 const NEW_UP = () => ({ armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 });
 
 function newRun() {
-  G.bar = [{ t: 'weapon', id: 'blaster' }, { t: 'supply', id: 'repair' }, { t: 'part', id: 'scrap' }, { t: 'part', id: 'scrap' }, { t: 'part', id: 'wire' }];
+  G.bar = [{ t: 'weapon', id: 'blaster', n: 1 }, { t: 'supply', id: 'repair', n: 1 }, { t: 'part', id: 'scrap', n: 2 }, { t: 'part', id: 'wire', n: 1 }];
   G.sel = 0; G.weapon = 'blaster';
   G.storage = { 'part:scrap': 4, 'part:wire': 2 };
+  G.reserve = [];
   G.bucks = 40;
   G.gear = { jetpack: false, fireboots: false, backpack: 0 };
   G.base = { shield: false, charger: 0 };
   G.progress = { unlocked: 0, beaten: [false, false, false, false, false] };
   G.up = NEW_UP();
   G.vessels = 0; G.spritesFound = 0;
-  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
-  G.vehicle = null; G.riding = false;
   G.companions.forEach((c) => c.destroy());
   G.companions = [];
   G.player = new Player();
@@ -359,18 +459,16 @@ function newRun() {
 function stateJSON() {
   return JSON.stringify({ bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
     up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: G.player.hp, total: G.total,
-    veh: G.vehicle ? G.vehicle.hp : null, vessels: G.vessels, spritesFound: G.spritesFound });
+    reserve: G.reserve.map((e) => ({ kind: e.kind, battery: G.reserveBattery(e), hp: e.hp })), vessels: G.vessels, spritesFound: G.spritesFound });
 }
 function applyState(json) {
   const s = JSON.parse(json);
-  G.bar = s.bar; G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base; G.progress = s.progress;
+  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base; G.progress = s.progress;
   G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
   G.companions.forEach((c) => c.destroy());
   G.player = new Player(); G.player.hp = s.hp;
+  G.reserve = (s.reserve || []).map((e) => ({ kind: e.kind, battery: e.battery, hp: e.hp, t: G.time }));
   G.companions = s.comps.map((d) => { const c = new Companion(d.kind, d.battery); c.hp = Math.min(c.maxHp, d.hp); if (d.away) { c.state = 'away'; c.detach(); } return c; });
-  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
-  G.riding = false;
-  G.vehicle = s.veh !== null && s.veh !== undefined ? new Vehicle(s.veh) : null;
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
   G.weapon = s.weapon || 'blaster';
   G.checkWeapon();
@@ -416,7 +514,6 @@ function spawnCamp(x, z, n, aggro = false, pool = ZONES[G.level].pool, lvl = G.l
 
 // common setup when arriving anywhere (home base or a biome)
 function arrive(Z, i, spawnYaw) {
-  if (G.riding && G.vehicle) G.vehicle.dock();
   clearEntities();
   World.dispose();
   G.updrafts = [];
@@ -434,6 +531,10 @@ function arrive(Z, i, spawnYaw) {
   p.hp = Math.min(p.hp, p.maxHp);
   setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
   G.companions.forEach((c) => c.onTravel());
+  // swaps that were under way finish now that we've changed places
+  for (const c of G.companions.slice()) if (c.swapTo) G.completeSwap(c);
+  for (const e of G.reserve) e.pending = false;
+  G.refreshReserveModels();
   G.levelDone = false; G.dying = 0; G.timeScale = 1;
   G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
   G.hintShown = {};
@@ -545,7 +646,7 @@ function nextInteractable() {
   if (G.objective === 'beacons' && !World.beacons.some((b) => b.state === 'charging')) {
     for (const b of World.beacons) if (b.state === 'idle') near(b.x, b.z, 5.5, 'beacon', b, 6);
   }
-  if (!G.riding) for (const b of World.beacons) if (b.state === 'done') near(b.x, b.z, 5.5, 'launch', b);
+  for (const b of World.beacons) if (b.state === 'done') near(b.x, b.z, 5.5, 'launch', b);
   return best;
 }
 
@@ -565,6 +666,19 @@ function interact(it) {
       break;
     }
   }
+}
+
+// portals work by just walking into them (E still works too)
+function walkThroughPortals() {
+  const p = G.player;
+  const inside = (P) => Math.hypot(P.x - p.pos.x, P.z - p.pos.z) < 1.9 && Math.abs(p.pos.y - P.y) < 3.5;
+  for (const P of World.hubPortals) {
+    if (!inside(P)) continue;
+    const lock = G.portalLock(P.i);
+    if (!lock) { interact({ kind: 'portal', obj: P }); return; }
+    if (!G.lockMsgT || G.time - G.lockMsgT > 3) { G.lockMsgT = G.time; Sound.play('deny'); UI.banner('PORTAL LOCKED', lock, '#8a94a8', 2.6); }
+  }
+  if (World.homePortal && !World.domeTrap && inside(World.homePortal)) goHome();
 }
 
 function openCache(c) {
@@ -682,7 +796,6 @@ function updateObjectives(dt) {
   } else if (G.objective === 'extract' && World.portal) {
     const P = World.portal;
     if (Math.hypot(p.pos.x - P.x, p.pos.z - P.z) < 2.8 && Math.abs(p.pos.y - P.y) < 6 && !p.dead) {
-      if (G.riding && G.vehicle) G.vehicle.dock();
       G.objective = 'done';
       G.levelDone = true;
       Sound.play('portal');
@@ -720,13 +833,6 @@ function updateObjectives(dt) {
   }
 }
 
-function toggleVehicle() {
-  if (G.riding && G.vehicle) { G.vehicle.dock(); return; }
-  if (!G.vehicle) { UI.feed('No Skyrider — build one in the Mechanic Room at home', '#ffb347'); Sound.play('deny'); return; }
-  if (G.player.climbing) return;
-  G.vehicle.deploy();
-}
-
 function collectSprite(sp) {
   sp.found = true;
   sp.model.visible = false;
@@ -761,25 +867,23 @@ function update(dt) {
       return;
     }
   } else if (!p.dead && !G.levelDone) {
-    if (Input.hit('KeyF')) toggleVehicle();
     if (Input.hit('KeyV')) UI.toggleView();
     // hotbar: number keys / mouse wheel select a slot, X drops the selected item
     for (let k = 0; k < 10; k++) if (Input.hit('Digit' + ((k + 1) % 10))) G.selectSlot(k);
     if (Input.wheel) { G.selectSlot(G.sel + Math.sign(Input.wheel)); Input.wheel = 0; }
     if (Input.hit('KeyX')) dropSelected();
     p.update(dt);
-    if (G.riding && G.vehicle) G.vehicle.update(dt);
     if (Input.hit('KeyE')) {
       const it = nextInteractable();
       if (it) interact(it);
     }
+    walkThroughPortals();
     // Scrap Sprites (hidden collectibles)
     for (const sp of World.sprites) {
       if (sp.found) continue;
       if (Math.hypot(sp.x - p.pos.x, sp.y - (p.pos.y + 0.8), sp.z - p.pos.z) < 1.7) collectSprite(sp);
     }
   }
-  if (G.vehicle && !G.riding) G.vehicle.hp = Math.min(G.vehicle.maxHp, G.vehicle.hp + 4 * dt);
 
   updateObjectives(dt);
 
@@ -877,7 +981,7 @@ function explodeAt(x, y, z, radius, dmg, color, scale = 1, selfDmg = 0) {
     if (e.dead || e.hidden) continue;
     const ey = e.aimY(y);
     const dd = Math.hypot(x - e.pos.x, y - ey, z - e.pos.z);
-    if (dd < radius + e.r) G.damageEnemy(e, dmg * (1 - 0.5 * dd / (radius + e.r)), e.pos.x, ey, e.pos.z, color, true);
+    if (dd < radius + e.r) G.damageEnemy(e, dmg * (1 - 0.7 * dd / (radius + e.r)), e.pos.x, ey, e.pos.z, color, true);
   }
   const p = G.player;
   if (selfDmg && !p.dead) {
@@ -897,9 +1001,11 @@ function dropSelected() {
   if (!it) return;
   if (it.t === 'weapon' && it.id === 'blaster') { UI.feed('Your Pulse Blaster stays with you — store it at home instead', '#9fb3c8'); return; }
   const p = G.player;
-  G.bar[G.sel] = null;
+  // X drops one from the stack
+  it.n = (it.n || 1) - 1;
+  if (it.n <= 0) G.bar[G.sel] = null;
   G.checkWeapon();
-  G.dropItem(it, p.pos.x, p.pos.y + 1.2, p.pos.z);
+  G.dropItem({ t: it.t, id: it.id }, p.pos.x, p.pos.y + 1.2, p.pos.z);
   UI.hotbarDirty = true;
   Sound.play('throw', null, 0.5);
 }
@@ -919,10 +1025,10 @@ function updateBullets(dt) {
       if (hitE || World.solidAt(b.pos.x, b.pos.y, b.pos.z) || b.life <= 0 || b.pos.y < World.hazardLevel) {
         b.dead = true;
         const gy = Math.max(b.pos.y, World.heightAt(b.pos.x, b.pos.z) + 0.3);
-        const R = b.bomb ? 5 : 8;
-        explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 2.2, b.bomb ? 12 : 30);
+        const R = b.bomb ? 5 : 5.5;
+        explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 1.8, b.bomb ? 12 : 25);
         Fx.shockRing(b.pos.x, gy, b.pos.z, b.bomb ? '#ffb38a' : '#e0ccff', R * 0.5, 50);
-        if (!b.bomb) for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 10) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
+        if (!b.bomb) for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 6) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
         Fx.addShake(0.5 * G.vol(b.pos) * 2);
         Sound.play('bomb', null, Math.min(1, G.vol(b.pos) * 2));
       }
@@ -1059,10 +1165,6 @@ function updateEnemyBullets(dt) {
       }
     }
     if (b.dead || p.dead) continue;
-    if (G.riding && G.vehicle) {
-      if (b.pos.distanceTo(G.vehicle.pos) < 1.7 + b.r) { b.dead = true; G.vehicle.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); }
-      continue;
-    }
     if (segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, b.pos.x, b.pos.y, b.pos.z) < 0.45 + b.r) {
       if (b.hugH && b.life > 1 && b.vel.lengthSq() < 1) {
         // lingering fire patch: burns while you stand in it
@@ -1080,10 +1182,10 @@ function updatePickups(dt) {
   const p = G.player;
   const mag = p.magnet;
   const vacuum = G.objective === 'extract';
-  const full = G.freeSlots() === 0;
   for (const k of G.pickups) {
     k.t += dt;
     const needsSlot = k.type !== 'health' && k.type !== 'bucks';
+    const full = needsSlot && !G.canAdd(k.item || { t: 'part', id: k.type });
     const dx = p.pos.x - k.pos.x, dy = p.pos.y + 0.9 - k.pos.y, dz = p.pos.z - k.pos.z;
     const dd = Math.hypot(dx, dy, dz);
     if (!p.dead && (dd < mag || (vacuum && k.t > 1)) && !(needsSlot && full) && k.t > 0) k.pulled = true;
@@ -1154,10 +1256,9 @@ function rot(o, x, y, z, k, dt) { ease(o.rotation, 'x', x, k, dt); ease(o.rotati
 
 function updateAvatar(dt) {
   const p = G.player, a = G.avatar, U = a.userData, J = U.J;
-  const riding = G.riding && G.vehicle;
   const climbing = !!p.climbing, gliding = p.gliding;
-  const air = !p.grounded && !climbing && !riding && !gliding;
-  const vx = p.vel.x, vz = p.vel.z, spd = riding ? 0 : Math.hypot(vx, vz);
+  const air = !p.grounded && !climbing && !gliding;
+  const vx = p.vel.x, vz = p.vel.z, spd = Math.hypot(vx, vz);
   const t = G.time;
 
   // ── gait phase (also drives footsteps in first person)
@@ -1183,16 +1284,15 @@ function updateAvatar(dt) {
   if (Input.mouse.down) U.aimT = 1.4; else U.aimT = Math.max(0, U.aimT - dt);
   const aiming = U.aimT > 0 && !gliding && !climbing;
   let targetYaw = U.bodyYaw;
-  if (riding || aiming) targetYaw = p.yaw + Math.PI;
+  if (aiming) targetYaw = p.yaw + Math.PI;
   else if (climbing) targetYaw = Math.atan2(p.climbing.x - p.pos.x, p.climbing.z - p.pos.z);
   else if (spd > 0.6) targetYaw = Math.atan2(vx, vz);
   const prevYaw = U.bodyYaw;
   U.bodyYaw += angDiff(U.bodyYaw, targetYaw) * (1 - Math.exp(-(aiming ? 18 : 9) * dt));
   const turnRate = angDiff(prevYaw, U.bodyYaw) / Math.max(dt, 1e-4);
 
-  if (riding) a.position.set(G.vehicle.pos.x, G.vehicle.pos.y - 0.55, G.vehicle.pos.z);
-  else a.position.copy(p.pos);
-  a.rotation.set(riding ? -p.pitch * 0.6 : 0, U.bodyYaw, riding ? G.vehicle.bank : 0, 'YXZ');
+  a.position.copy(p.pos);
+  a.rotation.set(0, U.bodyYaw, 0, 'YXZ');
 
   // ── gait weights
   const w = clamp(spd / 6, 0, 1);                       // walking amount
@@ -1272,15 +1372,8 @@ function updateAvatar(dt) {
     P.arms[0] = { sh: [-Math.PI + 0.35 + 0.45 * cs, 0, -0.15], elbow: -0.5 - 0.35 * Math.max(0, cs), wrist: 0 };
     P.arms[1] = { sh: [-Math.PI + 0.35 - 0.45 * cs, 0, 0.15], elbow: -0.5 - 0.35 * Math.max(0, -cs), wrist: 0 };
   }
-  if (riding) {
-    P.pelvisY = 0.6; P.pelvis = [0, 0, 0]; P.spine = [0.25, 0, 0]; P.chest = [0, 0, 0];
-    P.legs[0] = { hip: [-1.45, 0, -0.12], knee: 1.55, ankle: -0.15, toe: 0 };
-    P.legs[1] = { hip: [-1.45, 0, 0.12], knee: 1.55, ankle: -0.15, toe: 0 };
-    P.arms[0] = { sh: [-1.05, 0.25, -0.1], elbow: -0.7, wrist: 0 };
-    P.arms[1] = { sh: [-1.05, -0.25, 0.1], elbow: -0.7, wrist: 0 };
-  }
   // aiming: right arm points the blaster along the view, left hand braces it
-  if (aiming && !riding) {
+  if (aiming) {
     const lookPitch = p.pitch;
     const spineX = P.spine[0];
     P.arms[1] = { sh: [-Math.PI / 2 - lookPitch - spineX, 0.12, 0.05], elbow: -0.12, wrist: 0.1 };
@@ -1316,7 +1409,7 @@ function updateAvatar(dt) {
   });
   // whole-body lean into turns and speed
   const bank = clamp(-turnRate * 0.045 * w, -0.3, 0.3);
-  rot(J.root, 0, 0, riding ? 0 : bank, 8, dt);
+  rot(J.root, 0, 0, bank, 8, dt);
 
   U.glider.visible = gliding;
   const thrust = p.jetting ? 3 + Math.random() : air || p.dashT > 0 || gliding ? 1.4 : 0.5;
@@ -1328,7 +1421,7 @@ function updateCamera(dt) {
   const p = G.player;
   const shake = Fx.shake * Fx.shake;
   updateAvatar(dt);
-  G.bubble.visible = p.shield > 0 && !p.dead && !G.riding;
+  G.bubble.visible = p.shield > 0 && !p.dead;
   if (G.bubble.visible) { G.bubble.position.set(p.pos.x, p.pos.y + 1, p.pos.z); G.bubble.rotation.y += dt; G.bubble.scale.setScalar(1 + 0.03 * Math.sin(G.time * 6)); }
   G.iceBlock.visible = p.frozenT > 0 && G.thirdPerson && !p.dead;
   if (G.iceBlock.visible) G.iceBlock.position.set(p.pos.x, p.pos.y + 1, p.pos.z);
@@ -1345,14 +1438,13 @@ function updateCamera(dt) {
   const bobY = Math.sin(p.bob * 2) * 0.045 * p.bobAmt;
   const bobX = Math.cos(p.bob) * 0.03 * p.bobAmt;
   if (third) {
-    // over-the-shoulder follow camera (chase camera while flying) that stays out of walls
-    const riding = G.riding && G.vehicle;
+    // over-the-shoulder follow camera that stays out of walls
     const fx = -Math.sin(p.yaw) * Math.cos(p.pitch), fy = Math.sin(p.pitch), fz = -Math.cos(p.yaw) * Math.cos(p.pitch);
     const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
-    const px = (riding ? G.vehicle.pos.x : p.pos.x + rx * 0.6);
-    const py = riding ? G.vehicle.pos.y + 1.8 : p.pos.y + 1.6;
-    const pz = (riding ? G.vehicle.pos.z : p.pos.z + rz * 0.6);
-    const want = riding ? 9 : 4.3;
+    const px = p.pos.x + rx * 0.6;
+    const py = p.pos.y + 1.6;
+    const pz = p.pos.z + rz * 0.6;
+    const want = 4.3;
     let d = want;
     for (let t = 0.4; t <= want; t += 0.35) {
       const cx = px - fx * t, cy = py - fy * t, cz = pz - fz * t;
@@ -1428,8 +1520,7 @@ function frame(now) {
 }
 
 function initMenuScene() {
-  if (G.vehicle && G.vehicle.deployed) scene.remove(G.vehicle.model);
-  G.riding = false; G.focus = false;
+  G.focus = false;
   if (G.avatar) G.avatar.visible = false;
   if (G.fpGlider) G.fpGlider.visible = false;
   clearEntities();

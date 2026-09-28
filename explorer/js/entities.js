@@ -74,10 +74,10 @@ class Player {
   timers(dt) {
     this.invuln -= dt;
     this.recoil = Math.max(0, this.recoil - dt * 12);
-    this.energy = Math.min(100, this.energy + 11 * dt);
+    this.energy = Math.min(100, this.energy + 6 * dt);   // bomb recharges in ~17 s
     this.land = Math.max(0, this.land - dt * 3);
     this.stamRest -= dt;
-    const resting = this.grounded || G.riding;
+    const resting = this.grounded;
     if (this.stamRest <= 0 && resting) this.stamina = Math.min(this.maxStamina, this.stamina + (this.exhausted ? 28 : 40) * dt);
     if (this.exhausted && this.stamina >= this.maxStamina) this.exhausted = false;
   }
@@ -85,16 +85,9 @@ class Player {
   update(dt) {
     const I = Input;
     this.look(I);
-    if (I.touchMode && !G.riding) touchAimAssist(this, dt);
+    if (I.touchMode) touchAimAssist(this, dt);
     G.focus = false;
     this.effects(dt);
-    if (G.riding) {
-      this.timers(dt);
-      this.gliding = false; this.climbing = null; this.jetting = false;
-      this.fallTop = this.pos.y;
-      if (I.hit('KeyR')) this.useRepair();
-      return;
-    }
     const frozen = this.frozenT > 0;
 
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
@@ -160,10 +153,10 @@ class Player {
       const c = this.climbing;
       const ox = this.pos.x - c.x, oz = this.pos.z - c.z;
       let ang = Math.atan2(oz, ox);
-      ang += (mr * 2.4 * dt) / (c.r + this.r);
+      ang += (mr * 1.6 * dt) / (c.r + this.r);
       const R = c.r + this.r + 0.02;
       this.pos.x = c.x + Math.cos(ang) * R; this.pos.z = c.z + Math.sin(ang) * R;
-      const climbV = mf > 0.2 ? 3.4 : mf < -0.2 ? -3.4 : 0;
+      const climbV = mf > 0.2 ? 2.0 : mf < -0.2 ? -2.6 : 0;   // much slower than walking
       this.vel.set(0, climbV, 0);
       this.pos.y += climbV * dt;
       if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
@@ -216,7 +209,8 @@ class Player {
       this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vel.y * dt;
       const hit = World.collide(this.pos, this.r, this.pos.y + 0.4);
       // start climbing when pushing into something climbable
-      if (hit && hit.top !== undefined && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && this.pos.y < hit.top - 0.6) {
+      // building walls and trees can't be climbed; rocks, pillars and cliffs can
+      if (hit && hit.top !== undefined && hit.kind !== 'wall' && hit.kind !== 'tree' && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && this.pos.y < hit.top - 0.6) {
         const dx = hit.x - this.pos.x, dz = hit.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
         if ((dx / dl) * fx + (dz / dl) * fz > 0.35) {
           this.climbing = hit; this.gliding = false; this.vel.set(0, 0, 0);
@@ -334,7 +328,7 @@ class Player {
   }
 
   freeze(t) {
-    if (this.dead || G.riding) return;
+    if (this.dead) return;
     if (this.frozenT <= 0) { Sound.play('freeze'); Fx.tintFlash('#8ae9ff', 0.6); UI.feed('FROZEN!', '#8ae9ff'); }
     this.frozenT = Math.max(this.frozenT, t);
     this.gliding = false; this.jetting = false;
@@ -390,7 +384,6 @@ class Player {
   heal(v) { this.hp = Math.min(this.maxHp, this.hp + v); }
 
   hurt(dmg, from, silent) {
-    if (G.riding && G.vehicle) { G.vehicle.hurt(dmg, from); return; }
     if ((this.invuln > 0 && !silent) || this.dead || G.levelDone) return;
     // the Shield Bot's bubble soaks damage first
     if (this.shield > 0) {
@@ -490,7 +483,7 @@ class Enemy {
     const d = Math.hypot(p.pos.x - this.pos.x, p.pos.y - this.pos.y, p.pos.z - this.pos.z);
     if (d < R) {
       const near = 1 - d / R;
-      const rate = 0.35 + 1.9 * Math.pow(near, 1.4) + (G.riding ? 0.4 : 0);   // ~3 s at the edge, ~0.6 s point-blank
+      const rate = 0.35 + 1.9 * Math.pow(near, 1.4);   // ~3 s at the edge, ~0.6 s point-blank
       this.notice = Math.min(1, (this.notice || 0) + rate * dt);
       if (!this.noticeSfx) { this.noticeSfx = true; Sound.play('chirp', null, G.vol(this.pos)); }
       // turn toward the disturbance while deciding
@@ -687,7 +680,7 @@ class Enemy {
 
     // contact damage
     const cdy = Math.abs(p.chestY - this.cy);
-    if (this.aggro && !G.riding && dd < this.r + p.r + 0.2 && cdy < this.r + 1.2 && !p.dead) {
+    if (this.aggro && dd < this.r + p.r + 0.2 && cdy < this.r + 1.2 && !p.dead) {
       if (this.ai === 'swarm') { p.hurt(this.dmg, this.pos); G.killEnemy(this, true); return; }
       if (this.contactCd <= 0) { p.hurt(this.dmg, this.pos); this.contactCd = 0.9; }
     }
@@ -1212,7 +1205,7 @@ class Boss {
       case 'gust': {
         this.hoverTarget = 7;
         const ux = dx / dd, uz = dz / dd;
-        if (!G.riding && !p.dead) { p.vel.x += ux * 30 * dt; p.vel.z += uz * 30 * dt; }
+        if (!p.dead) { p.vel.x += ux * 30 * dt; p.vel.z += uz * 30 * dt; }
         for (let i = 0; i < 3; i++) {
           const a = ang + rand(-0.5, 0.5), r = rand(2, 20);
           Fx.trail(this.pos.x + Math.sin(a) * r, p.pos.y + rand(0, 3), this.pos.z + Math.cos(a) * r, '#dff6ff', 0.4, 0.3, 1.5);
@@ -1354,8 +1347,10 @@ class Boss {
 
 // ═════════════════════════ COMPANIONS ═════════════════════════
 // Bots run on batteries. As a battery drains the bot takes more damage and aims worse; when it runs low
-// the bot flies home to the Charging Room, recharges, then comes back to you on its own.
-//   state: follow · leaving · away · charging · returning · down
+// the bot flies back to the biome's home portal, travels through it to the Charging Room, recharges,
+// then travels back through the portal and flies to you. Bots can also be swapped with ones kept at home.
+//   state: follow · leaving · away · charging · transitBack · returning · down
+const PORTAL_TRANSIT = 8;   // seconds to travel through the portal each way
 let _cid = 0;
 class Companion {
   constructor(kind, battery = 100) {
@@ -1390,7 +1385,17 @@ class Companion {
   get active() { return this.state === 'follow' || this.state === 'returning'; }
   get offline() { return this.active ? 0 : 1; }   // legacy flag for older checks
   get statusText() {
-    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: 'Heading home', away: this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', charging: 'Charging', returning: 'On the way back', down: 'Knocked out' }[this.state];
+    if (this.state === 'away' && this.transitT > 0) return `Travelling home (${Math.ceil(this.transitT)}s)`;
+    if (this.swapTo && (this.state === 'leaving' || this.state === 'away')) return 'Going home to swap';
+    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: 'Flying to the portal', away: this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', charging: 'Charging', transitBack: `Coming through the portal (${Math.ceil(this.transitT)}s)`, returning: 'Flying back to you', down: 'Knocked out' }[this.state];
+  }
+  // fly straight toward a point at a steady speed; returns the remaining distance
+  flyTo(x, y, z, speed, dt) {
+    const dx = x - this.pos.x, dy = y - this.pos.y, dz = z - this.pos.z, d = Math.hypot(dx, dy, dz);
+    const st = Math.min(d, speed * dt);
+    if (d > 0.001) { this.pos.x += dx / d * st; this.pos.y += dy / d * st; this.pos.z += dz / d * st; }
+    this.model.lookAt(x, y, z);
+    return d - st;
   }
 
   attach() { if (!this.inScene) { G.scene.add(this.model); this.inScene = true; } if (this.beam) G.scene.add(this.beam); }
@@ -1419,6 +1424,7 @@ class Companion {
   // called when the player travels between home base and a biome
   onTravel() {
     const p = G.player;
+    this.transitT = 0;
     if (this.state === 'follow' || this.state === 'returning') {
       this.state = 'follow';
       this.pos.set(p.pos.x + rand(-2, 2), p.pos.y + 2, p.pos.z + rand(-2, 2));
@@ -1466,36 +1472,48 @@ class Companion {
           const k = 1 - Math.exp(-2.5 * dt);
           this.pos.x += (pad.x - this.pos.x) * k; this.pos.z += (pad.z - this.pos.z) * k;
           this.pos.y += (pad.y + (Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z) > 3 ? 4 : 0) - this.pos.y) * k;
-          if (Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z) < 0.4) { this.state = 'charging'; Sound.play('online', null, 0.6); }
+          if (Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z) < 0.4) {
+            if (this.swapTo) { G.completeSwap(this); return; }
+            this.state = 'charging'; Sound.play('online', null, 0.6);
+          }
         } else {
-          this.pos.y += dt * 9;
-          this.stateT -= dt;
-          if (this.stateT <= 0) {
+          // fly all the way back to the biome's home portal and go through it
+          const P = World.homePortal;
+          const tx = P ? P.x : this.pos.x, ty = P ? P.y + 3.9 : this.pos.y + 30, tz = P ? P.z : this.pos.z;
+          const rest = this.flyTo(tx, Math.max(ty, Math.min(this.pos.y + 1, ty + 12)), tz, 13, dt);
+          if (Math.random() < dt * 10) Fx.trail(this.pos.x, this.pos.y, this.pos.z, this.d.color, 0.4, 0.3, 2);
+          if (rest < 1.2 || (!P && this.pos.y > ty - 1)) {
             Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, this.d.color, 3, 0.4, 3);
-            const beam = makeBeam(this.d.color, 3, 0.3, 0.8); setBeam(beam, this.pos.x, this.pos.y, this.pos.z, this.pos.x, this.pos.y + 200, this.pos.z); G.scene.add(beam);
-            setTimeout(() => G.scene.remove(beam), 350);
-            Sound.play('portal', null, 0.4);
-            this.state = 'away'; this.detach();
+            if (P) Fx.shockRing(P.x, P.y + 3.9, P.z, this.d.color, 2, 20);
+            Sound.play('portal', null, 0.4 * G.vol(this.pos));
+            this.state = 'away'; this.transitT = PORTAL_TRANSIT; this.detach();
           }
         }
         m.position.copy(this.pos);
         return;
       }
       case 'away': {
+        // first the trip through the portal, then charging at home
+        if (this.transitT > 0) { this.transitT -= dt; if (this.transitT > 0 && !hub) return; }
+        if (this.swapTo) { G.completeSwap(this); return; }
         this.battery = Math.min(100, this.battery + this.chargeRate * dt);
         this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.05 * dt);
         if (hub) { this.onTravel(); return; }
-        if (this.battery >= 100 && this.hp >= this.maxHp) {
-          // beam back down next to the player
+        if (this.battery >= 100 && this.hp >= this.maxHp) { this.state = 'transitBack'; this.transitT = PORTAL_TRANSIT; }
+        return;
+      }
+      case 'transitBack': {
+        if (hub) { this.onTravel(); return; }
+        this.transitT -= dt;
+        if (this.transitT <= 0) {
+          // pop out of the home portal and fly back to the player
+          const P = World.homePortal;
           this.state = 'returning';
-          this.pos.set(p.pos.x + rand(-3, 3), p.pos.y + 14, p.pos.z + rand(-3, 3));
-          if (World.domeTrap) World.keepInside(this.pos, this.r);
+          if (P) this.pos.set(P.x, P.y + 3.9, P.z); else this.pos.set(p.pos.x, p.pos.y + 14, p.pos.z);
           this.attach();
-          const beam = makeBeam(this.d.color, 3, 0.3, 0.8); setBeam(beam, this.pos.x, this.pos.y, this.pos.z, this.pos.x, this.pos.y + 200, this.pos.z); G.scene.add(beam);
-          setTimeout(() => G.scene.remove(beam), 350);
           Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, this.d.color, 3, 0.4, 3);
-          UI.feed(`${this.d.name} recharged and back in action`, this.d.color);
-          Sound.play('online');
+          UI.feed(`${this.d.name} is back through the portal — on its way to you`, this.d.color);
+          Sound.play('online', null, 0.8);
         }
         return;
       }
@@ -1515,12 +1533,23 @@ class Companion {
       }
     }
 
+    // ── returning: a long flight from the portal back to the player ──
+    if (this.state === 'returning') {
+      const far = Math.hypot(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
+      if (far > 8) {
+        this.flyTo(p.pos.x, Math.max(p.pos.y + this.d.height + 2, World.floorAt(this.pos.x, this.pos.z) + 3), p.pos.z, 15, dt);
+        if (World.domeTrap && Math.hypot(this.pos.x - World.arena.x, this.pos.z - World.arena.z) < World.arena.r + 6) World.keepInside(this.pos, this.r);
+        m.position.copy(this.pos);
+        return;
+      }
+    }
     // ── follow / returning ──
     if (!hub && this.state === 'follow') {
       this.battery = Math.max(0, this.battery - 0.55 * dt);
       if (this.battery < 15 && !World.domeTrap) { this.goCharge('battery low'); return; }
     }
     if (hub && this.state === 'follow' && (this.battery < 95 || this.hp < this.maxHp * 0.95)) { this.state = 'leaving'; return; }
+    if (this.state === 'returning') this.state = 'follow';
     this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.01 * dt);
 
     // formation: fan out behind and beside the player so the squad rarely blocks the view
@@ -1669,142 +1698,5 @@ class Companion {
     // low battery: the halo flickers
     P.halo.visible = this.charge > 0.3 || Math.sin(this.t * 14) > 0;
     m.userData.bodyMat.emissiveIntensity = 0.05 + this.flash * 2;
-  }
-}
-
-// ═════════════════════════ SKYRIDER (craftable flying vehicle) ═════════════════════════
-// Deploy with F (or RIDE), fly where you look, shoot with twin cannons. It soaks up the
-// hits aimed at you; if it's destroyed you're thrown clear and can glide down.
-class Vehicle {
-  constructor(hp) {
-    this.maxHp = 240;
-    this.hp = hp ?? this.maxHp;
-    this.pos = new THREE.Vector3();
-    this.vel = new THREE.Vector3();
-    this.model = buildSkyriderModel();
-    this.fireCd = 0; this.side = 1; this.bank = 0; this.flash = 0;
-    this.deployed = false;
-  }
-
-  deploy() {
-    const p = G.player;
-    this.pos.set(p.pos.x, p.pos.y + 1.4, p.pos.z);
-    this.vel.copy(p.vel); this.vel.y = Math.max(this.vel.y, 6);
-    this.model.position.copy(this.pos);
-    G.scene.add(this.model);
-    this.deployed = true;
-    G.riding = true;
-    p.gliding = false; p.climbing = null;
-    Fx.shockRing(this.pos.x, this.pos.y, this.pos.z, '#ffb347', 3, 40);
-    Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, '#ffffff', 4, 0.3, 4);
-    Sound.play('deploy');
-    G.hint(Touch.enabled ? 'Skyrider: fly where you look · hold UP / DIVE · EXIT to dock' : 'Skyrider: fly where you look · Space climbs · C dives · F to dock');
-  }
-
-  dock() {
-    const p = G.player;
-    G.scene.remove(this.model);
-    this.deployed = false;
-    G.riding = false;
-    p.pos.set(this.pos.x, this.pos.y - 0.6, this.pos.z);
-    p.vel.copy(this.vel).multiplyScalar(0.5);
-    p.grounded = false; p.fallTop = p.pos.y;
-    Fx.shockRing(this.pos.x, this.pos.y, this.pos.z, '#3cf2ff', 2, 30);
-    Sound.play('deploy');
-  }
-
-  hurt(dmg, from) {
-    this.hp -= dmg;
-    this.flash = 1;
-    Fx.addShake(0.15);
-    Fx.sparks(this.pos.x, this.pos.y, this.pos.z, 6, '#ffb347', 7);
-    if (from) UI.damageDir(from.x, from.z);
-    Sound.play('hit');
-    if (this.hp <= 0) this.destroy();
-  }
-
-  destroy() {
-    const p = G.player;
-    Fx.explosion(this.pos.x, this.pos.y, this.pos.z, '#ffb347', 2.4);
-    Fx.addShake(0.9);
-    Sound.play('explode', true);
-    G.scene.remove(this.model);
-    G.vehicle = null;
-    G.riding = false;
-    p.pos.set(this.pos.x, this.pos.y - 0.6, this.pos.z);
-    p.vel.set(this.vel.x * 0.4, 7, this.vel.z * 0.4);
-    p.grounded = false; p.fallTop = p.pos.y;
-    p.invuln = 1.5;
-    UI.banner('SKYRIDER DESTROYED', Touch.enabled ? 'Tap GLIDE to open your glider' : 'Press Space to open your glider', '#ffb347', 2.6);
-  }
-
-  update(dt) {
-    const p = G.player, I = Input;
-    let mf = (I.key('KeyW') || I.key('ArrowUp') ? 1 : 0) - (I.key('KeyS') || I.key('ArrowDown') ? 1 : 0);
-    let mr = (I.key('KeyD') || I.key('ArrowRight') ? 1 : 0) - (I.key('KeyA') || I.key('ArrowLeft') ? 1 : 0);
-    if (I.touch) { mf -= I.touch.my; mr += I.touch.mx; }
-    const up = I.key('Space'), down = I.key('KeyC') || I.key('ControlLeft');
-    const boost = I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint);
-    const dir = p.forward(_v1).clone();
-    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
-    const speed = 26 * (boost ? 1.7 : 1);
-    const tx = dir.x * mf * speed + rx * mr * 15;
-    const tz = dir.z * mf * speed + rz * mr * 15;
-    const ty = dir.y * Math.max(0, mf) * speed + (up ? 12 : 0) - (down ? 12 : 0);
-    const k = 1 - Math.exp(-2.2 * dt);
-    this.vel.x += (tx - this.vel.x) * k; this.vel.y += (ty - this.vel.y) * k; this.vel.z += (tz - this.vel.z) * k;
-    this.pos.addScaledVector(this.vel, dt);
-    const floor = Math.max(World.groundAt(this.pos.x, this.pos.z, this.pos.y), World.hazardLevel) + 1.4;
-    if (this.pos.y < floor) {
-      if (this.vel.y < -14) this.hurt(8);
-      this.pos.y = floor; this.vel.y = Math.max(0, this.vel.y);
-    }
-    this.pos.y = Math.min(this.pos.y, World.hazardLevel + 170);
-    World.collide(this.pos, 1.3, this.pos.y - 0.5);
-    World.keepInside(this.pos, 1.3);
-
-    p.pos.set(this.pos.x, this.pos.y - 0.9, this.pos.z);
-    p.vel.copy(this.vel);
-    p.grounded = false;
-
-    // twin cannons
-    this.fireCd -= dt;
-    if (I.mouse.down && this.fireCd <= 0) {
-      this.fireCd = 0.09;
-      this.side *= -1;
-      const aim = G.aimPoint();
-      const mx = this.pos.x + rx * this.side * 1.35 + dir.x * 1.6, my = this.pos.y - 0.15 + dir.y * 1.6, mz = this.pos.z + rz * this.side * 1.35 + dir.z * 1.6;
-      const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
-      G.spawnBolt(mx, my, mz, d, 200, 12 + G.level * 1.5, '#ffb347', true);
-      Fx.muzzle(mx, my, mz, '#ffb347');
-      Sound.play('shoot');
-    }
-    if (I.mouse.rightPressed || I.hit('KeyG')) {
-      if (p.energy < 100 && G.takeItem('supply', 'cell')) p.energy = 100;
-      if (p.energy >= 100) {
-        p.energy = 0;
-        G.spawnGrenade(new THREE.Vector3(this.pos.x, this.pos.y - 1, this.pos.z), this.vel.clone().addScaledVector(dir, 12));
-        Sound.play('throw');
-      } else Sound.play('deny');
-    }
-
-    // model: nose follows the view, banks into turns
-    this.flash = Math.max(0, this.flash - dt * 5);
-    const m = this.model;
-    m.position.copy(this.pos);
-    const yawRate = (this.lastYaw !== undefined ? angDiff(this.lastYaw, p.yaw) : 0) / Math.max(dt, 0.001);
-    this.lastYaw = p.yaw;
-    this.bank = lerp(this.bank, clamp(-mr * 0.5 + yawRate * 0.15, -0.9, 0.9), 1 - Math.exp(-4 * dt));
-    m.rotation.set(-p.pitch * 0.6, p.yaw + Math.PI, this.bank, 'YXZ');
-    m.userData.bodyMat.emissiveIntensity = this.flash * 2;
-    const thrust = 0.8 + Math.min(1.6, this.vel.length() / 25);
-    for (const t of m.userData.thrusters) { t.scale.setScalar(thrust * (0.9 + Math.random() * 0.2)); }
-    if (Math.random() < 0.8) {
-      for (const s of [-1, 1]) {
-        const bx = this.pos.x + rx * s * 0.95 - dir.x * 1.6, bz = this.pos.z + rz * s * 0.95 - dir.z * 1.6;
-        Fx.trail(bx, this.pos.y - 0.25 - dir.y * 1.6, bz, '#ffb347', 0.5 * thrust, 0.25, 2.5);
-      }
-    }
-    if (this.hp < this.maxHp * 0.3 && Math.random() < dt * 12) Fx.smoke(this.pos.x, this.pos.y, this.pos.z, 0.8, 1, 0, 1, 0);
   }
 }

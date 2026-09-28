@@ -53,7 +53,6 @@
     <div class="track big"><i id="bar-hull"></i></div>
     <div class="vrow small"><span class="lbl plasma">PLASMA</span><div class="track"><i id="bar-plasma" class="plasma"></i></div><span id="val-plasma" class="val plasma"></span></div>
     <div class="vrow small"><span class="lbl">DASH</span><div class="track"><i id="bar-dash"></i></div><span id="val-repair" class="val green"></span></div>
-    <div class="vrow small" id="veh-row"><span class="lbl veh">SKY</span><div class="track"><i id="bar-veh" class="veh"></i></div><span id="val-veh" class="val veh"></span></div>
     <div class="vrow small" id="fuel-row"><span class="lbl fuel">FUEL</span><div class="track"><i id="bar-fuel" class="fuel"></i></div><span id="val-fuel" class="val fuel"></span></div>
     <div id="bucks-box"><img id="bucks-ico" alt=""><b id="hud-bucks">0</b><span>BOTBUCKS</span></div>
   </div>
@@ -96,12 +95,6 @@
   <div class="tbtn use" data-tbtn="use" id="tb-use" role="button" aria-label="Use">
     <svg viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V3.5a1.5 1.5 0 0 1 3 0V11M14 11V5a1.5 1.5 0 0 1 3 0v8c0 4-2.5 7-6 7-2.5 0-4-1.5-5.5-4L4 12.5a1.5 1.5 0 0 1 2.5-1.5L8 13"/></svg><span>USE</span>
   </div>
-  <div class="tbtn ride" data-tbtn="ride" id="tb-ride" role="button" aria-label="Ride Skyrider">
-    <svg viewBox="0 0 24 24"><path d="M12 3l2 6 7 3-7 3-2 6-2-6-7-3 7-3z"/></svg><span>RIDE</span>
-  </div>
-  <div class="tbtn dive" data-tbtn="descend" id="tb-descend" role="button" aria-label="Dive">
-    <svg viewBox="0 0 24 24"><path d="M5 10l7 7 7-7M5 4l7 7 7-7"/></svg><span>DIVE</span>
-  </div>
   <div class="tbtn repair" data-tbtn="repair" id="tb-repair" role="button" aria-label="Repair kit" data-n="0">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>FIX</span>
   </div>
@@ -133,11 +126,10 @@
         <div><kbd>JUMP</kbd><span>Jump · tap mid-air to glide · hold for jetpack</span></div>
         <div><kbd>Hotbar</kbd><span>Tap a slot to hold that item / weapon</span></div>
         <div><kbd>Walk into rocks</kbd><span>Climb them (uses stamina)</span></div>
-        <div><kbd>RIDE</kbd><span>Deploy / dock your Skyrider</span></div>
         <div><kbd>VIEW</kbd><span>First / third person</span></div>
         <div><kbd>DASH</kbd><span>Burst with brief invulnerability</span></div>
         <div><kbd>BOMB</kbd><span>Plasma grenade</span></div>
-        <div><kbd>USE</kbd><span>Rooms · portals · shops · caches · uplinks</span></div>
+        <div><kbd>USE</kbd><span>Rooms · shops · caches · uplinks (walk into portals)</span></div>
         <div><kbd>CRAFT</kbd><span>Field kit — build simple bots</span></div>
       </div>
       <div class="howto-grid desk-only">
@@ -146,27 +138,26 @@
         <div><kbd>Space</kbd><span>Jump · tap mid-air to glide · hold for jetpack</span></div>
         <div><kbd>1–9 / wheel</kbd><span>Select hotbar slot · <b>X</b> drop it</span></div>
         <div><kbd>Walk into rocks</kbd><span>Climb (uses stamina)</span></div>
-        <div><kbd>F</kbd><span>Deploy / dock Skyrider</span></div>
         <div><kbd>V</kbd><span>First / third person</span></div>
         <div><kbd>Q</kbd><span>Dash — brief invulnerability</span></div>
         <div><kbd>Right-click / G</kbd><span>Plasma grenade</span></div>
-        <div><kbd>E</kbd><span>Rooms · portals · shops · caches · beacons</span></div>
+        <div><kbd>E</kbd><span>Rooms · shops · caches · beacons (walk into portals)</span></div>
         <div><kbd>R</kbd><span>Use repair kit</span></div>
         <div><kbd>Tab / I</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>M</kbd><span>Mute</span></div>
       </div>
-      <p><b>Home base</b> is a house with three rooms: the <b>Mechanic Room</b> (build bots, a shield
-        generator and the Skyrider), the <b>Charging Room</b> (bots recharge here) and <b>Storage</b> (unlimited).
+      <p><b>Home base</b> is a house with three rooms: the <b>Mechanic Room</b> (build bots and a shield
+        generator), the <b>Charging Room</b> (bots recharge here) and <b>Storage</b> (unlimited).
         Five portals ring the house: <b>Plains → Snowy Plains → Mountains → Volcano → Sky Islands</b>.
         Beat a biome's boss to open the next portal.</p>
-      <p>Your <b>hotbar</b> holds one item per slot — parts, weapons and supplies. Sell salvage at each biome's
+      <p>Your <b>hotbar</b> stacks parts and supplies up to 20 per slot. Sell salvage at each biome's
         <b>shop</b> for <b>Botbucks</b> and buy weapons, gear (jetpack, fire boots), premium bots and upgrades.
-        Bot batteries drain; low bots fly home to recharge and come back on their own. Watch out for
+        Bot batteries drain; low bots fly back through the portal to recharge and return on their own, and you can swap squad bots with ones waiting at home. Watch out for
         <b>fall damage</b> and your own <b>bomb blasts</b>. Once you enter a boss dome, there is no way out
         until the boss falls.</p>
     </div>
-    <div class="menu-foot">5 biomes · 5 bosses · 9 companion bots · 4 weapons · a home to come back to</div>
+    <div class="menu-foot">5 biomes · 6 theme songs · 5 bosses · 9 companion bots · 4 weapons · a home to come back to</div>
     <a class="menu-link" href="../index.html">Play the original top-down Scrapforge ▸</a>
   </div>
 </div>

@@ -559,16 +559,6 @@ body.touch .dmg-arc { left: -80px; top: -80px; width: 160px; height: 160px; }
 #focus-vignette { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(20,120,110,0.35) 100%); }
 #focus-vignette.on { opacity: 1; }
-#veh-row { display: none; }
-#veh-row.show { display: flex; }
-.lbl.veh, .val.veh { color: #ffc27a; }
-.track i.veh { --c: #ffb347; }
-.tbtn.ride { width: 56px; height: 56px; right: calc(222px + env(safe-area-inset-right)); bottom: 186px; color: #ffe0b0; border-color: rgba(255,179,71,0.6); display: none; }
-.tbtn.ride.avail { display: flex; }
-.tbtn.ride.on { background: rgba(255,179,71,0.35); }
-.tbtn.dive { width: 52px; height: 52px; right: calc(131px + env(safe-area-inset-right)); bottom: 172px; display: none; }
-body.riding .tbtn.dive { display: flex; }
-body.riding .tbtn.use, body.riding .tbtn.dash { opacity: 0.35; }
 #tb-view { right: calc(118px + env(safe-area-inset-right)); }
 body.touch #stamina { left: calc(50% + 36px); width: 36px; height: 36px; top: calc(50% - 24px); }
 
@@ -640,3 +630,19 @@ body.touch #bucks-box { margin-top: 4px; padding-top: 3px; }
 body.touch #bucks-box b { font-size: 13px; }
 body.touch #hud { z-index: 8; }
 body.touch #obj-kills { display: none; }
+
+.hb u { position: absolute; right: 3px; bottom: 1px; text-decoration: none; font-family: Orbitron, sans-serif; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; pointer-events: none; }
+.stackn { font-family: Orbitron, sans-serif; font-size: 12px; color: var(--c); }
+.inv-item.sellrow { flex-wrap: wrap; }
+.sell-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.sell-box input[type=range] { width: 80px; accent-color: #ffd23f; }
+.store-item { cursor: default; flex-wrap: wrap; }
+.wd-btns { display: flex; gap: 4px; width: 100%; }
+.wd-btns .btn { flex: 1; }
+body.touch .hb u { font-size: 9px; }
+
+.sq-btns { display: flex; flex-direction: column; gap: 4px; }
+.squad-item.reserve { opacity: .92; border-left-style: dashed; }
+.swap-box { display: flex; gap: 4px; margin-top: 4px; }
+.swap-box select { flex: 1; min-width: 0; background: #0c1624; color: #dfe8f4; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-family: Rajdhani, sans-serif; font-size: 12px; padding: 2px 4px; }
+.home-note { padding: 6px 4px; }

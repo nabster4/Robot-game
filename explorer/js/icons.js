@@ -369,16 +369,7 @@ const weapIconURL = (id) => iconURL('w_' + id, 64, (g, s) => { glow(g, s / 2, s 
 const upgIconURL = (id, color) => iconURL('u_' + id + color, 64, (g, s) => { glow(g, s / 2, s / 2, s * 0.5, color, 0.35); drawUpgradeIcon(g, id, s / 2, s / 2, s * 0.28, color); });
 
 
-// Skyrider & Scrap Sprite icons for the workshop
-const vehIconURL = () => iconURL('v_skyrider', 64, (g, s) => {
-  glow(g, s / 2, s / 2, s * 0.5, '#ffb347', 0.35);
-  g.save(); g.translate(s / 2, s / 2); g.rotate(-Math.PI / 4);
-  g.fillStyle = '#2c3e52'; g.strokeStyle = '#ffb347'; g.lineWidth = 2; g.lineJoin = 'round';
-  poly(g, [[0, -1], [0.18, -0.2], [0.95, 0.25], [0.95, 0.4], [0.18, 0.3], [0.14, 0.75], [0.4, 0.95], [-0.4, 0.95], [-0.14, 0.75], [-0.18, 0.3], [-0.95, 0.4], [-0.95, 0.25], [-0.18, -0.2]], s * 0.36);
-  g.fill(); g.stroke();
-  g.fillStyle = '#3cf2ff'; g.beginPath(); g.ellipse(0, -s * 0.12, s * 0.05, s * 0.1, 0, 0, TAU); g.fill();
-  g.restore();
-});
+// Scrap Sprite icon for the inventory
 const spriteIconURL = () => iconURL('sprite', 48, (g, s) => {
   glow(g, s / 2, s / 2, s * 0.5, '#3aff9a', 0.5);
   g.fillStyle = '#2a4a3a'; g.strokeStyle = '#3aff9a'; g.lineWidth = 2;

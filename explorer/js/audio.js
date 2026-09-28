@@ -161,6 +161,66 @@ const Sound = (() => {
       'D5 D5 F5 D5 A5 D5 F5 A5', 'G#5 ~ ~ - B5 ~ ~ -', 'A5 ~ E5 - C5 - A4 -', 'G#4 ~ B4 ~ E5 ~ G#5 ~']),
   }, ['a', 'b']);
 
+  // ── one catchy theme song per place (index 0-4 = biomes, 5 = home base) ──
+  // lead: instrument voice · groove: drum & bass pattern
+  const PLACE_SONGS = [
+    { // Green Plains — sunny, skipping whistle tune
+      bpm: 124, lead: 'whistle', groove: 'skip', bars: song({
+        a: sec('a', 'G D Em C G D C D', [
+          'D5 - G5 - B5 - A5 G5', 'F#5 ~ A5 - D5 ~ ~ -', 'E5 - G5 - B5 ~ A5 G5', 'E5 ~ ~ - C5 - E5 -',
+          'D5 - G5 - B5 - D6 B5', 'A5 ~ F#5 - D5 - F#5 -', 'G5 - E5 - C5 - E5 -', 'D5 ~ ~ ~ A4 - D5 -']),
+        b: sec('b', 'C D Bm Em C D G G', [
+          'E5 E5 - G5 - E5 C5 -', 'D5 D5 - F#5 - A5 ~ -', 'B4 - D5 - F#5 ~ E5 D5', 'E5 ~ ~ - G5 - B5 -',
+          'C6 ~ B5 - A5 - G5 -', 'F#5 - E5 - D5 - A5 -', 'G5 ~ ~ - D5 - B4 -', 'G4 - B4 - D5 - G5 -']),
+      }, ['a', 'a', 'b', 'a']) },
+    { // Snowy Plains — sparkling music-box bells
+      bpm: 100, lead: 'bell', groove: 'soft', bars: song({
+        a: sec('a', 'Bm G D A Bm G Em F#', [
+          'F#5 - D5 - B4 - D5 F#5', 'G5 ~ ~ - D5 - B4 -', 'A5 - F#5 - D5 - F#5 A5', 'E5 ~ ~ - C#5 - A4 -',
+          'B5 - A5 - F#5 - D5 -', 'G5 ~ F#5 - E5 - D5 -', 'E5 - G5 - B5 ~ A5 G5', 'F#5 ~ ~ ~ A#4 ~ C#5 -']),
+        b: sec('b', 'G A F#m Bm G A D F#', [
+          'D6 ~ B5 - G5 - B5 -', 'C#6 ~ A5 - E5 - A5 -', 'A5 - F#5 - C#5 - F#5 -', 'B5 ~ ~ - F#5 - D5 -',
+          'B5 - A5 - G5 - D5 -', 'E5 - F#5 - G5 - A5 -', 'F#5 ~ D5 - A4 - D5 -', 'C#5 ~ ~ ~ F#4 ~ ~ ~']),
+      }, ['a', 'b']) },
+    { // Mountains — heroic brass march
+      bpm: 112, lead: 'horn', groove: 'march', bars: song({
+        a: sec('a', 'Em C G D Em C D D', [
+          'E5 - - B4 E5 - G5 -', 'E5 ~ ~ - C5 - E5 -', 'D5 - - B4 D5 - G5 -', 'F#5 ~ ~ - A5 - F#5 -',
+          'G5 - F#5 - E5 - B5 -', 'G5 ~ E5 - C5 - E5 -', 'F#5 - E5 - D5 - A4 -', 'D5 ~ ~ ~ F#5 ~ ~ ~']),
+        b: sec('b', 'C D Em Em C D B B', [
+          'G5 ~ E5 - C5 - G5 -', 'A5 ~ F#5 - D5 - A5 -', 'B5 ~ ~ - G5 - E5 -', 'B5 - A5 - G5 - F#5 -',
+          'E5 - G5 - C6 ~ B5 A5', 'A5 - F#5 - D5 - F#5 A5', 'B5 ~ ~ ~ D#5 ~ F#5 -', 'B5 ~ A5 - F#5 - D#5 -']),
+      }, ['a', 'b']) },
+    { // Fiery Volcano — driving chiptune rock
+      bpm: 134, lead: 'chip', groove: 'drive', bars: song({
+        a: sec('a', 'Dm Dm Bb C Dm Dm Bb A', [
+          'D5 - D5 F5 - D5 A5 -', 'G5 F5 E5 - D5 ~ ~ -', 'D5 - D5 F5 - D5 Bb5 -', 'A5 G5 E5 - C5 ~ ~ -',
+          'D5 - F5 - A5 - D6 -', 'C6 - A5 - F5 - A5 -', 'Bb5 ~ A5 - G5 - F5 -', 'E5 ~ ~ ~ C#5 ~ E5 -']),
+        b: sec('b', 'Bb C Dm Dm Bb C A A', [
+          'F5 ~ ~ - D5 - F5 G5', 'E5 ~ ~ - C5 - E5 G5', 'A5 ~ ~ - F5 - D5 -', 'A5 - Bb5 - A5 - F5 -',
+          'D6 ~ C6 - Bb5 - A5 -', 'G5 ~ A5 - Bb5 - C6 -', 'A5 ~ ~ - E5 - C#5 -', 'A4 - C#5 - E5 - A5 -']),
+      }, ['a', 'a', 'b', 'a']) },
+    { // Sky Islands — airy, floating arpeggios
+      bpm: 118, lead: 'whistle', groove: 'float', bars: song({
+        a: sec('a', 'F G Am C F G C C', [
+          'C5 - F5 - A5 ~ C6 -', 'B5 ~ A5 - G5 - D5 -', 'E5 - A5 - C6 ~ B5 A5', 'G5 ~ ~ - E5 - C5 -',
+          'F5 - A5 - C6 ~ E6 D6', 'D6 ~ B5 - G5 - B5 -', 'C6 ~ G5 - E5 - G5 -', 'C6 ~ ~ ~ - - - -']),
+        b: sec('b', 'Dm G F C Dm G Am G', [
+          'A5 ~ F5 - D5 - F5 A5', 'B5 ~ G5 - D5 - G5 B5', 'C6 - A5 - F5 - A5 C6', 'E6 ~ ~ - C6 - G5 -',
+          'D6 - C6 - A5 - F5 -', 'D5 - G5 - B5 - D6 -', 'C6 ~ B5 - A5 - E5 -', 'D5 ~ ~ ~ G5 ~ B5 -']),
+      }, ['a', 'b']) },
+    { // Home Base — cozy, bouncy bells
+      bpm: 104, lead: 'bell', groove: 'bounce', bars: song({
+        a: sec('a', 'C G Am F C G F G', [
+          'E5 - G5 - C6 ~ B5 G5', 'D5 ~ ~ - G5 - B5 -', 'C5 - E5 - A5 ~ G5 E5', 'F5 ~ E5 - D5 - C5 -',
+          'E5 - G5 - C6 ~ D6 C6', 'B5 ~ G5 - D5 - G5 -', 'A5 - G5 - F5 - A5 -', 'G5 ~ ~ ~ D5 - B4 -']),
+        b: sec('b', 'F G Em Am F G C C', [
+          'A4 - C5 - F5 ~ E5 -', 'D5 - B4 - G4 ~ ~ -', 'G4 - B4 - E5 ~ D5 B4', 'C5 ~ ~ - A4 - C5 -',
+          'F5 - E5 - D5 - C5 -', 'D5 ~ E5 - F5 - G5 -', 'E5 ~ D5 - C5 ~ ~ -', 'C5 - G4 - E4 - G4 -']),
+      }, ['a', 'b', 'a', 'b']) },
+  ];
+  let place = PLACE_SONGS[5];
+
   const THEMES = { explore: EXPLORE, combat: COMBAT, boss: BOSS };
   // each zone gets its own key and tempo so the soundtrack doesn't wear thin
   const ZONE_MUSIC = [{ t: 0, bpm: 116 }, { t: -2, bpm: 122 }, { t: 3, bpm: 112 }, { t: -4, bpm: 108 }, { t: 2, bpm: 124 }, { t: -1, bpm: 128 }];
@@ -194,7 +254,23 @@ const Sound = (() => {
     const g = ctx.createGain(), lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     const oscs = [];
-    if (style === 'pluck') {
+    if (style === 'bell') {
+      oscs.push(['sine', f, 0], ['sine', f * 3.01, 0], ['triangle', f * 2, 3]);
+      lp.frequency.setValueAtTime(7000, t);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.1, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.7, dur * 1.8));
+    } else if (style === 'whistle') {
+      oscs.push(['sine', f, 0], ['triangle', f, 4]);
+      lp.frequency.setValueAtTime(4000, t);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.085, t + 0.03); g.gain.setValueAtTime(0.075, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.15);
+    } else if (style === 'horn') {
+      oscs.push(['sawtooth', f, -4], ['sawtooth', f, 5], ['square', f / 2, 0]);
+      lp.frequency.setValueAtTime(700, t); lp.frequency.linearRampToValueAtTime(2200, t + 0.08); lp.frequency.exponentialRampToValueAtTime(1100, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 0.05); g.gain.setValueAtTime(0.045, t + dur * 0.85); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
+    } else if (style === 'chip') {
+      oscs.push(['square', f, 0], ['square', f * 2, 6]);
+      lp.frequency.setValueAtTime(5000, t);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.04, t + 0.004); g.gain.setValueAtTime(0.034, t + dur * 0.75); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+    } else if (style === 'pluck') {
       oscs.push(['triangle', f, 0], ['sine', f * 2, 0]);
       lp.frequency.setValueAtTime(5000, t); lp.frequency.exponentialRampToValueAtTime(900, t + 0.4);
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.11, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.5, dur * 1.4));
@@ -205,7 +281,7 @@ const Sound = (() => {
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.012); g.gain.setValueAtTime(v * 0.8, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.08);
     }
     const vib = ctx.createOscillator(), vg = ctx.createGain();
-    vib.frequency.value = 5.5; vg.gain.value = style === 'pluck' ? 0 : f * 0.006;
+    vib.frequency.value = style === 'whistle' ? 6 : 5.5; vg.gain.value = style === 'pluck' || style === 'bell' || style === 'chip' ? 0 : f * (style === 'whistle' ? 0.012 : 0.006);
     vib.connect(vg);
     for (const [type, freq, det] of oscs) {
       const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = det;
@@ -228,8 +304,8 @@ const Sound = (() => {
   }
 
   function stepDur() {
-    const k = theme === 'explore' ? 0.86 : theme === 'boss' ? 1.1 : 1;
-    return 60 / (zoneMusic.bpm * k) / 4;
+    if (theme === 'explore') return 60 / place.bpm / 4;
+    return 60 / (zoneMusic.bpm * (theme === 'boss' ? 1.1 : 1)) / 4;
   }
 
   function playStep(t) {
@@ -237,9 +313,9 @@ const Sound = (() => {
     if (i === 0) {
       const want = intensity >= 2 ? 'boss' : intensity >= 1 ? 'combat' : 'explore';
       if (want !== theme) { theme = want; barIdx = 0; if (want !== 'explore') noise(t, 1.2, 0.12, 6000, 'highpass', null, music); }
-      else barIdx = (barIdx + 1) % THEMES[theme].length;
+      else barIdx = (barIdx + 1) % (theme === 'explore' ? place.bars.length : THEMES[theme].length);
     }
-    const bars = THEMES[theme];
+    const bars = theme === 'explore' ? place.bars : THEMES[theme];
     const bar = bars[Math.max(0, barIdx)];
     const T = zoneMusic.t;
     const sd = stepDur();
@@ -248,13 +324,48 @@ const Sound = (() => {
     const fill = bar.idx === 7;
 
     if (theme === 'explore') {
-      if (i === 0) pad(t, ch, 55 + T, sd * 16, 0.028);
-      if (i === 0 || i === 8) tone(t, mtof(root), sd * 7, 'sine', 0.13, null, music);
-      if (i % 2 === 0) hat(t, i % 4 === 0 ? 0.02 : 0.012);
-      if (i === 0 && bar.idx % 4 === 0) kick(t, 0.25);
-      if (i === 12) tone(t, 1800, 0.03, 'square', 0.015, 900, music);
+      // each place has its own song, groove and instrument (played in its written key)
+      const r0 = 45 + ((ch.root - 9 + 12) % 12), third = ch.minor ? 3 : 4;
+      const gv = place.groove;
+      if (i === 0) pad(t, ch, 55, sd * 16, gv === 'float' ? 0.034 : 0.024);
+      if (gv === 'bounce') {
+        if (i === 0 || i === 8) kick(t, 0.3);
+        if (i === 4 || i === 12) snare(t, 0.06);
+        if (i % 2 === 0) hat(t, 0.018);
+        const bp = [0, null, null, 7, null, null, 12, null, 0, null, 7, null, 12, null, 7, null];
+        if (bp[i] !== null) tone(t, mtof(r0 + bp[i]), sd * 1.6, 'triangle', 0.14, null, music);
+      } else if (gv === 'skip') {
+        if (i === 0 || i === 6 || i === 8) kick(t, 0.32);
+        if (i === 4 || i === 12) snare(t, 0.08);
+        hat(t, i % 2 ? 0.012 : 0.022);
+        const bp = [0, 12, 7, 12];
+        if (i % 2 === 0) tone(t, mtof(r0 + bp[(i / 2) % 4]), sd * 1.4, 'square', 0.05, null, music);
+      } else if (gv === 'soft') {
+        if (i === 0) kick(t, 0.2);
+        if (i % 4 === 2) hat(t, 0.012, true);
+        if (i === 0 || i === 8) tone(t, mtof(r0), sd * 7, 'sine', 0.12, null, music);
+        const arp = [0, third, 7, 12, 7, third];
+        if (i % 2 === 1) tone(t, mtof(r0 + 36 + arp[((i - 1) / 2) % 6]), sd * 3, 'sine', 0.018, null, music);
+      } else if (gv === 'march') {
+        if (i % 4 === 0) kick(t, 0.38);
+        if (i === 4 || i === 12) snare(t, 0.1);
+        if (bar.idx % 2 === 1 && i >= 12) snare(t, 0.05);
+        if (i % 2 === 0) tone(t, mtof(r0 + (i % 8 === 6 ? 7 : 0)), sd * 1.6, 'sawtooth', 0.07, null, music);
+      } else if (gv === 'drive') {
+        if (i % 4 === 0 || i === 14) kick(t, 0.5);
+        if (i === 4 || i === 12) snare(t, 0.14);
+        hat(t, i % 2 ? 0.03 : 0.05);
+        tone(t, mtof(r0 + (i % 4 === 2 ? 12 : 0)), sd * 0.9, 'sawtooth', 0.09, null, music);
+      } else {   // float
+        if (i === 0 || i === 10) kick(t, 0.26);
+        if (i === 8) snare(t, 0.07);
+        if (i % 4 === 2) hat(t, 0.015, true);
+        if (i === 0) tone(t, mtof(r0), sd * 15, 'sine', 0.13, null, music);
+        const arp = [0, 7, 12, third + 12, 19, third + 12, 12, 7];
+        if (i % 2 === 0) tone(t, mtof(r0 + 24 + arp[i / 2]), sd * 2.5, 'triangle', 0.028, null, music);
+      }
       const ev = i % 2 === 0 ? bar.mel[i / 2] : null;
-      if (ev) lead(t, ev.m + T, ev.len * 2 * sd, 'pluck');
+      if (ev) lead(t, ev.m, ev.len * 2 * sd, place.lead);
     } else if (theme === 'combat') {
       if (i === 0) pad(t, ch, 55 + T, sd * 16, 0.018);
       if (i === 0 && bar.idx === 0) noise(t, 1.0, 0.1, 5000, 'highpass', null, music); // crash
@@ -305,7 +416,11 @@ const Sound = (() => {
     init,
     play,
     setIntensity(v) { intensity = v; },
-    setZone(i) { zoneMusic = ZONE_MUSIC[i % ZONE_MUSIC.length]; },
+    setZone(i) {
+      zoneMusic = ZONE_MUSIC[i % ZONE_MUSIC.length];
+      const next = PLACE_SONGS[i % PLACE_SONGS.length];
+      if (next !== place) { place = next; if (theme === 'explore') barIdx = -1; }
+    },
     toggleMute() {
       muted = !muted;
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.7, ctx.currentTime, 0.05);
