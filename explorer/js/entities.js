@@ -1622,10 +1622,13 @@ class Companion {
           const amt = (tgt === p ? 2.25 : 5) * M * dt;
           if (tgt === p) p.heal(amt); else tgt.hp = Math.min(tgt.maxHp, tgt.hp + amt);
           const ty2 = tgt === p ? p.pos.y + 0.9 : tgt.pos.y;
-          setBeam(this.beam, this.pos.x, this.pos.y, this.pos.z, tgt.pos.x, ty2, tgt.pos.z);
-          this.beam.material.opacity = 0.4 + 0.2 * Math.sin(this.t * 12);
-          if (Math.random() < dt * 8) Fx.glowBurst(tgt.pos.x + rand(-0.4, 0.4), ty2 + rand(0, 0.8), tgt.pos.z + rand(-0.4, 0.4), this.d.color, 0.3, 0.5, 2);
-          Sound.play('heal', null, 0.5);
+          // gentle pulses instead of a constant beam: a faint thread flickers on briefly every ~1.5 s
+          const ph = this.t % 1.5;
+          if (ph < 0.14) {
+            setBeam(this.beam, this.pos.x, this.pos.y, this.pos.z, tgt.pos.x, ty2, tgt.pos.z, 0.012);
+            this.beam.material.opacity = 0.22 * (1 - ph / 0.14);
+            if (!this.pulsed) { this.pulsed = true; Fx.glowBurst(tgt.pos.x, ty2 + 0.4, tgt.pos.z, this.d.color, 0.5, 0.35, 1.2); Sound.play('heal', null, 0.15); }
+          } else this.pulsed = false;
         }
         break;
       }

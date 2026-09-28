@@ -476,7 +476,11 @@ function applyState(json) {
   UI.hotbarDirty = true;
 }
 function takeSnapshot() { G.snapshot = stateJSON(); }
-function restoreSnapshot() { applyState(G.snapshot); }
+function restoreSnapshot() {
+  const worlds = G.progress.worlds;
+  applyState(G.snapshot);
+  if (worlds) G.progress.worlds = worlds;
+}
 
 // progress is saved every time you get home
 const SAVE_KEY = 'sf-outlands-save';
@@ -513,11 +517,13 @@ function spawnCamp(x, z, n, aggro = false, pool = ZONES[G.level].pool, lvl = G.l
 }
 
 // common setup when arriving anywhere (home base or a biome)
-function arrive(Z, i, spawnYaw) {
+function arrive(Z, i, spawnYaw, seed) {
   clearEntities();
   World.dispose();
   G.updrafts = [];
-  World.build(scene, Z, i);
+  // a saved seed rebuilds a biome exactly as it was, so saved progress lines up with it
+  if (seed) useRng(mulberry32(seed));
+  try { World.build(scene, Z, i); } finally { useRng(null); }
   G.updrafts.push(...World.updraftCols);
   const p = G.player;
   p.pos.set(World.spawn.x, World.surf(World.spawn.x, World.spawn.z), World.spawn.z);
@@ -592,9 +598,11 @@ function startZone(i) {
   G.where = 'biome';
   G.level = i;
   const Z = ZONES[i];
-  arrive(Z, i, Math.atan2(0, 165));
+  const W = biomeSave(i);
+  arrive(Z, i, Math.atan2(0, 165), W.seed);
   const p = G.player;
   p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
+  const restored = restoreBiome(W);
 
   // roaming machine camps
   if (World.sky) {
@@ -612,16 +620,38 @@ function startZone(i) {
   }
 
   G.objective = 'beacons';
+  if (restored.allBeacons) { G.objective = 'arena'; World.openDome(); World.domeFade = 0; }
   G.reinforceT = 45;
   takeSnapshot();
   Weather.init(scene, Z.ambient, Z.ambientColor || Z.accent);
   Sound.setZone(i);
   UI.banner(`${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
-  setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
+  if (restored.beacons) setTimeout(() => { if (G.level === i && G.where === 'biome') UI.hint(restored.allBeacons ? `Welcome back — every beacon is online. ${Z.boss.name} waits in the arena` : `Welcome back — ${restored.beacons}/${World.beacons.length} beacons are still online`); }, 4200);
+  else setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
   setTimeout(() => { if (G.level === i && G.where === 'biome' && G.state === 'playing') UI.hint(`${Z.shop.name} is right by the portal — sell salvage for Botbucks`); }, 11000);
   if (i === 0) setTimeout(() => { if (G.level === 0 && G.where === 'biome' && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 19000);
   if (World.sky) setTimeout(() => { if (G.where === 'biome' && World.sky) UI.hint(Touch.enabled ? 'Hold JUMP in mid-air to fly with the jetpack between islands' : 'Hold Space in mid-air to fly with the jetpack between islands'); }, 5000);
   UI.refreshHUD(true);
+}
+
+// ─────────── Per-biome progress (kept between visits and in the save) ───────────
+function biomeSave(i) {
+  if (!G.progress.worlds) G.progress.worlds = {};
+  let W = G.progress.worlds[i];
+  if (!W) W = G.progress.worlds[i] = { seed: (Math.random() * 2 ** 31) | 0 || 1, beacons: [], caches: [], sprites: [] };
+  return W;
+}
+function restoreBiome(W) {
+  let n = 0;
+  for (const b of World.beacons) if (W.beacons.includes(b.id)) { b.state = 'done'; b.progress = 1; World.setBeaconColor(b, '#6bff9e', 5); n++; }
+  World.caches.forEach((c, k) => { if (W.caches.includes(k)) { c.opened = true; c.openT = 1; c.lid.rotation.x = -1.9; c.sprite.material.opacity = 0; } });
+  World.sprites.forEach((sp, k) => { if (W.sprites.includes(k)) { sp.found = true; sp.model.visible = false; } });
+  return { beacons: n, allBeacons: World.beacons.length > 0 && n >= World.beacons.length };
+}
+function remember(list, v) {
+  if (G.where !== 'biome') return;
+  const W = biomeSave(G.level);
+  if (!W[list].includes(v)) W[list].push(v);
 }
 
 function goHome() {
@@ -683,6 +713,7 @@ function walkThroughPortals() {
 
 function openCache(c) {
   c.opened = true;
+  remember('caches', World.caches.indexOf(c));
   const n = c.golden ? 3 : randi(3, 5);
   const bag = c.golden ? ['quantum', 'core', 'lens'] : [];
   for (let i = 0; i < n; i++) bag.push(weighted([['scrap', 4], ['wire', 3], ['servo', 2], ['circuit', 2], ['lens', 1], ['core', 1], ['quantum', 0.15]]));
@@ -757,6 +788,8 @@ function updateObjectives(dt) {
       }
       if (b.progress >= 1) {
         b.state = 'done';
+        remember('beacons', b.id);
+        saveGame();
         for (const e of G.enemies) e.hunter = false;
         setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
         World.setBeaconColor(b, '#6bff9e', 5);
@@ -835,6 +868,7 @@ function updateObjectives(dt) {
 
 function collectSprite(sp) {
   sp.found = true;
+  remember('sprites', World.sprites.indexOf(sp));
   sp.model.visible = false;
   G.spritesFound++;
   Fx.shockRing(sp.x, sp.y, sp.z, '#3aff9a', 1.5, 30);

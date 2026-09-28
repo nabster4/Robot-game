@@ -1,11 +1,15 @@
 'use strict';
 // ───────────────────────── Math helpers ─────────────────────────
 const TAU = Math.PI * 2;
-const rand = (a, b) => a + Math.random() * (b - a);
-const randi = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+// the random source for gameplay helpers; world building swaps in a seeded one (useRng) so a
+// saved biome can be rebuilt exactly (three.js's own Math.random use is left alone)
+let _rng = Math.random;
+function useRng(f) { _rng = f || Math.random; }
+const rand = (a, b) => a + _rng() * (b - a);
+const randi = (a, b) => Math.floor(a + _rng() * (b - a + 1));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
-const pick = (a) => a[(Math.random() * a.length) | 0];
+const pick = (a) => a[(_rng() * a.length) | 0];
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const dist2D = (ax, az, bx, bz) => Math.hypot(bx - ax, bz - az);
 
@@ -19,7 +23,7 @@ function angDiff(a, b) {
 function weighted(list) {
   let tot = 0;
   for (const [, w] of list) tot += w;
-  let r = Math.random() * tot;
+  let r = _rng() * tot;
   for (const [v, w] of list) { if ((r -= w) <= 0) return v; }
   return list[list.length - 1][0];
 }

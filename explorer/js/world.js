@@ -13,7 +13,7 @@ const World = {
     scene.add(this.group);
     this.half = this.size / 2;
     this.N = Math.round(this.size / this.seg);
-    this.noise = makePerlin(1337 + idx * 7919 + Math.floor(Math.random() * 100000));
+    this.noise = makePerlin(1337 + idx * 7919 + Math.floor(_rng() * 100000));
     this.colliders = [];
     this.grid = new Map();
     this.beacons = [];
@@ -374,12 +374,12 @@ const World = {
       const h = rand(3, 13);
       const y = this.heightAt(x, z);
       const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = rand(0, TAU);
-      if (Math.random() < 0.3) grp.rotation.z = rand(-0.2, 0.2);
+      if (_rng() < 0.3) grp.rotation.z = rand(-0.2, 0.2);
       this.group.add(grp);
       mesh(Geo.box(1.4, h, 1.4), concrete, 0, h / 2 - 0.3, 0, grp).receiveShadow = true;
       mesh(Geo.box(1.7, 0.4, 1.7), concrete, 0, h - 0.2, 0, grp);
-      if (Math.random() < 0.7) mesh(Geo.box(0.08, h * 0.6, 0.08), accentGlow, 0.72, h * 0.45, 0.72, grp).castShadow = false;
-      if (Math.random() < 0.3) {
+      if (_rng() < 0.7) mesh(Geo.box(0.08, h * 0.6, 0.08), accentGlow, 0.72, h * 0.45, 0.72, grp).castShadow = false;
+      if (_rng() < 0.3) {
         // arch to a second pillar
         mesh(Geo.box(1.4, h * 0.8, 1.4), concrete, 5, h * 0.4 - 0.3, 0, grp);
         mesh(Geo.box(6.8, 0.8, 1.6), concrete, 2.5, h * 0.8, 0, grp);
@@ -419,7 +419,7 @@ const World = {
         const n = randi(3, 7);
         for (let k = 0; k < n; k++) {
           const w = rand(0.5, 2), h = rand(0.3, 1.2), dd = rand(0.5, 2);
-          const g = Math.random() < 0.3 ? Geo.cyl(w * 0.4, w * 0.4, h * 2, 8) : Geo.box(w, h, dd);
+          const g = _rng() < 0.3 ? Geo.cyl(w * 0.4, w * 0.4, h * 2, 8) : Geo.box(w, h, dd);
           const m = mesh(g, pick(mats), x + rand(-1.5, 1.5), y + h * 0.3 + k * 0.25, z + rand(-1.5, 1.5), this.group);
           m.rotation.set(rand(-0.6, 0.6), rand(0, TAU), rand(-0.6, 0.6));
           m.receiveShadow = true;
@@ -666,9 +666,9 @@ const World = {
   // ─────────── Scrap Sprites (hidden collectibles, like Koroks) ───────────
   placeSprites(n) {
     const spots = [];
-    for (const is of this.islands.slice().sort(() => Math.random() - 0.5)) if (is.kind !== 'spawn') spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
+    for (const is of this.islands.slice().sort(() => _rng() - 0.5)) if (is.kind !== 'spawn') spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
     const tall = this.colliders.filter((c) => (c.kind === 'pillar' && c.top - this.heightAt(c.x, c.z) > 6 && c.bottom === -Infinity) || (c.kind === 'rock' && c.top - this.heightAt(c.x, c.z) > 3.2));
-    tall.sort(() => Math.random() - 0.5);
+    tall.sort(() => _rng() - 0.5);
     for (const c of tall) { if (spots.length >= n - 1) break; spots.push([c.x, c.top + 0.6, c.z]); }
     // one hidden in a quiet corner of the map
     const hid = this.sky ? null : this.randomClear(1, 40);
@@ -689,7 +689,7 @@ const World = {
       if (!at) continue;
       // clumps: most trees grow near another tree
       let [x, z] = at;
-      if (trees.length && Math.random() < 0.55) {
+      if (trees.length && _rng() < 0.55) {
         const o = pick(trees), a = rand(0, TAU), d = rand(3.5, 7);
         const nx = o.x + Math.cos(a) * d, nz = o.z + Math.sin(a) * d;
         if (this.isClear(nx, nz, 1.2)) { x = nx; z = nz; }
@@ -788,7 +788,7 @@ const World = {
     const place = (m, i, s, h, hex, sy = 1) => {
       let x = s.x, z = s.z, y = s.y;
       for (let t = 0; t < 4; t++) {
-        const a = rand(0, TAU), r = Math.sqrt(Math.random()) * s.r;
+        const a = rand(0, TAU), r = Math.sqrt(_rng()) * s.r;
         x = s.x + Math.cos(a) * r; z = s.z + Math.sin(a) * r;
         y = this.sky ? s.y : this.heightAt(x, z);
         if (y > this.hazardLevel + 0.3) break;
@@ -1201,7 +1201,7 @@ const World = {
         this.addCollider(x, z, 0.4 * tr.s, is.top + this.treeHeight('round', tr.s) * 0.92, 'tree', is.top - 1);
       }
       ground.push({ x: is.x, z: is.z, y: is.top, r: is.r * 0.85 });
-      if (is.r > 8 && Math.random() < 0.7) {
+      if (is.r > 8 && _rng() < 0.7) {
         const a = rand(0, TAU), r = is.r * 0.6, x = is.x + Math.cos(a) * r, z = is.z + Math.sin(a) * r;
         if (!busy.some(([bx, bz, br]) => Math.hypot(x - bx, z - bz) < br)) {
           const s = rand(1, 1.8), m = mesh(Geo.sphere(1, 0), rockM, x, is.top + s * 0.4, z, this.group);
@@ -1213,7 +1213,7 @@ const World = {
     this.plantGround(ground, F);
     // caches, sprites & updraft columns
     const spots = this.islands.filter((i) => i.kind === 'step' || i.kind === 'camp');
-    spots.sort(() => Math.random() - 0.5);
+    spots.sort(() => _rng() - 0.5);
     spots.slice(0, 12 + idx).forEach((is, i) => this.buildCache(is.x + rand(-1, 1), is.z + rand(-1, 1), i < 2, is.top));
     this.placeSprites(9);
     for (let i = 0; i < 7; i++) {

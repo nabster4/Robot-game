@@ -904,11 +904,15 @@ body.touch .hb u { font-size: 9px; }
 'use strict';
 // ───────────────────────── Math helpers ─────────────────────────
 const TAU = Math.PI * 2;
-const rand = (a, b) => a + Math.random() * (b - a);
-const randi = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+// the random source for gameplay helpers; world building swaps in a seeded one (useRng) so a
+// saved biome can be rebuilt exactly (three.js's own Math.random use is left alone)
+let _rng = Math.random;
+function useRng(f) { _rng = f || Math.random; }
+const rand = (a, b) => a + _rng() * (b - a);
+const randi = (a, b) => Math.floor(a + _rng() * (b - a + 1));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
-const pick = (a) => a[(Math.random() * a.length) | 0];
+const pick = (a) => a[(_rng() * a.length) | 0];
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const dist2D = (ax, az, bx, bz) => Math.hypot(bx - ax, bz - az);
 
@@ -922,7 +926,7 @@ function angDiff(a, b) {
 function weighted(list) {
   let tot = 0;
   for (const [, w] of list) tot += w;
-  let r = Math.random() * tot;
+  let r = _rng() * tot;
   for (const [v, w] of list) { if ((r -= w) <= 0) return v; }
   return list[list.length - 1][0];
 }
@@ -3260,7 +3264,7 @@ const World = {
     scene.add(this.group);
     this.half = this.size / 2;
     this.N = Math.round(this.size / this.seg);
-    this.noise = makePerlin(1337 + idx * 7919 + Math.floor(Math.random() * 100000));
+    this.noise = makePerlin(1337 + idx * 7919 + Math.floor(_rng() * 100000));
     this.colliders = [];
     this.grid = new Map();
     this.beacons = [];
@@ -3621,12 +3625,12 @@ const World = {
       const h = rand(3, 13);
       const y = this.heightAt(x, z);
       const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = rand(0, TAU);
-      if (Math.random() < 0.3) grp.rotation.z = rand(-0.2, 0.2);
+      if (_rng() < 0.3) grp.rotation.z = rand(-0.2, 0.2);
       this.group.add(grp);
       mesh(Geo.box(1.4, h, 1.4), concrete, 0, h / 2 - 0.3, 0, grp).receiveShadow = true;
       mesh(Geo.box(1.7, 0.4, 1.7), concrete, 0, h - 0.2, 0, grp);
-      if (Math.random() < 0.7) mesh(Geo.box(0.08, h * 0.6, 0.08), accentGlow, 0.72, h * 0.45, 0.72, grp).castShadow = false;
-      if (Math.random() < 0.3) {
+      if (_rng() < 0.7) mesh(Geo.box(0.08, h * 0.6, 0.08), accentGlow, 0.72, h * 0.45, 0.72, grp).castShadow = false;
+      if (_rng() < 0.3) {
         // arch to a second pillar
         mesh(Geo.box(1.4, h * 0.8, 1.4), concrete, 5, h * 0.4 - 0.3, 0, grp);
         mesh(Geo.box(6.8, 0.8, 1.6), concrete, 2.5, h * 0.8, 0, grp);
@@ -3666,7 +3670,7 @@ const World = {
         const n = randi(3, 7);
         for (let k = 0; k < n; k++) {
           const w = rand(0.5, 2), h = rand(0.3, 1.2), dd = rand(0.5, 2);
-          const g = Math.random() < 0.3 ? Geo.cyl(w * 0.4, w * 0.4, h * 2, 8) : Geo.box(w, h, dd);
+          const g = _rng() < 0.3 ? Geo.cyl(w * 0.4, w * 0.4, h * 2, 8) : Geo.box(w, h, dd);
           const m = mesh(g, pick(mats), x + rand(-1.5, 1.5), y + h * 0.3 + k * 0.25, z + rand(-1.5, 1.5), this.group);
           m.rotation.set(rand(-0.6, 0.6), rand(0, TAU), rand(-0.6, 0.6));
           m.receiveShadow = true;
@@ -3913,9 +3917,9 @@ const World = {
   // ─────────── Scrap Sprites (hidden collectibles, like Koroks) ───────────
   placeSprites(n) {
     const spots = [];
-    for (const is of this.islands.slice().sort(() => Math.random() - 0.5)) if (is.kind !== 'spawn') spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
+    for (const is of this.islands.slice().sort(() => _rng() - 0.5)) if (is.kind !== 'spawn') spots.push([is.x + rand(-is.r * 0.5, is.r * 0.5), is.top + 0.6, is.z + rand(0, is.r * 0.5)]);
     const tall = this.colliders.filter((c) => (c.kind === 'pillar' && c.top - this.heightAt(c.x, c.z) > 6 && c.bottom === -Infinity) || (c.kind === 'rock' && c.top - this.heightAt(c.x, c.z) > 3.2));
-    tall.sort(() => Math.random() - 0.5);
+    tall.sort(() => _rng() - 0.5);
     for (const c of tall) { if (spots.length >= n - 1) break; spots.push([c.x, c.top + 0.6, c.z]); }
     // one hidden in a quiet corner of the map
     const hid = this.sky ? null : this.randomClear(1, 40);
@@ -3936,7 +3940,7 @@ const World = {
       if (!at) continue;
       // clumps: most trees grow near another tree
       let [x, z] = at;
-      if (trees.length && Math.random() < 0.55) {
+      if (trees.length && _rng() < 0.55) {
         const o = pick(trees), a = rand(0, TAU), d = rand(3.5, 7);
         const nx = o.x + Math.cos(a) * d, nz = o.z + Math.sin(a) * d;
         if (this.isClear(nx, nz, 1.2)) { x = nx; z = nz; }
@@ -4035,7 +4039,7 @@ const World = {
     const place = (m, i, s, h, hex, sy = 1) => {
       let x = s.x, z = s.z, y = s.y;
       for (let t = 0; t < 4; t++) {
-        const a = rand(0, TAU), r = Math.sqrt(Math.random()) * s.r;
+        const a = rand(0, TAU), r = Math.sqrt(_rng()) * s.r;
         x = s.x + Math.cos(a) * r; z = s.z + Math.sin(a) * r;
         y = this.sky ? s.y : this.heightAt(x, z);
         if (y > this.hazardLevel + 0.3) break;
@@ -4448,7 +4452,7 @@ const World = {
         this.addCollider(x, z, 0.4 * tr.s, is.top + this.treeHeight('round', tr.s) * 0.92, 'tree', is.top - 1);
       }
       ground.push({ x: is.x, z: is.z, y: is.top, r: is.r * 0.85 });
-      if (is.r > 8 && Math.random() < 0.7) {
+      if (is.r > 8 && _rng() < 0.7) {
         const a = rand(0, TAU), r = is.r * 0.6, x = is.x + Math.cos(a) * r, z = is.z + Math.sin(a) * r;
         if (!busy.some(([bx, bz, br]) => Math.hypot(x - bx, z - bz) < br)) {
           const s = rand(1, 1.8), m = mesh(Geo.sphere(1, 0), rockM, x, is.top + s * 0.4, z, this.group);
@@ -4460,7 +4464,7 @@ const World = {
     this.plantGround(ground, F);
     // caches, sprites & updraft columns
     const spots = this.islands.filter((i) => i.kind === 'step' || i.kind === 'camp');
-    spots.sort(() => Math.random() - 0.5);
+    spots.sort(() => _rng() - 0.5);
     spots.slice(0, 12 + idx).forEach((is, i) => this.buildCache(is.x + rand(-1, 1), is.z + rand(-1, 1), i < 2, is.top));
     this.placeSprites(9);
     for (let i = 0; i < 7; i++) {
@@ -6211,10 +6215,13 @@ class Companion {
           const amt = (tgt === p ? 2.25 : 5) * M * dt;
           if (tgt === p) p.heal(amt); else tgt.hp = Math.min(tgt.maxHp, tgt.hp + amt);
           const ty2 = tgt === p ? p.pos.y + 0.9 : tgt.pos.y;
-          setBeam(this.beam, this.pos.x, this.pos.y, this.pos.z, tgt.pos.x, ty2, tgt.pos.z);
-          this.beam.material.opacity = 0.4 + 0.2 * Math.sin(this.t * 12);
-          if (Math.random() < dt * 8) Fx.glowBurst(tgt.pos.x + rand(-0.4, 0.4), ty2 + rand(0, 0.8), tgt.pos.z + rand(-0.4, 0.4), this.d.color, 0.3, 0.5, 2);
-          Sound.play('heal', null, 0.5);
+          // gentle pulses instead of a constant beam: a faint thread flickers on briefly every ~1.5 s
+          const ph = this.t % 1.5;
+          if (ph < 0.14) {
+            setBeam(this.beam, this.pos.x, this.pos.y, this.pos.z, tgt.pos.x, ty2, tgt.pos.z, 0.012);
+            this.beam.material.opacity = 0.22 * (1 - ph / 0.14);
+            if (!this.pulsed) { this.pulsed = true; Fx.glowBurst(tgt.pos.x, ty2 + 0.4, tgt.pos.z, this.d.color, 0.5, 0.35, 1.2); Sound.play('heal', null, 0.15); }
+          } else this.pulsed = false;
         }
         break;
       }
@@ -7772,7 +7779,11 @@ function applyState(json) {
   UI.hotbarDirty = true;
 }
 function takeSnapshot() { G.snapshot = stateJSON(); }
-function restoreSnapshot() { applyState(G.snapshot); }
+function restoreSnapshot() {
+  const worlds = G.progress.worlds;
+  applyState(G.snapshot);
+  if (worlds) G.progress.worlds = worlds;
+}
 
 // progress is saved every time you get home
 const SAVE_KEY = 'sf-outlands-save';
@@ -7809,11 +7820,13 @@ function spawnCamp(x, z, n, aggro = false, pool = ZONES[G.level].pool, lvl = G.l
 }
 
 // common setup when arriving anywhere (home base or a biome)
-function arrive(Z, i, spawnYaw) {
+function arrive(Z, i, spawnYaw, seed) {
   clearEntities();
   World.dispose();
   G.updrafts = [];
-  World.build(scene, Z, i);
+  // a saved seed rebuilds a biome exactly as it was, so saved progress lines up with it
+  if (seed) useRng(mulberry32(seed));
+  try { World.build(scene, Z, i); } finally { useRng(null); }
   G.updrafts.push(...World.updraftCols);
   const p = G.player;
   p.pos.set(World.spawn.x, World.surf(World.spawn.x, World.spawn.z), World.spawn.z);
@@ -7888,9 +7901,11 @@ function startZone(i) {
   G.where = 'biome';
   G.level = i;
   const Z = ZONES[i];
-  arrive(Z, i, Math.atan2(0, 165));
+  const W = biomeSave(i);
+  arrive(Z, i, Math.atan2(0, 165), W.seed);
   const p = G.player;
   p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
+  const restored = restoreBiome(W);
 
   // roaming machine camps
   if (World.sky) {
@@ -7908,16 +7923,38 @@ function startZone(i) {
   }
 
   G.objective = 'beacons';
+  if (restored.allBeacons) { G.objective = 'arena'; World.openDome(); World.domeFade = 0; }
   G.reinforceT = 45;
   takeSnapshot();
   Weather.init(scene, Z.ambient, Z.ambientColor || Z.accent);
   Sound.setZone(i);
   UI.banner(`${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
-  setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
+  if (restored.beacons) setTimeout(() => { if (G.level === i && G.where === 'biome') UI.hint(restored.allBeacons ? `Welcome back — every beacon is online. ${Z.boss.name} waits in the arena` : `Welcome back — ${restored.beacons}/${World.beacons.length} beacons are still online`); }, 4200);
+  else setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
   setTimeout(() => { if (G.level === i && G.where === 'biome' && G.state === 'playing') UI.hint(`${Z.shop.name} is right by the portal — sell salvage for Botbucks`); }, 11000);
   if (i === 0) setTimeout(() => { if (G.level === 0 && G.where === 'biome' && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 19000);
   if (World.sky) setTimeout(() => { if (G.where === 'biome' && World.sky) UI.hint(Touch.enabled ? 'Hold JUMP in mid-air to fly with the jetpack between islands' : 'Hold Space in mid-air to fly with the jetpack between islands'); }, 5000);
   UI.refreshHUD(true);
+}
+
+// ─────────── Per-biome progress (kept between visits and in the save) ───────────
+function biomeSave(i) {
+  if (!G.progress.worlds) G.progress.worlds = {};
+  let W = G.progress.worlds[i];
+  if (!W) W = G.progress.worlds[i] = { seed: (Math.random() * 2 ** 31) | 0 || 1, beacons: [], caches: [], sprites: [] };
+  return W;
+}
+function restoreBiome(W) {
+  let n = 0;
+  for (const b of World.beacons) if (W.beacons.includes(b.id)) { b.state = 'done'; b.progress = 1; World.setBeaconColor(b, '#6bff9e', 5); n++; }
+  World.caches.forEach((c, k) => { if (W.caches.includes(k)) { c.opened = true; c.openT = 1; c.lid.rotation.x = -1.9; c.sprite.material.opacity = 0; } });
+  World.sprites.forEach((sp, k) => { if (W.sprites.includes(k)) { sp.found = true; sp.model.visible = false; } });
+  return { beacons: n, allBeacons: World.beacons.length > 0 && n >= World.beacons.length };
+}
+function remember(list, v) {
+  if (G.where !== 'biome') return;
+  const W = biomeSave(G.level);
+  if (!W[list].includes(v)) W[list].push(v);
 }
 
 function goHome() {
@@ -7979,6 +8016,7 @@ function walkThroughPortals() {
 
 function openCache(c) {
   c.opened = true;
+  remember('caches', World.caches.indexOf(c));
   const n = c.golden ? 3 : randi(3, 5);
   const bag = c.golden ? ['quantum', 'core', 'lens'] : [];
   for (let i = 0; i < n; i++) bag.push(weighted([['scrap', 4], ['wire', 3], ['servo', 2], ['circuit', 2], ['lens', 1], ['core', 1], ['quantum', 0.15]]));
@@ -8053,6 +8091,8 @@ function updateObjectives(dt) {
       }
       if (b.progress >= 1) {
         b.state = 'done';
+        remember('beacons', b.id);
+        saveGame();
         for (const e of G.enemies) e.hunter = false;
         setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
         World.setBeaconColor(b, '#6bff9e', 5);
@@ -8131,6 +8171,7 @@ function updateObjectives(dt) {
 
 function collectSprite(sp) {
   sp.found = true;
+  remember('sprites', World.sprites.indexOf(sp));
   sp.model.visible = false;
   G.spritesFound++;
   Fx.shockRing(sp.x, sp.y, sp.z, '#3aff9a', 1.5, 30);

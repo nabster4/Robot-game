@@ -46,6 +46,8 @@ In the Sky Islands, falling into the clouds drops you back on the last island yo
    **Stormwing** (a mechanical bird that **vanishes, reappears behind you** and dives, with feather volleys and wind gusts). Each has an enraged Overdrive phase.
 5. **Home.** Beating the boss opens the next biome's portal. Step into the portal to go home.
 
+**Progress is remembered:** each biome keeps its layout between visits, along with the beacons you've activated, caches you've opened and Scrap Sprites you've found. Leave halfway through and pick up where you left off (it's saved with your game too).
+
 **Portals:** just walk into a portal to travel. Locked portals tell you what they need.
 
 **Open-world systems (inspired by *Zelda: Tears of the Kingdom*)**
