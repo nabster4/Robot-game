@@ -94,7 +94,10 @@ const Input = {
   endFrame() { this.pressed = {}; this.mouse.rightPressed = false; this.mouse.dx = 0; this.mouse.dy = 0; this.wheel = 0; },
   init(canvas) {
     window.addEventListener('keydown', (e) => {
-      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && e.target === document.body) e.preventDefault();
+      // while playing, keys belong to the game: never let Space/Enter "click" a button that kept focus
+      const playing = document.body.classList.contains('playing');
+      if (playing && e.target !== document.body && e.target.blur) e.target.blur();
+      if (['Tab', 'Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && (playing || e.target === document.body)) e.preventDefault();
       if (e.code === 'Tab') e.preventDefault();
       this.keys[e.code] = true;
       if (!e.repeat) this.pressed[e.code] = true;

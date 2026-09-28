@@ -56,6 +56,7 @@ const UI = {
   },
 
   hideAll() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
     $('hud').classList.toggle('show', G.state === 'playing');
   },
