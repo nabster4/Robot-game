@@ -672,7 +672,11 @@ class Enemy {
       const hx = this.pos.x - HD.x, hz = this.pos.z - HD.z, hd = Math.hypot(hx, hz) || 1, R = HD.r + this.r;
       if (hd < R) { this.pos.x = HD.x + (hx / hd) * R; this.pos.z = HD.z + (hz / hd) * R; }
     }
-    if (World.domeTrap && Math.hypot(this.pos.x - World.arena.x, this.pos.z - World.arena.z) < World.arena.r + 2) World.keepInside(this.pos, this.r);
+    // the sealed boss dome is a one-on-one fight: other robots are kept outside it
+    if (World.domeTrap) {
+      const A = World.arena, ax = this.pos.x - A.x, az = this.pos.z - A.z, ad = Math.hypot(ax, az) || 1, R = A.r + 2 + this.r;
+      if (ad < R) { this.pos.x = A.x + (ax / ad) * R; this.pos.z = A.z + (az / ad) * R; }
+    }
     const gNow = World.floorAt(this.pos.x, this.pos.z);
     const flyBase = World.sky ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, World.hazardLevel);
     if (this.d.hover > 1) this.pos.y = lerp(this.pos.y, flyBase + this.d.hover + Math.sin(this.t * 2) * 0.35, 1 - Math.exp(-3 * dt));
@@ -751,7 +755,7 @@ class Boss {
     this.maxHp = this.hp = def.hp || 1600;
     this.speed = K.speed;
     this.dmg = 12 * (1 + 0.22 * levelIdx);
-    this.patterns = def.patterns;
+    this.patterns = def.patterns.filter((p) => p !== 'summon');   // bosses fight alone
     this.queue = [];
     this.state = 'intro'; this.stateT = 2.2;
     this.t = 0; this.phase = 1;
@@ -861,6 +865,11 @@ class Boss {
   clearMarkers() { for (const m of this.markers) G.scene.remove(m.sprite); this.markers = []; }
 
   update(dt) {
+    G.bossFiring = true;
+    try { this.think(dt); } finally { G.bossFiring = false; }
+  }
+
+  think(dt) {
     const p = G.player;
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
     const dd = Math.hypot(dx, dz) || 1;

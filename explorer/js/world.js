@@ -296,11 +296,6 @@ const World = {
         hit = c;
       }
     }
-    // boss dome: once the fight starts nobody gets out until the boss is down
-    if (this.domeTrap) {
-      const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 1.2 - r;
-      if (d > R) { p.x = this.arena.x + (dx / d) * R; p.z = this.arena.z + (dz / d) * R; hit = hit || { dome: true }; }
-    }
     // sealed arena dome
     if (this.domeSealed) {
       const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 2;
@@ -558,6 +553,10 @@ const World = {
     this.domeWire.scale.setScalar(1);
     this.dome.material.color.set(this.zone.boss.color).multiplyScalar(0.8);
     this.domeWire.material.color.set(this.zone.boss.color).multiplyScalar(1.4);
+  },
+  insideDome(x, y, z, pad = 0) {
+    const A = this.arena, R = A.r + 2 + pad;
+    return (x - A.x) ** 2 + (y - A.y) ** 2 + (z - A.z) ** 2 < R * R;
   },
   keepInside(p, r = 0.5) {
     if (!this.domeTrap) return;

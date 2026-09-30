@@ -351,7 +351,7 @@ const G = {
     const m = new THREE.Mesh(bulletGeo, opts && opts.big ? Mat.std(color, { rough: 0.9, metal: 0.1, emissive: '#ff8a3a', ei: 0.4 }) : Mat.glow(color, 4));
     m.scale.setScalar(r); m.position.set(x, y, z); scene.add(m);
     const o = opts || {};
-    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor });
+    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor, fromBoss: !!(this.bossFiring || o.fromBoss) });
   },
 
   get thirdPerson() { return this.settings.view === 'third'; },
@@ -818,6 +818,11 @@ function updateObjectives(dt) {
       // the dome slams shut: you and your squad are locked in until the boss falls
       World.trapDome();
       for (const c of G.companions) if (c.active) { World.keepInside(c.pos, c.r); }
+      // it's just you (and your bots) against the boss: robots caught inside are destroyed
+      for (const e of G.enemies) if (!e.isBoss && !e.dead && Math.hypot(e.pos.x - A.x, e.pos.z - A.z) < A.r + 3) G.killEnemy(e, false);
+      for (const s of G.spawns) scene.remove(s.beam);
+      G.spawns.length = 0;
+      for (const b of G.ebullets) if (World.insideDome(b.pos.x, b.pos.y, b.pos.z)) b.dead = true;
       const a = Math.atan2(p.pos.x - A.x, p.pos.z - A.z) + Math.PI;
       G.queueSpawn('boss', A.x + Math.sin(a) * 12, A.z + Math.cos(a) * 12, false, 2.2);
       UI.banner('⚠ WARNING ⚠', `${Z.boss.name} — ${Z.boss.title.toUpperCase()}`, '#ff3355', 3.2);
@@ -1172,6 +1177,10 @@ function updateEnemyBullets(dt) {
       b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, '#5ab8ff', 1.4, 0.3, 3); HD.flash = 1; Sound.play('block', null, 0.5);
       continue;
     }
+    if (World.domeTrap && !b.fromBoss && World.insideDome(b.pos.x, b.pos.y, b.pos.z)) {
+      b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, ZONES[G.level].boss.color, 1.2, 0.3, 2);
+      continue;
+    }
     const ground = b.grav ? World.floorAt(b.pos.x, b.pos.z) : -1e9;
     if (World.solidAt(b.pos.x, b.pos.y, b.pos.z) || (b.grav && b.pos.y <= ground + 0.2)) {
       b.dead = true;
@@ -1183,7 +1192,7 @@ function updateEnemyBullets(dt) {
         Sound.play('explode', false, G.vol(b.pos));
         const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
         if (pd < b.splash && !p.dead) { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); }
-        if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3 });
+        if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3, fromBoss: b.fromBoss });
       } else Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4);
       continue;
     }

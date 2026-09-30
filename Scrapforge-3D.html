@@ -1124,7 +1124,7 @@ const ZONES = [
     beacons: 3,
     pool: [['drone', 6], ['swarmer', 2], ['grunt', 4]],
     shop: { name: "TINKER TOM'S", color: '#6bff9e', items: ['repair', 'cell', 'scatter', 'bot_shield', 'up_armor', 'up_magnet', 'backpack'] },
-    boss: { kind: 'beast', name: 'BRAMBLEBACK', title: 'Iron Boar of the Meadow', color: '#ff9f43', hp: 1500, patterns: ['charge', 'pounce', 'stomp', 'aimed', 'summon'] },
+    boss: { kind: 'beast', name: 'BRAMBLEBACK', title: 'Iron Boar of the Meadow', color: '#ff9f43', hp: 1500, patterns: ['charge', 'pounce', 'stomp', 'aimed'] },
   },
   {
     id: 'snow', name: 'Snowy Plains', short: 'SNOW',
@@ -1141,7 +1141,7 @@ const ZONES = [
     beacons: 3,
     pool: [['frostdrone', 5], ['icemite', 2.5], ['snowgrunt', 4], ['sniper', 1.5]],
     shop: { name: 'FROSTBYTE OUTFITTERS', color: '#8ae9ff', items: ['repair', 'cell', 'rifle', 'bot_tesla', 'bot_bubble', 'up_overclock', 'up_thruster', 'backpack'] },
-    boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral', 'summon'] },
+    boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral'] },
   },
   {
     id: 'mountains', name: 'The Mountains', short: 'MOUNTAINS',
@@ -1158,7 +1158,7 @@ const ZONES = [
     beacons: 4,
     pool: [['drone', 3], ['grunt', 4], ['sniper', 2.5], ['shielder', 2], ['rockcrusher', 1.5]],
     shop: { name: 'SUMMIT SUPPLY', color: '#ffcf6a', items: ['jetpack', 'fireboots', 'launcher', 'bot_rocket', 'up_split', 'up_slot', 'repair', 'cell'] },
-    boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial', 'summon'] },
+    boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial'] },
   },
   {
     id: 'volcano', name: 'Fiery Volcano', short: 'VOLCANO',
@@ -1176,7 +1176,7 @@ const ZONES = [
     beacons: 4,
     pool: [['firedrone', 4], ['embermite', 3], ['magmagrunt', 4], ['shielder', 2], ['tank', 1.5], ['carrier', 1]],
     shop: { name: 'MAGMA MARKET', color: '#ff8c42', items: ['bot_laser', 'bot_bomber', 'up_firmware', 'up_armor', 'up_slot', 'backpack', 'repair', 'cell'] },
-    boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge', 'summon'] },
+    boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge'] },
   },
   {
     id: 'sky', name: 'Sky Islands', short: 'SKY',
@@ -1193,7 +1193,7 @@ const ZONES = [
     beacons: 4,
     pool: [['hawk', 5], ['grunt', 3], ['sniper', 2], ['shielder', 1.5], ['carrier', 1]],
     shop: { name: 'CLOUD BAZAAR', color: '#ffe14d', items: ['bot_laser', 'bot_bomber', 'bot_rocket', 'up_firmware', 'up_overclock', 'up_split', 'rifle', 'launcher', 'repair', 'cell'] },
-    boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral', 'summon'] },
+    boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
 ];
 
@@ -3547,11 +3547,6 @@ const World = {
         hit = c;
       }
     }
-    // boss dome: once the fight starts nobody gets out until the boss is down
-    if (this.domeTrap) {
-      const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 1.2 - r;
-      if (d > R) { p.x = this.arena.x + (dx / d) * R; p.z = this.arena.z + (dz / d) * R; hit = hit || { dome: true }; }
-    }
     // sealed arena dome
     if (this.domeSealed) {
       const dx = p.x - this.arena.x, dz = p.z - this.arena.z, d = Math.hypot(dx, dz), R = this.arena.r + 2;
@@ -3809,6 +3804,10 @@ const World = {
     this.domeWire.scale.setScalar(1);
     this.dome.material.color.set(this.zone.boss.color).multiplyScalar(0.8);
     this.domeWire.material.color.set(this.zone.boss.color).multiplyScalar(1.4);
+  },
+  insideDome(x, y, z, pad = 0) {
+    const A = this.arena, R = A.r + 2 + pad;
+    return (x - A.x) ** 2 + (y - A.y) ** 2 + (z - A.z) ** 2 < R * R;
   },
   keepInside(p, r = 0.5) {
     if (!this.domeTrap) return;
@@ -5265,7 +5264,11 @@ class Enemy {
       const hx = this.pos.x - HD.x, hz = this.pos.z - HD.z, hd = Math.hypot(hx, hz) || 1, R = HD.r + this.r;
       if (hd < R) { this.pos.x = HD.x + (hx / hd) * R; this.pos.z = HD.z + (hz / hd) * R; }
     }
-    if (World.domeTrap && Math.hypot(this.pos.x - World.arena.x, this.pos.z - World.arena.z) < World.arena.r + 2) World.keepInside(this.pos, this.r);
+    // the sealed boss dome is a one-on-one fight: other robots are kept outside it
+    if (World.domeTrap) {
+      const A = World.arena, ax = this.pos.x - A.x, az = this.pos.z - A.z, ad = Math.hypot(ax, az) || 1, R = A.r + 2 + this.r;
+      if (ad < R) { this.pos.x = A.x + (ax / ad) * R; this.pos.z = A.z + (az / ad) * R; }
+    }
     const gNow = World.floorAt(this.pos.x, this.pos.z);
     const flyBase = World.sky ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, World.hazardLevel);
     if (this.d.hover > 1) this.pos.y = lerp(this.pos.y, flyBase + this.d.hover + Math.sin(this.t * 2) * 0.35, 1 - Math.exp(-3 * dt));
@@ -5344,7 +5347,7 @@ class Boss {
     this.maxHp = this.hp = def.hp || 1600;
     this.speed = K.speed;
     this.dmg = 12 * (1 + 0.22 * levelIdx);
-    this.patterns = def.patterns;
+    this.patterns = def.patterns.filter((p) => p !== 'summon');   // bosses fight alone
     this.queue = [];
     this.state = 'intro'; this.stateT = 2.2;
     this.t = 0; this.phase = 1;
@@ -5454,6 +5457,11 @@ class Boss {
   clearMarkers() { for (const m of this.markers) G.scene.remove(m.sprite); this.markers = []; }
 
   update(dt) {
+    G.bossFiring = true;
+    try { this.think(dt); } finally { G.bossFiring = false; }
+  }
+
+  think(dt) {
     const p = G.player;
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
     const dd = Math.hypot(dx, dz) || 1;
@@ -7654,7 +7662,7 @@ const G = {
     const m = new THREE.Mesh(bulletGeo, opts && opts.big ? Mat.std(color, { rough: 0.9, metal: 0.1, emissive: '#ff8a3a', ei: 0.4 }) : Mat.glow(color, 4));
     m.scale.setScalar(r); m.position.set(x, y, z); scene.add(m);
     const o = opts || {};
-    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor });
+    this.ebullets.push({ pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(vx, vy, vz), dmg, r, color, life: o.life || 5, mesh: m, hugH, effect: o.effect, grav: o.grav || 0, splash: o.splash || 0, marker: o.marker, meteor: o.meteor, fromBoss: !!(this.bossFiring || o.fromBoss) });
   },
 
   get thirdPerson() { return this.settings.view === 'third'; },
@@ -8121,6 +8129,11 @@ function updateObjectives(dt) {
       // the dome slams shut: you and your squad are locked in until the boss falls
       World.trapDome();
       for (const c of G.companions) if (c.active) { World.keepInside(c.pos, c.r); }
+      // it's just you (and your bots) against the boss: robots caught inside are destroyed
+      for (const e of G.enemies) if (!e.isBoss && !e.dead && Math.hypot(e.pos.x - A.x, e.pos.z - A.z) < A.r + 3) G.killEnemy(e, false);
+      for (const s of G.spawns) scene.remove(s.beam);
+      G.spawns.length = 0;
+      for (const b of G.ebullets) if (World.insideDome(b.pos.x, b.pos.y, b.pos.z)) b.dead = true;
       const a = Math.atan2(p.pos.x - A.x, p.pos.z - A.z) + Math.PI;
       G.queueSpawn('boss', A.x + Math.sin(a) * 12, A.z + Math.cos(a) * 12, false, 2.2);
       UI.banner('⚠ WARNING ⚠', `${Z.boss.name} — ${Z.boss.title.toUpperCase()}`, '#ff3355', 3.2);
@@ -8475,6 +8488,10 @@ function updateEnemyBullets(dt) {
       b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, '#5ab8ff', 1.4, 0.3, 3); HD.flash = 1; Sound.play('block', null, 0.5);
       continue;
     }
+    if (World.domeTrap && !b.fromBoss && World.insideDome(b.pos.x, b.pos.y, b.pos.z)) {
+      b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, ZONES[G.level].boss.color, 1.2, 0.3, 2);
+      continue;
+    }
     const ground = b.grav ? World.floorAt(b.pos.x, b.pos.z) : -1e9;
     if (World.solidAt(b.pos.x, b.pos.y, b.pos.z) || (b.grav && b.pos.y <= ground + 0.2)) {
       b.dead = true;
@@ -8486,7 +8503,7 @@ function updateEnemyBullets(dt) {
         Sound.play('explode', false, G.vol(b.pos));
         const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
         if (pd < b.splash && !p.dead) { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); }
-        if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3 });
+        if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3, fromBoss: b.fromBoss });
       } else Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4);
       continue;
     }

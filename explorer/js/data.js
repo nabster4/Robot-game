@@ -78,7 +78,7 @@ const ZONES = [
     beacons: 3,
     pool: [['drone', 6], ['swarmer', 2], ['grunt', 4]],
     shop: { name: "TINKER TOM'S", color: '#6bff9e', items: ['repair', 'cell', 'scatter', 'bot_shield', 'up_armor', 'up_magnet', 'backpack'] },
-    boss: { kind: 'beast', name: 'BRAMBLEBACK', title: 'Iron Boar of the Meadow', color: '#ff9f43', hp: 1500, patterns: ['charge', 'pounce', 'stomp', 'aimed', 'summon'] },
+    boss: { kind: 'beast', name: 'BRAMBLEBACK', title: 'Iron Boar of the Meadow', color: '#ff9f43', hp: 1500, patterns: ['charge', 'pounce', 'stomp', 'aimed'] },
   },
   {
     id: 'snow', name: 'Snowy Plains', short: 'SNOW',
@@ -95,7 +95,7 @@ const ZONES = [
     beacons: 3,
     pool: [['frostdrone', 5], ['icemite', 2.5], ['snowgrunt', 4], ['sniper', 1.5]],
     shop: { name: 'FROSTBYTE OUTFITTERS', color: '#8ae9ff', items: ['repair', 'cell', 'rifle', 'bot_tesla', 'bot_bubble', 'up_overclock', 'up_thruster', 'backpack'] },
-    boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral', 'summon'] },
+    boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral'] },
   },
   {
     id: 'mountains', name: 'The Mountains', short: 'MOUNTAINS',
@@ -112,7 +112,7 @@ const ZONES = [
     beacons: 4,
     pool: [['drone', 3], ['grunt', 4], ['sniper', 2.5], ['shielder', 2], ['rockcrusher', 1.5]],
     shop: { name: 'SUMMIT SUPPLY', color: '#ffcf6a', items: ['jetpack', 'fireboots', 'launcher', 'bot_rocket', 'up_split', 'up_slot', 'repair', 'cell'] },
-    boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial', 'summon'] },
+    boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial'] },
   },
   {
     id: 'volcano', name: 'Fiery Volcano', short: 'VOLCANO',
@@ -130,7 +130,7 @@ const ZONES = [
     beacons: 4,
     pool: [['firedrone', 4], ['embermite', 3], ['magmagrunt', 4], ['shielder', 2], ['tank', 1.5], ['carrier', 1]],
     shop: { name: 'MAGMA MARKET', color: '#ff8c42', items: ['bot_laser', 'bot_bomber', 'up_firmware', 'up_armor', 'up_slot', 'backpack', 'repair', 'cell'] },
-    boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge', 'summon'] },
+    boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge'] },
   },
   {
     id: 'sky', name: 'Sky Islands', short: 'SKY',
@@ -147,7 +147,7 @@ const ZONES = [
     beacons: 4,
     pool: [['hawk', 5], ['grunt', 3], ['sniper', 2], ['shielder', 1.5], ['carrier', 1]],
     shop: { name: 'CLOUD BAZAAR', color: '#ffe14d', items: ['bot_laser', 'bot_bomber', 'bot_rocket', 'up_firmware', 'up_overclock', 'up_split', 'rifle', 'launcher', 'repair', 'cell'] },
-    boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral', 'summon'] },
+    boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
 ];
 

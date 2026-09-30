@@ -40,7 +40,7 @@ In the Sky Islands, falling into the clouds drops you back on the last island yo
 1. **Explore.** Find the **signal beacons** by following their light pillars, using the compass and radar. Open hidden **salvage caches**.
 2. **Uplink.** Activate a beacon and stay inside its ring for 22 seconds while machines warp in to stop you.
 3. **Core Gate.** When every beacon is online, the dome over the central arena drops.
-4. **Boss.** Step in and the dome **seals behind you and your bots**. No one gets out until the boss is destroyed. Five distinct bosses, each harder than the last:
+4. **Boss.** Step in and the dome **seals behind you and your bots**. No one gets out until the boss is destroyed, and it's a one-on-one fight: robots inside are cleared out, others can't get in, their shots can't get through the dome, and bosses never call in helpers. Five distinct bosses, each harder than the last:
    **Brambleback** (an iron boar that charges, pounces and stomps), **Glacieros** (an ice golem whose frost waves and beams **freeze you solid**, then it attacks),
    **Colossus** (a 20 m walker that hurls boulders and stomps shockwaves), **Infernus** (a flaming magma demon with flamethrowers, meteor rain and burning ground) and
    **Stormwing** (a mechanical bird that **vanishes, reappears behind you** and dives, with feather volleys and wind gusts). Each has an enraged Overdrive phase.
