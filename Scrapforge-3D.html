@@ -747,6 +747,23 @@ body.touch #depth { top: 38%; right: calc(10px + env(safe-area-inset-right)); wi
 .lg.wreck { border: 2px solid #7fd8e8; border-radius: 0 0 6px 6px; border-top: none; width: 8px; height: 7px; }
 body.talking #keys-hint { opacity: 0; }
 
+/* ═════════════════════════ CONTROLLER ═════════════════════════ */
+.howto-sub { font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #8fb4d8; margin: 4px 0 8px; }
+#pad-hint { display: none; position: absolute; right: 16px; bottom: 202px; max-width: 560px; font-size: 12px; letter-spacing: 1px; color: rgba(185,201,223,0.6); text-align: right; }
+body.pad #keys-hint { display: none; }
+body.pad #pad-hint { display: block; }
+body.talking #pad-hint { opacity: 0; }
+@media (max-width: 1000px) { body.pad #pad-hint { display: none; } }
+#pad-cursor { position: fixed; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
+  border: 2px solid #3cf2ff; background: rgba(60,242,255,0.18); box-shadow: 0 0 12px rgba(60,242,255,0.7);
+  pointer-events: none; z-index: 9999; display: none; }
+#pad-cursor.show { display: block; }
+.pad-hover { outline: 2px solid #3cf2ff !important; outline-offset: 2px; }
+#pad-toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -20px); padding: 8px 16px; border-radius: 10px;
+  background: rgba(10,18,30,0.88); border: 1px solid rgba(60,242,255,0.5); color: #dff6ff; font-size: 14px; letter-spacing: 0.5px;
+  pointer-events: none; z-index: 9999; opacity: 0; transition: opacity 0.25s, transform 0.25s; }
+#pad-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 </style>
 </head>
 <body>
@@ -802,7 +819,10 @@ body.talking #keys-hint { opacity: 0; }
 
   <canvas id="radar" width="180" height="180"></canvas>
   <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · M map · J quests · Q dash · RMB bomb · hold SPACE jetpack · underwater SPACE / SHIFT rise &amp; sink</div>
+  <div id="pad-hint">RT fire · LT bomb · A jump · B dash · X use · Y repair · LB/RB hotbar · L3 sprint · ◀ drop · ▶ view · ▲ quests · ▼ field kit · VIEW map · underwater A / B rise &amp; sink</div>
 </div>
+<div id="pad-cursor"></div>
+<div id="pad-toast"></div>
 
 
 <!-- ═══════ Touch controls (phones / tablets) ═══════ -->
@@ -892,6 +912,20 @@ body.talking #keys-hint { opacity: 0; }
         <div><kbd>Tab / I</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>N</kbd><span>Mute</span></div>
+      </div>
+      <div class="howto-sub desk-only">Controller (Xbox names · PlayStation: A = ✕, B = ○, X = □, Y = △)</div>
+      <div class="howto-grid desk-only">
+        <div><kbd>Left stick</kbd><span>Move · click it to sprint</span></div>
+        <div><kbd>Right stick</kbd><span>Look · light aim assist</span></div>
+        <div><kbd>RT</kbd><span>Fire · <b>LT</b> plasma grenade</span></div>
+        <div><kbd>A</kbd><span>Jump · glide · hold for jetpack · rise underwater</span></div>
+        <div><kbd>B</kbd><span>Dash · sink underwater</span></div>
+        <div><kbd>X</kbd><span>Interact · next line of dialogue</span></div>
+        <div><kbd>Y</kbd><span>Use repair kit</span></div>
+        <div><kbd>LB / RB</kbd><span>Hotbar slot · <b>D-pad ◀</b> drop it</span></div>
+        <div><kbd>D-pad ▲ / ▼</kbd><span>Quests · field kit · <b>▶</b> or <b>R3</b> view</span></div>
+        <div><kbd>View / Menu</kbd><span>World map · pause</span></div>
+        <div><kbd>Menus</kbd><span>Stick or D-pad moves the cursor · <b>A</b> select · <b>B</b> back · right stick scrolls · <b>LB/RB</b> tabs</span></div>
       </div>
       <p><b>Halloway Works</b>, your home base: Wren's <b>Workshop</b> (build bots, base systems and new rooms),
         the <b>Charging Bay</b> (bots recharge here) and <b>Storage</b> (unlimited). Build the <b>Garage</b> (gear),
@@ -6624,7 +6658,7 @@ const Sea = {
     }
     p.gliding = false; p.jetting = false; p.climbing = null;
     if (Math.random() < dt * (2 + Math.hypot(p.vel.x, p.vel.y, p.vel.z))) Fx.glow.emit(p.pos.x + rand(-0.4, 0.4), p.pos.y + 1.4, p.pos.z + rand(-0.4, 0.4), rand(-0.2, 0.2), rand(1, 2), rand(-0.2, 0.2), rand(1, 2), 0.08, new THREE.Color('#dff6ff'), 1.2, 0, 0, 1);
-    if (G.hint) G.hint(Touch.enabled ? 'Swimming — you move where you look · hold JUMP to rise' : 'Swimming — you move where you look · Space rises, Shift or C sinks');
+    if (G.hint) G.hint(ctl('Swimming — you move where you look · Space rises, Shift or C sinks', 'Swimming — you move where you look · hold JUMP to rise', 'Swimming — you move where you look · A rises, B sinks'));
   },
 
   // pressure: diving below your hull's rating crushes you slowly
@@ -7100,7 +7134,7 @@ class Player {
   update(dt) {
     const I = Input;
     this.look(I);
-    if (I.touchMode) touchAimAssist(this, dt);
+    if (I.touchMode || I.pad) touchAimAssist(this, dt);
     G.focus = false;
     this.inCave = !!World.caveAt(this.pos.x, this.pos.z, this.pos.y);
     this.swim = !this.inCave && Sea.swimmable(this.pos.x, this.pos.z, this.pos.y);
@@ -7112,11 +7146,12 @@ class Player {
     let mf = (I.key('KeyW') || I.key('ArrowUp') ? 1 : 0) - (I.key('KeyS') || I.key('ArrowDown') ? 1 : 0);
     let mr = (I.key('KeyD') || I.key('ArrowRight') ? 1 : 0) - (I.key('KeyA') || I.key('ArrowLeft') ? 1 : 0);
     if (I.touch) { mf -= I.touch.my; mr += I.touch.mx; }
+    if (I.pad) { mf -= I.pad.my; mr += I.pad.mx; }
     if (frozen) { mf = 0; mr = 0; }
     let wx = fx * mf + rx * mr, wz = fz * mf + rz * mr;
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; } // analog stick keeps partial deflection as walking speed
-    const wantSprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint)) && mf > 0;
+    const wantSprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint) || (I.pad && I.pad.sprint)) && mf > 0;
     const sprinting = wantSprint && this.grounded && !this.exhausted && wl > 0.1;
     if (sprinting) this.useStamina(13 * dt);
     let spd = this.speed * (sprinting ? 1.6 : 1) * (this.exhausted ? 0.75 : 1) * (this.slowT > 0 ? 0.6 : 1);
@@ -7158,7 +7193,7 @@ class Player {
     if (G.gear.jetpack && I.key('Space') && !this.grounded && !this.climbing && !frozen && this.fuel > 0) {
       this.spaceHeld += dt;
       if (this.spaceHeld > 0.2 || this.jetting) {
-        if (!this.jetting) { Sound.play('jet'); if (G.hint) G.hint(Touch.enabled ? 'Jetpack — hold JUMP to fly · fuel refills on the ground' : 'Jetpack — hold Space to fly · fuel refills on the ground'); }
+        if (!this.jetting) { Sound.play('jet'); if (G.hint) G.hint(ctl('Jetpack — hold Space to fly · fuel refills on the ground', 'Jetpack — hold JUMP to fly · fuel refills on the ground', 'Jetpack — hold A to fly · fuel refills on the ground')); }
         this.jetting = true; this.pendingGlide = false; this.gliding = false;
       }
     } else {
@@ -7243,14 +7278,14 @@ class Player {
         const dx = hit.x - this.pos.x, dz = hit.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
         if ((dx / dl) * fx + (dz / dl) * fz > 0.35) {
           this.climbing = hit; this.gliding = false; this.vel.set(0, 0, 0);
-          if (G.hint) G.hint(Touch.enabled ? 'Climbing — push the stick up to climb, JUMP to leap off' : 'Climbing — hold forward to climb, Space to leap off');
+          if (G.hint) G.hint(ctl('Climbing — hold forward to climb, Space to leap off', 'Climbing — push the stick up to climb, JUMP to leap off', 'Climbing — push the stick up to climb, A to leap off'));
         }
       }
       // pushing into a cliff face starts a (slow) climb
       if (cliff && !this.climbing && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && !this.jetting && cliff.x * fx + cliff.z * fz > 0.45) {
         this.climbing = { terrain: true, ux: cliff.x, uz: cliff.z, x: this.pos.x + cliff.x * 5, z: this.pos.z + cliff.z * 5, r: 0.5 };
         this.gliding = false; this.vel.set(0, 0, 0);
-        if (G.hint) G.hint(Touch.enabled ? 'Climbing the cliff — push the stick up, JUMP to leap off · watch your stamina' : 'Climbing the cliff — hold W to climb, Space to leap off · watch your stamina');
+        if (G.hint) G.hint(ctl('Climbing the cliff — hold W to climb, Space to leap off · watch your stamina', 'Climbing the cliff — push the stick up, JUMP to leap off · watch your stamina', 'Climbing the cliff — push the stick up, A to leap off · watch your stamina'));
       }
       // too steep to stand on: slide down
       if (this.grounded && !this.inCave && !cliff) {
@@ -7381,7 +7416,7 @@ class Player {
     if (this.exhausted || this.stamina <= 1 || this.pos.y - World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= 1.6) return;
     this.gliding = true; this.launchT = 0;
     Sound.play('glide');
-    if (G.hint) G.hint(Touch.enabled ? 'Gliding — steer with the stick, tap DROP to let go' : 'Gliding — steer with movement, press Space again to drop');
+    if (G.hint) G.hint(ctl('Gliding — steer with movement, press Space again to drop', 'Gliding — steer with the stick, tap DROP to let go', 'Gliding — steer with the stick, press A again to drop'));
   }
 
   fallDamage(gy) {
@@ -7396,7 +7431,7 @@ class Player {
     this.hurt(dmg, null);
     Fx.shockRing(this.pos.x, gy + 0.1, this.pos.z, '#ffffff', 1.5, 20);
     UI.feed(`Fall damage −${dmg}`, '#ff6b6b');
-    if (G.hint) G.hint(Touch.enabled ? 'Long drops hurt — tap GLIDE in mid-air to land safely' : 'Long drops hurt — press Space in mid-air to glide down safely');
+    if (G.hint) G.hint(ctl('Long drops hurt — press Space in mid-air to glide down safely', 'Long drops hurt — tap GLIDE in mid-air to land safely', 'Long drops hurt — press A in mid-air to glide down safely'));
   }
 
   fellIntoVoid() {
@@ -7499,6 +7534,7 @@ class Player {
     Fx.hurtFlash(silent ? 0.25 : 0.55);
     if (from) { this.lastHurtFrom = { x: from.x, z: from.z, t: 1.2 }; UI.damageDir(from.x, from.z); }
     Sound.play('hurt');
+    Pad.rumble(silent ? 0.15 : 0.35 + dmg / 40, silent ? 0.3 : 0.6, silent ? 90 : 180);
     G.stats.damageTaken += dmg;
     if (this.hp <= 0) { this.hp = 0; G.playerDied(); }
   }
@@ -9074,6 +9110,293 @@ function touchAimAssist(p, dt) {
 </script>
 <script>
 'use strict';
+// Game controller support (Xbox / PlayStation / most USB and Bluetooth pads in the browser's
+// "standard" layout). In play, the pad feeds the same Input object as the keyboard and mouse.
+// On menus, shops and the map, it drives an on-screen cursor: left stick moves it, the D-pad hops
+// between buttons, A clicks, B goes back and the right stick scrolls.
+
+// standard-layout button indices
+const PB = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+
+// Pick the right words for a prompt: controller, touch or keyboard.
+function ctl(kb, touch, pad) { return Pad.active ? pad : Touch.enabled ? touch : kb; }
+
+const Pad = {
+  connected: false,
+  active: false,            // the last input came from the pad (prompts show pad buttons)
+  DEAD: 0.18,               // stick dead zone
+  LOOK_SPEED: 1500,         // right-stick turn rate at full tilt, in "mouse pixels" per second (× look sensitivity)
+  CURSOR_SPEED: 1100,       // menu cursor speed at full tilt, px/s
+  prev: [],
+  held: new Set(),          // keys the pad is holding down in Input.keys
+  firing: false,
+  sprint: false,
+  cx: 0, cy: 0,
+  lastState: '',
+  hoverEl: null,
+  rumbleCd: 0,
+
+  init() {
+    this.cursor = document.getElementById('pad-cursor');
+    this.toast = document.getElementById('pad-toast');
+    this.cx = window.innerWidth / 2; this.cy = window.innerHeight / 2;
+    window.addEventListener('gamepadconnected', (e) => this.say(`Controller connected — ${this.shortName(e.gamepad.id)}`));
+    window.addEventListener('gamepaddisconnected', () => {
+      if (this.pad()) return;
+      this.release();
+      this.connected = false;
+      this.setActive(false);
+      this.say('Controller disconnected');
+      if (G.state === 'playing') UI.pause();
+    });
+    // touching the keyboard or mouse hands the prompts back to them
+    window.addEventListener('keydown', () => this.setActive(false));
+    document.addEventListener('mousemove', (e) => { if (Math.abs(e.movementX) + Math.abs(e.movementY) > 6) this.setActive(false); });
+  },
+
+  shortName(id) { return (id || 'gamepad').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || 'gamepad'; },
+
+  say(text) {
+    if (!this.toast) return;
+    this.toast.textContent = text;
+    this.toast.classList.add('show');
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(() => this.toast.classList.remove('show'), 2600);
+  },
+
+  setActive(on) {
+    if (this.active === on) return;
+    this.active = on;
+    document.body.classList.toggle('pad', on);
+    UI.hotbarDirty = true;
+    if (!on) this.showCursor(false);
+    else if (G.state !== 'playing') this.snapToFirst();
+  },
+
+  pad() {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    let best = null;
+    for (const g of list) if (g && g.connected && (!best || (g.mapping === 'standard' && best.mapping !== 'standard'))) best = g;
+    return best;
+  },
+
+  // let go of everything the pad is holding (disconnect, or switching between play and menus)
+  release() {
+    for (const k of this.held) Input.keys[k] = false;
+    this.held.clear();
+    if (this.firing) { Input.mouse.down = false; this.firing = false; }
+    this.sprint = false;
+    Input.pad = null;
+  },
+
+  hold(code, on) {
+    if (on && !this.held.has(code)) { this.held.add(code); Input.keys[code] = true; Input.pressed[code] = true; }
+    else if (!on && this.held.has(code)) { this.held.delete(code); Input.keys[code] = false; }
+  },
+
+  stick(x, y) {
+    const m = Math.hypot(x, y);
+    if (m < this.DEAD) return [0, 0, 0];
+    const k = Math.min(1, (m - this.DEAD) / (1 - this.DEAD));
+    return [(x / m) * k, (y / m) * k, k];
+  },
+
+  rumble(strong, weak, ms) {
+    if (!this.active || this.rumbleCd > 0) return;
+    const g = this.pad();
+    const a = g && g.vibrationActuator;
+    if (!a || !a.playEffect) return;
+    this.rumbleCd = 0.08;
+    try { a.playEffect('dual-rumble', { duration: ms, strongMagnitude: clamp(strong, 0, 1), weakMagnitude: clamp(weak, 0, 1) }).catch(() => {}); } catch (e) { /* not supported */ }
+  },
+
+  // called once per frame, before the game reads Input
+  poll(dt) {
+    this.rumbleCd -= dt;
+    const g = this.pad();
+    if (!g) { if (this.connected) { this.connected = false; this.release(); } return; }
+    if (!this.connected) { this.connected = true; this.prev = []; }
+
+    const bv = (i) => { const b = g.buttons[i]; return b ? (typeof b === 'object' ? b.value : b) : 0; };
+    const down = (i) => { const b = g.buttons[i]; return !!b && (b.pressed || bv(i) > 0.35); };
+    const now = []; for (let i = 0; i < g.buttons.length; i++) now[i] = down(i);
+    const hit = (i) => now[i] && !this.prev[i];
+    const ax = (i) => g.axes[i] || 0;
+    const L = this.stick(ax(0), ax(1)), R = this.stick(ax(2), ax(3));
+
+    if (now.some((b, i) => b && !this.prev[i]) || L[2] > 0 || R[2] > 0) {
+      this.setActive(true);
+      if (now.some(Boolean)) Sound.init();
+    }
+
+    const state = G.state;
+    if (state !== this.lastState) {
+      if (state === 'playing' || this.lastState === 'playing') this.release();
+      this.lastState = state;
+      if (state !== 'playing' && this.active) this.snapToFirst();
+    }
+
+    if (state === 'playing') this.play(g, now, hit, L, R, dt);
+    else if (this.active) this.menu(g, now, hit, L, R, dt);
+    this.prev = now;
+  },
+
+  play(g, now, hit, L, R, dt) {
+    const p = G.player;
+    this.showCursor(false);
+    // left stick moves; click it to sprint until you let the stick go
+    if (hit(PB.L3)) this.sprint = !this.sprint;
+    if (L[2] < 0.25) this.sprint = false;
+    Input.pad = { mx: L[0], my: L[1], sprint: this.sprint };
+    // right stick looks: a curve gives fine aim near the centre and fast turns at full tilt
+    if (R[2] > 0) {
+      const c = Math.pow(R[2], 1.8) / R[2];
+      Input.mouse.dx += R[0] * c * this.LOOK_SPEED * dt;
+      Input.mouse.dy += R[1] * c * this.LOOK_SPEED * 0.7 * dt;
+    }
+    // fire with the right trigger
+    const fire = now[PB.RT];
+    if (fire !== this.firing) { this.firing = fire; Input.mouse.down = fire; }
+    const swimming = p && p.swim;
+    this.hold('Space', now[PB.A]);
+    this.hold('KeyC', swimming && now[PB.B]);
+    if (hit(PB.B) && !swimming) Input.pressed.KeyQ = true;
+    if (hit(PB.X)) Input.pressed[document.getElementById('dialog').classList.contains('show') ? 'Enter' : 'KeyE'] = true;
+    if (hit(PB.Y)) Input.pressed.KeyR = true;
+    if (hit(PB.LT)) Input.pressed.KeyG = true;
+    if (hit(PB.LB) || hit(PB.RB)) Input.wheel += hit(PB.RB) ? 1 : -1;
+    if (hit(PB.R3) || hit(PB.RIGHT)) Input.pressed.KeyV = true;
+    if (hit(PB.LEFT)) Input.pressed.KeyX = true;
+    if (hit(PB.UP)) Input.pressed.KeyJ = true;
+    if (hit(PB.DOWN)) Input.pressed.Tab = true;
+    if (hit(PB.BACK)) Input.pressed.KeyM = true;
+    if (hit(PB.START)) Input.pressed.Escape = true;
+  },
+
+  // ───────── menus: on-screen cursor ─────────
+  showCursor(on) {
+    if (!this.cursor) return;
+    this.cursor.classList.toggle('show', on);
+    if (!on && this.hoverEl) { this.hoverEl.classList.remove('pad-hover'); this.hoverEl = null; }
+  },
+
+  clickables() {
+    const out = [];
+    document.querySelectorAll('button, input[type=range], input[type=checkbox], label, .tab, .slot, [data-travel], [data-tab], .btn').forEach((el) => {
+      if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') return;
+      if (el.closest('#touch, #hud') && G.state !== 'playing') return;
+      if (el.tagName === 'LABEL' && el.querySelector('input[type=range]')) return; // hop to the slider itself
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) return;
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (t && (t === el || el.contains(t) || t.contains(el))) out.push({ el, x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    });
+    return out;
+  },
+
+  snapToFirst() {
+    // the world map: start in the middle, ready to place a marker
+    if (G.state === 'map') { this.cx = window.innerWidth / 2; this.cy = window.innerHeight / 2; return; }
+    const c = this.clickables();
+    if (!c.length) return;
+    // prefer the main action of the screen
+    const pref = ['btn-continue', 'btn-start', 'btn-resume', 'btn-retry', 'btn-again', 'ws-continue'];
+    const pick = pref.map((id) => c.find((o) => o.el.id === id)).find(Boolean) || c[0];
+    this.cx = pick.x; this.cy = pick.y;
+  },
+
+  // D-pad: hop to the nearest button in that direction
+  hop(dx, dy) {
+    let best = null, bs = Infinity;
+    for (const o of this.clickables()) {
+      const ox = o.x - this.cx, oy = o.y - this.cy;
+      const along = ox * dx + oy * dy;
+      if (along < 8) continue;
+      const across = Math.abs(ox * dy - oy * dx);
+      const s = along + across * 2.2;
+      if (s < bs) { bs = s; best = o; }
+    }
+    if (best) { this.cx = best.x; this.cy = best.y; Sound.play('click', null, 0.25); }
+  },
+
+  target() {
+    const el = document.elementFromPoint(this.cx, this.cy);
+    return el ? (el.closest('button, input, label, .tab, .slot, [data-travel], [data-tab], canvas, .btn') || el) : null;
+  },
+
+  click() {
+    const el = this.target();
+    if (!el) return;
+    const o = { bubbles: true, cancelable: true, clientX: this.cx, clientY: this.cy, button: 0, pointerType: 'mouse', isPrimary: true };
+    if (el.matches('input[type=range]')) {
+      const r = el.getBoundingClientRect(), mn = +el.min || 0, mx = +el.max || 100, st = +el.step || 1;
+      el.value = Math.round((mn + clamp((this.cx - r.left) / r.width, 0, 1) * (mx - mn)) / st) * st;
+      el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    el.dispatchEvent(new PointerEvent('pointerdown', o));
+    el.dispatchEvent(new MouseEvent('mousedown', o));
+    el.dispatchEvent(new PointerEvent('pointerup', o));
+    el.dispatchEvent(new MouseEvent('mouseup', o));
+    el.click();
+  },
+
+  nudgeRange(el, dir) {
+    const st = +el.step || 1;
+    el.value = clamp(+el.value + dir * st, +el.min || 0, +el.max || 100);
+    el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+  },
+
+  scroll(el, dy) {
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const s = getComputedStyle(n);
+      if (n.scrollHeight > n.clientHeight + 2 && /(auto|scroll)/.test(s.overflowY)) { n.scrollTop += dy; return; }
+    }
+    window.scrollBy(0, dy);
+  },
+
+  menu(g, now, hit, L, R, dt) {
+    this.showCursor(true);
+    if (L[2] > 0) {
+      const sp = this.CURSOR_SPEED * (0.25 + 0.75 * L[2] * L[2]) * dt;
+      this.cx = clamp(this.cx + L[0] / (L[2] || 1) * L[2] * sp, 2, window.innerWidth - 2);
+      this.cy = clamp(this.cy + L[1] / (L[2] || 1) * L[2] * sp, 2, window.innerHeight - 2);
+    }
+    const tgt = this.target();
+    const range = tgt && tgt.matches && tgt.matches('input[type=range]') ? tgt : null;
+    if (hit(PB.UP)) this.hop(0, -1);
+    if (hit(PB.DOWN)) this.hop(0, 1);
+    if (hit(PB.LEFT)) range ? this.nudgeRange(range, -1) : this.hop(-1, 0);
+    if (hit(PB.RIGHT)) range ? this.nudgeRange(range, 1) : this.hop(1, 0);
+    if (R[2] > 0 && tgt) this.scroll(tgt, R[1] * 900 * dt);
+    if (hit(PB.A)) this.click();
+    if (hit(PB.B)) {
+      if (G.state === 'menu') { const h = document.getElementById('howto'); if (h && !h.classList.contains('hidden')) h.classList.add('hidden'); }
+      else Input.pressed.Escape = true;
+    }
+    if (hit(PB.START) && (G.state === 'paused' || G.state === 'workshop' || G.state === 'map')) Input.pressed.Escape = true;
+    if (hit(PB.BACK) && G.state === 'map') Input.pressed.KeyM = true;
+    // bumpers flip through the tabs of a workshop or shop screen
+    if (hit(PB.LB) || hit(PB.RB)) {
+      const tabs = [...document.querySelectorAll('#ws-tabs .tab')].filter((t) => t.offsetParent);
+      if (tabs.length) {
+        const i = Math.max(0, tabs.findIndex((t) => t.classList.contains('active')));
+        tabs[(i + (hit(PB.RB) ? 1 : -1) + tabs.length) % tabs.length].click();
+      }
+    }
+    if (this.cursor) this.cursor.style.transform = `translate(${this.cx}px, ${this.cy}px)`;
+    const h = tgt && tgt.matches && tgt.matches('button, input, label, .tab, .slot, [data-travel], [data-tab], .btn') ? tgt : null;
+    if (h !== this.hoverEl) {
+      if (this.hoverEl) this.hoverEl.classList.remove('pad-hover');
+      if (h) h.classList.add('pad-hover');
+      this.hoverEl = h;
+    }
+  },
+};
+
+</script>
+<script>
+'use strict';
 const $ = (id) => document.getElementById(id);
 
 const UI = {
@@ -9787,7 +10110,7 @@ const UI = {
     $('bar-plasma').style.width = p.energy + '%';
     $('val-plasma').textContent = p.energy >= 100 ? 'READY' : G.cells ? `+${G.cells} CELL` : '';
     $('bar-dash').style.width = (100 * (1 - Math.max(0, p.dashCd) / p.dashMax)) + '%';
-    $('val-repair').textContent = Touch.enabled ? `REPAIR ×${G.repairKits}` : `[R] REPAIR ×${G.repairKits}`;
+    $('val-repair').textContent = ctl(`[R] REPAIR ×${G.repairKits}`, `REPAIR ×${G.repairKits}`, `[Y] REPAIR ×${G.repairKits}`);
     $('vitals').classList.toggle('low', hk < 0.3);
     $('fuel-row').classList.toggle('show', !!G.gear.jetpack);
     if (G.gear.jetpack) { $('bar-fuel').style.width = p.fuel + '%'; $('val-fuel').textContent = p.jetting ? 'BURN' : p.fuel >= 100 ? 'FULL' : ''; }
@@ -9874,7 +10197,7 @@ const UI = {
     const it = G.state === 'playing' && !p.dead ? nextInteractable() : null;
     const pr = $('prompt');
     if (it) {
-      const key = Touch.enabled ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
+      const key = `<kbd>${ctl('E', 'USE', 'X')}</kbd>`;
       const txt = {
         cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
@@ -10159,7 +10482,7 @@ const TUT_TEXT = {
   rack: 'Take the Pulse Blaster from the rack by the workshop door',
   targets: 'Shoot the practice drones in the yard',
   bot: 'Build a Gunner Drone at the workbench',
-  get map() { return Touch.enabled ? 'Open the world map (MAP)' : 'Open the world map (M)'; },
+  get map() { return ctl('Open the world map (M)', 'Open the world map (MAP)', 'Open the world map (VIEW button)'); },
 };
 
 const Story = {
@@ -10281,7 +10604,7 @@ const Story = {
     if (!this.F || this.tutorialDone || G.cine) return;
     if (this.step === 'look') {
       this.F.look += (Math.abs(Input.mouse.dx) + Math.abs(Input.mouse.dy)) * 0.002 + dt * 0.15;
-      if (this.F.look > 1.6) { this.advance(); Dialog.say([L(Touch.enabled ? "Good. Come over here — walk with the left stick, then tap USE." : "Good. Come over here — WASD to walk, then press E to talk.")]); }
+      if (this.F.look > 1.6) { this.advance(); Dialog.say([L(ctl("Good. Come over here — WASD to walk, then press E to talk.", "Good. Come over here — walk with the left stick, then tap USE.", "Good. Come over here — walk with the left stick, then press X to talk."))]); }
     }
     if (this.step === 'bot' && (G.companions.length || G.reserve.length)) this.event('bot');
   },
@@ -10311,7 +10634,7 @@ const Story = {
     this.F.armed = true;
     this.giveBlaster();
     Sound.play('pickup');
-    UI.banner('PULSE BLASTER', Touch.enabled ? 'Hold FIRE to shoot' : 'Left-click to shoot', '#3cf2ff', 2.5);
+    UI.banner('PULSE BLASTER', ctl('Left-click to shoot', 'Hold FIRE to shoot', 'Pull RT to shoot'), '#3cf2ff', 2.5);
     if (this.step === 'rack') { this.advance(); Dialog.say(STORY.armed); }
   },
 
@@ -11245,7 +11568,7 @@ function launchFrom(b) {
   for (const c of World.caches) if (!c.opened && !c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < 170) { c.revealed = true; n++; }
   WorldMap.reveal(b.x, b.z, 260);
   UI.banner('SKY LAUNCH', n ? `${n} salvage caches revealed on your compass` : 'Open your glider in mid-air', '#6bff9e', 2.4);
-  UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — a long fall without it hurts!`);
+  UI.hint(`${ctl('Press Space', 'Tap GLIDE', 'Press A')} in mid-air to open your glider — a long fall without it hurts!`);
 }
 
 function startUplink(b) {
@@ -11316,7 +11639,7 @@ function beaconOnline(b) {
   b.state = 'done';
   remember('beacons', b.id);
   for (const e of G.enemies) e.hunter = false;
-  setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
+  setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${ctl('press E', 'tap LAUNCH', 'press X')} at the base`), 3200);
   World.setBeaconColor(b, '#6bff9e', 5);
   Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
   Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
@@ -12108,6 +12431,7 @@ function frame(now) {
   // rAF timestamps can precede the performance.now() taken at load, so never allow a negative step
   const dt = clamp((now - lastT) / 1000, 0, 0.05);
   lastT = Math.max(lastT, now);
+  Pad.poll(dt);
 
   if (G.state === 'playing') {
     if (Input.hit('Tab') || Input.hit('KeyI')) UI.openStation('field');
@@ -12180,6 +12504,7 @@ Input.init(canvas);
 Input.onLockChange = (locked) => { if (!locked && G.state === 'playing' && !Input.fallback) UI.pause(); };
 canvas.addEventListener('click', () => { if (G.state === 'playing' && !Input.locked) Input.lock(canvas); });
 Touch.init();
+Pad.init();
 if (Touch.enabled) {
   // phones: performance mode by default (no shadows, reduced resolution, no MSAA)
   G.settings.quality = 'low';

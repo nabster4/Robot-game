@@ -835,7 +835,7 @@ function launchFrom(b) {
   for (const c of World.caches) if (!c.opened && !c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < 170) { c.revealed = true; n++; }
   WorldMap.reveal(b.x, b.z, 260);
   UI.banner('SKY LAUNCH', n ? `${n} salvage caches revealed on your compass` : 'Open your glider in mid-air', '#6bff9e', 2.4);
-  UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — a long fall without it hurts!`);
+  UI.hint(`${ctl('Press Space', 'Tap GLIDE', 'Press A')} in mid-air to open your glider — a long fall without it hurts!`);
 }
 
 function startUplink(b) {
@@ -906,7 +906,7 @@ function beaconOnline(b) {
   b.state = 'done';
   remember('beacons', b.id);
   for (const e of G.enemies) e.hunter = false;
-  setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
+  setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${ctl('press E', 'tap LAUNCH', 'press X')} at the base`), 3200);
   World.setBeaconColor(b, '#6bff9e', 5);
   Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
   Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
@@ -1698,6 +1698,7 @@ function frame(now) {
   // rAF timestamps can precede the performance.now() taken at load, so never allow a negative step
   const dt = clamp((now - lastT) / 1000, 0, 0.05);
   lastT = Math.max(lastT, now);
+  Pad.poll(dt);
 
   if (G.state === 'playing') {
     if (Input.hit('Tab') || Input.hit('KeyI')) UI.openStation('field');
@@ -1770,6 +1771,7 @@ Input.init(canvas);
 Input.onLockChange = (locked) => { if (!locked && G.state === 'playing' && !Input.fallback) UI.pause(); };
 canvas.addEventListener('click', () => { if (G.state === 'playing' && !Input.locked) Input.lock(canvas); });
 Touch.init();
+Pad.init();
 if (Touch.enabled) {
   // phones: performance mode by default (no shadows, reduced resolution, no MSAA)
   G.settings.quality = 'low';

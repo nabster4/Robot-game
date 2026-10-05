@@ -68,7 +68,10 @@
 
   <canvas id="radar" width="180" height="180"></canvas>
   <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · M map · J quests · Q dash · RMB bomb · hold SPACE jetpack · underwater SPACE / SHIFT rise &amp; sink</div>
+  <div id="pad-hint">RT fire · LT bomb · A jump · B dash · X use · Y repair · LB/RB hotbar · L3 sprint · ◀ drop · ▶ view · ▲ quests · ▼ field kit · VIEW map · underwater A / B rise &amp; sink</div>
 </div>
+<div id="pad-cursor"></div>
+<div id="pad-toast"></div>
 
 
 <!-- ═══════ Touch controls (phones / tablets) ═══════ -->
@@ -158,6 +161,20 @@
         <div><kbd>Tab / I</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>N</kbd><span>Mute</span></div>
+      </div>
+      <div class="howto-sub desk-only">Controller (Xbox names · PlayStation: A = ✕, B = ○, X = □, Y = △)</div>
+      <div class="howto-grid desk-only">
+        <div><kbd>Left stick</kbd><span>Move · click it to sprint</span></div>
+        <div><kbd>Right stick</kbd><span>Look · light aim assist</span></div>
+        <div><kbd>RT</kbd><span>Fire · <b>LT</b> plasma grenade</span></div>
+        <div><kbd>A</kbd><span>Jump · glide · hold for jetpack · rise underwater</span></div>
+        <div><kbd>B</kbd><span>Dash · sink underwater</span></div>
+        <div><kbd>X</kbd><span>Interact · next line of dialogue</span></div>
+        <div><kbd>Y</kbd><span>Use repair kit</span></div>
+        <div><kbd>LB / RB</kbd><span>Hotbar slot · <b>D-pad ◀</b> drop it</span></div>
+        <div><kbd>D-pad ▲ / ▼</kbd><span>Quests · field kit · <b>▶</b> or <b>R3</b> view</span></div>
+        <div><kbd>View / Menu</kbd><span>World map · pause</span></div>
+        <div><kbd>Menus</kbd><span>Stick or D-pad moves the cursor · <b>A</b> select · <b>B</b> back · right stick scrolls · <b>LB/RB</b> tabs</span></div>
       </div>
       <p><b>Halloway Works</b>, your home base: Wren's <b>Workshop</b> (build bots, base systems and new rooms),
         the <b>Charging Bay</b> (bots recharge here) and <b>Storage</b> (unlimited). Build the <b>Garage</b> (gear),
@@ -287,6 +304,7 @@
 <script src="js/wardens.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/touch.js"></script>
+<script src="js/gamepad.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/story.js"></script>
 <script src="js/game.js"></script>

@@ -108,7 +108,7 @@ const TUT_TEXT = {
   rack: 'Take the Pulse Blaster from the rack by the workshop door',
   targets: 'Shoot the practice drones in the yard',
   bot: 'Build a Gunner Drone at the workbench',
-  get map() { return Touch.enabled ? 'Open the world map (MAP)' : 'Open the world map (M)'; },
+  get map() { return ctl('Open the world map (M)', 'Open the world map (MAP)', 'Open the world map (VIEW button)'); },
 };
 
 const Story = {
@@ -230,7 +230,7 @@ const Story = {
     if (!this.F || this.tutorialDone || G.cine) return;
     if (this.step === 'look') {
       this.F.look += (Math.abs(Input.mouse.dx) + Math.abs(Input.mouse.dy)) * 0.002 + dt * 0.15;
-      if (this.F.look > 1.6) { this.advance(); Dialog.say([L(Touch.enabled ? "Good. Come over here — walk with the left stick, then tap USE." : "Good. Come over here — WASD to walk, then press E to talk.")]); }
+      if (this.F.look > 1.6) { this.advance(); Dialog.say([L(ctl("Good. Come over here — WASD to walk, then press E to talk.", "Good. Come over here — walk with the left stick, then tap USE.", "Good. Come over here — walk with the left stick, then press X to talk."))]); }
     }
     if (this.step === 'bot' && (G.companions.length || G.reserve.length)) this.event('bot');
   },
@@ -260,7 +260,7 @@ const Story = {
     this.F.armed = true;
     this.giveBlaster();
     Sound.play('pickup');
-    UI.banner('PULSE BLASTER', Touch.enabled ? 'Hold FIRE to shoot' : 'Left-click to shoot', '#3cf2ff', 2.5);
+    UI.banner('PULSE BLASTER', ctl('Left-click to shoot', 'Hold FIRE to shoot', 'Pull RT to shoot'), '#3cf2ff', 2.5);
     if (this.step === 'rack') { this.advance(); Dialog.say(STORY.armed); }
   },
 

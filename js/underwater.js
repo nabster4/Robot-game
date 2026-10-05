@@ -177,7 +177,7 @@ const Sea = {
     }
     p.gliding = false; p.jetting = false; p.climbing = null;
     if (Math.random() < dt * (2 + Math.hypot(p.vel.x, p.vel.y, p.vel.z))) Fx.glow.emit(p.pos.x + rand(-0.4, 0.4), p.pos.y + 1.4, p.pos.z + rand(-0.4, 0.4), rand(-0.2, 0.2), rand(1, 2), rand(-0.2, 0.2), rand(1, 2), 0.08, new THREE.Color('#dff6ff'), 1.2, 0, 0, 1);
-    if (G.hint) G.hint(Touch.enabled ? 'Swimming — you move where you look · hold JUMP to rise' : 'Swimming — you move where you look · Space rises, Shift or C sinks');
+    if (G.hint) G.hint(ctl('Swimming — you move where you look · Space rises, Shift or C sinks', 'Swimming — you move where you look · hold JUMP to rise', 'Swimming — you move where you look · A rises, B sinks'));
   },
 
   // pressure: diving below your hull's rating crushes you slowly

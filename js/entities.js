@@ -87,7 +87,7 @@ class Player {
   update(dt) {
     const I = Input;
     this.look(I);
-    if (I.touchMode) touchAimAssist(this, dt);
+    if (I.touchMode || I.pad) touchAimAssist(this, dt);
     G.focus = false;
     this.inCave = !!World.caveAt(this.pos.x, this.pos.z, this.pos.y);
     this.swim = !this.inCave && Sea.swimmable(this.pos.x, this.pos.z, this.pos.y);
@@ -99,11 +99,12 @@ class Player {
     let mf = (I.key('KeyW') || I.key('ArrowUp') ? 1 : 0) - (I.key('KeyS') || I.key('ArrowDown') ? 1 : 0);
     let mr = (I.key('KeyD') || I.key('ArrowRight') ? 1 : 0) - (I.key('KeyA') || I.key('ArrowLeft') ? 1 : 0);
     if (I.touch) { mf -= I.touch.my; mr += I.touch.mx; }
+    if (I.pad) { mf -= I.pad.my; mr += I.pad.mx; }
     if (frozen) { mf = 0; mr = 0; }
     let wx = fx * mf + rx * mr, wz = fz * mf + rz * mr;
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; } // analog stick keeps partial deflection as walking speed
-    const wantSprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint)) && mf > 0;
+    const wantSprint = (I.key('ShiftLeft') || I.key('ShiftRight') || (I.touch && I.touch.sprint) || (I.pad && I.pad.sprint)) && mf > 0;
     const sprinting = wantSprint && this.grounded && !this.exhausted && wl > 0.1;
     if (sprinting) this.useStamina(13 * dt);
     let spd = this.speed * (sprinting ? 1.6 : 1) * (this.exhausted ? 0.75 : 1) * (this.slowT > 0 ? 0.6 : 1);
@@ -145,7 +146,7 @@ class Player {
     if (G.gear.jetpack && I.key('Space') && !this.grounded && !this.climbing && !frozen && this.fuel > 0) {
       this.spaceHeld += dt;
       if (this.spaceHeld > 0.2 || this.jetting) {
-        if (!this.jetting) { Sound.play('jet'); if (G.hint) G.hint(Touch.enabled ? 'Jetpack — hold JUMP to fly · fuel refills on the ground' : 'Jetpack — hold Space to fly · fuel refills on the ground'); }
+        if (!this.jetting) { Sound.play('jet'); if (G.hint) G.hint(ctl('Jetpack — hold Space to fly · fuel refills on the ground', 'Jetpack — hold JUMP to fly · fuel refills on the ground', 'Jetpack — hold A to fly · fuel refills on the ground')); }
         this.jetting = true; this.pendingGlide = false; this.gliding = false;
       }
     } else {
@@ -230,14 +231,14 @@ class Player {
         const dx = hit.x - this.pos.x, dz = hit.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
         if ((dx / dl) * fx + (dz / dl) * fz > 0.35) {
           this.climbing = hit; this.gliding = false; this.vel.set(0, 0, 0);
-          if (G.hint) G.hint(Touch.enabled ? 'Climbing — push the stick up to climb, JUMP to leap off' : 'Climbing — hold forward to climb, Space to leap off');
+          if (G.hint) G.hint(ctl('Climbing — hold forward to climb, Space to leap off', 'Climbing — push the stick up to climb, JUMP to leap off', 'Climbing — push the stick up to climb, A to leap off'));
         }
       }
       // pushing into a cliff face starts a (slow) climb
       if (cliff && !this.climbing && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && !this.jetting && cliff.x * fx + cliff.z * fz > 0.45) {
         this.climbing = { terrain: true, ux: cliff.x, uz: cliff.z, x: this.pos.x + cliff.x * 5, z: this.pos.z + cliff.z * 5, r: 0.5 };
         this.gliding = false; this.vel.set(0, 0, 0);
-        if (G.hint) G.hint(Touch.enabled ? 'Climbing the cliff — push the stick up, JUMP to leap off · watch your stamina' : 'Climbing the cliff — hold W to climb, Space to leap off · watch your stamina');
+        if (G.hint) G.hint(ctl('Climbing the cliff — hold W to climb, Space to leap off · watch your stamina', 'Climbing the cliff — push the stick up, JUMP to leap off · watch your stamina', 'Climbing the cliff — push the stick up, A to leap off · watch your stamina'));
       }
       // too steep to stand on: slide down
       if (this.grounded && !this.inCave && !cliff) {
@@ -368,7 +369,7 @@ class Player {
     if (this.exhausted || this.stamina <= 1 || this.pos.y - World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= 1.6) return;
     this.gliding = true; this.launchT = 0;
     Sound.play('glide');
-    if (G.hint) G.hint(Touch.enabled ? 'Gliding — steer with the stick, tap DROP to let go' : 'Gliding — steer with movement, press Space again to drop');
+    if (G.hint) G.hint(ctl('Gliding — steer with movement, press Space again to drop', 'Gliding — steer with the stick, tap DROP to let go', 'Gliding — steer with the stick, press A again to drop'));
   }
 
   fallDamage(gy) {
@@ -383,7 +384,7 @@ class Player {
     this.hurt(dmg, null);
     Fx.shockRing(this.pos.x, gy + 0.1, this.pos.z, '#ffffff', 1.5, 20);
     UI.feed(`Fall damage −${dmg}`, '#ff6b6b');
-    if (G.hint) G.hint(Touch.enabled ? 'Long drops hurt — tap GLIDE in mid-air to land safely' : 'Long drops hurt — press Space in mid-air to glide down safely');
+    if (G.hint) G.hint(ctl('Long drops hurt — press Space in mid-air to glide down safely', 'Long drops hurt — tap GLIDE in mid-air to land safely', 'Long drops hurt — press A in mid-air to glide down safely'));
   }
 
   fellIntoVoid() {
@@ -486,6 +487,7 @@ class Player {
     Fx.hurtFlash(silent ? 0.25 : 0.55);
     if (from) { this.lastHurtFrom = { x: from.x, z: from.z, t: 1.2 }; UI.damageDir(from.x, from.z); }
     Sound.play('hurt');
+    Pad.rumble(silent ? 0.15 : 0.35 + dmg / 40, silent ? 0.3 : 0.6, silent ? 90 : 180);
     G.stats.damageTaken += dmg;
     if (this.hp <= 0) { this.hp = 0; G.playerDied(); }
   }

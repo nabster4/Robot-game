@@ -712,7 +712,7 @@ const UI = {
     $('bar-plasma').style.width = p.energy + '%';
     $('val-plasma').textContent = p.energy >= 100 ? 'READY' : G.cells ? `+${G.cells} CELL` : '';
     $('bar-dash').style.width = (100 * (1 - Math.max(0, p.dashCd) / p.dashMax)) + '%';
-    $('val-repair').textContent = Touch.enabled ? `REPAIR ×${G.repairKits}` : `[R] REPAIR ×${G.repairKits}`;
+    $('val-repair').textContent = ctl(`[R] REPAIR ×${G.repairKits}`, `REPAIR ×${G.repairKits}`, `[Y] REPAIR ×${G.repairKits}`);
     $('vitals').classList.toggle('low', hk < 0.3);
     $('fuel-row').classList.toggle('show', !!G.gear.jetpack);
     if (G.gear.jetpack) { $('bar-fuel').style.width = p.fuel + '%'; $('val-fuel').textContent = p.jetting ? 'BURN' : p.fuel >= 100 ? 'FULL' : ''; }
@@ -799,7 +799,7 @@ const UI = {
     const it = G.state === 'playing' && !p.dead ? nextInteractable() : null;
     const pr = $('prompt');
     if (it) {
-      const key = Touch.enabled ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
+      const key = `<kbd>${ctl('E', 'USE', 'X')}</kbd>`;
       const txt = {
         cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',

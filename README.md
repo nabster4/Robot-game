@@ -157,6 +157,27 @@ Saves have a version number. A save from the older portal version keeps your hot
 | `Esc` / `P` | Pause and settings (sensitivity, third person, invert Y, performance mode, world map) |
 | `N` | Mute |
 
+### Controller (gamepad)
+
+Plug in or pair an Xbox, PlayStation or other standard controller, then press any button. The game picks it up straight away, and the prompts and hint bar switch to controller buttons; touching the keyboard or mouse switches them back. It works in Chrome, Edge and Firefox on PC. PlayStation buttons: A = ✕, B = ○, X = □, Y = △.
+
+| Button | Action |
+| --- | --- |
+| Left stick | Move (analog). Click it (`L3`) to sprint until you let go |
+| Right stick | Look, with light aim assist |
+| `RT` / `LT` | Fire / plasma bomb |
+| `A` | Jump. Tap in mid-air to glide, hold for the jetpack, and leap off while climbing. Underwater: rise |
+| `B` | Dash. Underwater: sink |
+| `X` | Interact, or the next line of dialogue |
+| `Y` | Repair kit |
+| `LB` / `RB` | Previous / next hotbar slot |
+| D-pad | ▲ quest log · ▼ field kit · ◀ drop the selected item · ▶ first / third person (also `R3`) |
+| `View` / `Menu` | World map / pause |
+
+**Menus, shops and the map** show a glowing cursor. Move it with the left stick, or hop between buttons with the D-pad. `A` selects, `B` goes back, the right stick scrolls lists, and `LB` / `RB` switch tabs. On a slider, D-pad ◀ ▶ nudges the value. On the world map, `A` places or removes a marker. Your robot's controller rumbles when it takes a hit.
+
+Browsers only report a controller after a button is pressed while the page has focus. If the game stays silent, click once; some browsers only allow sound after a mouse click or key press.
+
 ### On a phone or tablet (landscape)
 
 Touch controls turn on automatically.
@@ -188,6 +209,7 @@ js/underwater.js the Sunken Reach: swimming, pressure, sea floor, wrecks, sea ca
 js/wardens.js   how each Warden is reached: ice grotto mirror puzzle, summit route, lava moat and bridge, Sky Lift
 js/worldmap.js  full-screen world map with fog of war and player markers
 js/models.js    low-poly robot, boss, companion, weapon, pickup and secret models
+js/gamepad.js   controller support: buttons and sticks feed the shared input, plus an on-screen cursor for menus
 js/entities.js  Player controller (cliff climbing, caves), Enemy AI, Boss patterns, Companions
 js/post.js      bloom and tone-mapping post-processing
 js/fx.js        particles, debris, lights, lightning, weather
