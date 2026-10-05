@@ -12,6 +12,10 @@ const PARTS = {
 const PART_ORDER = ['scrap', 'wire', 'servo', 'circuit', 'lens', 'core', 'quantum'];
 
 // ───────────────────────── Enemies (world units: metres, seconds) ─────────────────────────
+// How often an enemy gunner's shot is aimed to hit you (0 = never, 1 = always). The other shots are
+// fired to pass close by. This is the one knob for how dangerous gunfire is.
+const ENEMY_HIT_CHANCE = 0.5;
+
 // drops: [part, chance, min, max]
 const ENEMY_TYPES = {
   drone: {

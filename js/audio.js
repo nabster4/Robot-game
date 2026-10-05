@@ -90,7 +90,25 @@ const Sound = (() => {
     freeze(t) { noise(t, 0.6, 0.2, 5000, 'highpass', 9000); [1568, 1318, 1046].forEach((f, i) => tone(t + i * 0.05, f, 0.3, 'sine', 0.05)); },
     coin(t) { tone(t, 1318, 0.06, 'square', 0.04); tone(t + 0.06, 1760, 0.12, 'square', 0.04); },
     buy(t) { [784, 988, 1318].forEach((f, i) => tone(t + i * 0.06, f, 0.18, 'triangle', 0.08)); noise(t, 0.1, 0.06, 6000, 'highpass'); },
-    rifle(t) { tone(t, 2200, 0.18, 'sawtooth', 0.05, 300); noise(t, 0.08, 0.1, 5000, 'highpass'); },
+    // Laser Rifle: deep and heavy — a sharp click on the attack, a sub-bass thump, a falling growl
+    // through a closing filter, and a short dark tail
+    rifle(t) {
+      noise(t, 0.016, 0.42, 3800, 'highpass');                     // the crack of the attack
+      tone(t, 1600, 0.035, 'square', 0.06, 500);                    // bright edge, gone in an instant
+      tone(t, 92, 0.24, 'sine', 0.55, 34);                          // sub-bass thump
+      tone(t, 185, 0.14, 'square', 0.07, 62);                       // body
+      const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(440, t); o.frequency.exponentialRampToValueAtTime(105, t + 0.17);
+      lp.type = 'lowpass'; lp.Q.value = 6;
+      lp.frequency.setValueAtTime(3200, t); lp.frequency.exponentialRampToValueAtTime(380, t + 0.18);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.2 * volMul, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.21);
+      o.connect(lp).connect(g).connect(sfx);
+      o.start(t); o.stop(t + 0.24);
+      noise(t + 0.02, 0.2, 0.13, 900, 'lowpass', 160);              // short tail
+    },
     scatter(t) { noise(t, 0.25, 0.3, 1800, 'lowpass', 300); tone(t, 180, 0.15, 'square', 0.06, 70); },
     slam(t) { noise(t, 0.9, 0.6, 500, 'lowpass', 40); tone(t, 55, 0.9, 'sine', 0.5, 25); },
   };

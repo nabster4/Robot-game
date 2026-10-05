@@ -66,13 +66,14 @@ const Dialog = {
     if (!this.cur) this.next();
   },
   busy() { return !!this.cur; },
-  clear() { this.queue = []; this.cur = null; this.el().classList.remove('show'); },
+  clear() { this.queue = []; this.cur = null; this.el().classList.remove('show'); document.body.classList.remove('talking'); },
   el() { return document.getElementById('dialog'); },
   next() {
     const prev = this.cur;
     this.cur = this.queue.shift() || null;
     if (prev && prev.onDone) prev.onDone();
     const el = this.el();
+    document.body.classList.toggle('talking', !!this.cur);
     if (!this.cur) { el.classList.remove('show'); return; }
     this.t = 0; this.shown = 0;
     el.querySelector('.d-who').textContent = this.cur.who;

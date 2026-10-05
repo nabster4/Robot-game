@@ -480,6 +480,12 @@ const Villages = {
       n.model.position.set(n.x, n.y + (moving ? Math.abs(Math.sin(n.t * 8)) * 0.06 : Math.sin(n.t * 2) * 0.02), n.z);
       const U = n.model.userData;
       if (U.eye) U.eye.scale.y = (n.t % 4) < 0.12 ? 0.2 : 1;   // blink
+      // villagers step around each other
+      for (const o of World.npcs) {
+        if (o === n || o.still || !o.model.visible) continue;
+        const ox = n.x - o.x, oz = n.z - o.z, od = Math.hypot(ox, oz);
+        if (od < 1.1 && od > 0.001 && !n.still) { n.x = o.x + ox / od * 1.1; n.z = o.z + oz / od * 1.1; }
+      }
       // keep the player from walking through villagers
       if (d < 0.9 && d > 0.001) { p.pos.x = n.x + (p.pos.x - n.x) / d * 0.9; p.pos.z = n.z + (p.pos.z - n.z) / d * 0.9; }
     }

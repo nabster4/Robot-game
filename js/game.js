@@ -1323,6 +1323,7 @@ function updateEnemyBullets(dt) {
   for (const b of G.ebullets) {
     if (b.dead) continue;
     if (b.grav) b.vel.y -= b.grav * dt;
+    const px0 = b.pos.x, py0 = b.pos.y, pz0 = b.pos.z;
     b.pos.addScaledVector(b.vel, dt);
     if (b.hugH) b.pos.y = (b.fromBoss ? World.arenaFloor(b.pos.x, b.pos.z) : World.floorAt(b.pos.x, b.pos.z, b.pos.y - b.hugH)) + b.hugH;
     b.mesh.position.copy(b.pos);
@@ -1365,7 +1366,14 @@ function updateEnemyBullets(dt) {
       }
     }
     if (b.dead || p.dead) continue;
-    if (segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, b.pos.x, b.pos.y, b.pos.z) < 0.45 + b.r) {
+    // swept test: fast shots must not skip through you between frames
+    let touch = false;
+    const steps = Math.min(8, Math.ceil(Math.hypot(b.pos.x - px0, b.pos.y - py0, b.pos.z - pz0) / 0.5));
+    for (let k = 1; k <= steps && !touch; k++) {
+      const f = k / steps;
+      touch = segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, lerp(px0, b.pos.x, f), lerp(py0, b.pos.y, f), lerp(pz0, b.pos.z, f)) < 0.45 + b.r;
+    }
+    if (touch) {
       if (b.hugH && b.life > 1 && b.vel.lengthSq() < 1) {
         // lingering fire patch: burns while you stand in it
         if (p.invuln <= 0) { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); }
@@ -1456,7 +1464,8 @@ function rot(o, x, y, z, k, dt) { ease(o.rotation, 'x', x, k, dt); ease(o.rotati
 function updateAvatar(dt) {
   const p = G.player, a = G.avatar, U = a.userData, J = U.J;
   const climbing = !!p.climbing, gliding = p.gliding;
-  const air = !p.grounded && !climbing && !gliding;
+  const swimming = !!p.swim;
+  const air = !p.grounded && !climbing && !gliding && !swimming;
   const vx = p.vel.x, vz = p.vel.z, spd = Math.hypot(vx, vz);
   const t = G.time;
 
@@ -1550,6 +1559,15 @@ function updateAvatar(dt) {
     P.arms[0] = { sh: [0.75, 0, -0.25], elbow: -0.35, wrist: 0 };
     P.arms[1] = { sh: [0.75, 0, 0.25], elbow: -0.35, wrist: 0 };
   }
+  if (swimming) {
+    // swimming: body stretched out along the stroke, legs kicking, arms sweeping
+    const k = Math.sin(t * 6), stroke = Math.sin(t * 3);
+    P.pelvisY = 0.95; P.spine = [0.25, 0, 0]; P.chest = [0.1, 0, 0];
+    P.legs[0] = { hip: [0.2 + 0.35 * k, 0, -0.08], knee: 0.3 + 0.25 * Math.max(0, k), ankle: 0.5, toe: 0.3 };
+    P.legs[1] = { hip: [0.2 - 0.35 * k, 0, 0.08], knee: 0.3 + 0.25 * Math.max(0, -k), ankle: 0.5, toe: 0.3 };
+    P.arms[0] = { sh: [-2.4 + 0.9 * stroke, 0, -0.35], elbow: -0.3, wrist: 0 };
+    P.arms[1] = { sh: [-2.4 - 0.9 * stroke, 0, 0.35], elbow: -0.3, wrist: 0 };
+  }
   if (gliding) {
     const sway = Math.sin(t * 2.1);
     P.pelvisY = 0.95;
@@ -1608,7 +1626,7 @@ function updateAvatar(dt) {
   });
   // whole-body lean into turns and speed
   const bank = clamp(-turnRate * 0.045 * w, -0.3, 0.3);
-  rot(J.root, 0, 0, bank, 8, dt);
+  rot(J.root, swimming ? 1.1 + clamp(-p.pitch, -0.6, 0.6) * (spd > 1 ? 1 : 0) : 0, 0, bank, swimming ? 4 : 8, dt);
 
   U.glider.visible = gliding;
   const thrust = p.jetting ? 3 + Math.random() : air || p.dashT > 0 || gliding ? 1.4 : 0.5;

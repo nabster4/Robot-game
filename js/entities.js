@@ -35,7 +35,7 @@ class Player {
     this.recoil = 0; this.bob = 0; this.bobAmt = 0; this.land = 0;
     this.hazardT = 0;
     this.lastHurtFrom = null;
-    // Zelda-style traversal
+    // traversal: stamina, glider, climbing
     this.stamina = 100; this.exhausted = false; this.stamRest = 0;
     this.gliding = false; this.climbing = null; this.airT = 0; this.launchT = 0;
     this.walk = 0;
@@ -289,7 +289,7 @@ class Player {
 
     this.timers(dt);
 
-    // Zelda-style focus: aiming while gliding or falling slows time
+    // focus: aiming while gliding or falling slows time
     if (I.mouse.down && (this.gliding || (this.airT > 0.45 && this.vel.y < 0)) && !this.exhausted && this.stamina > 0) {
       G.focus = true;
       this.useStamina(16 * dt / Math.max(0.3, G.timeScale));
@@ -543,6 +543,27 @@ class Enemy {
     Fx.muzzle(sx, sy, sz, this.d.color);
   }
 
+  // An aimed shot from a gunner: ENEMY_HIT_CHANCE of the time it leads you and flies true; otherwise
+  // it is fired to pass 1.4–2.6 m to one side (close enough to feel dangerous).
+  aimedShot(spd, r = 0.3, color, sideYaw = 0) {
+    const p = G.player;
+    const sx0 = this.pos.x, sz0 = this.pos.z, sy = this.cy + 0.1;
+    const d = Math.hypot(p.pos.x - sx0, p.pos.z - sz0) || 1;
+    const T = d / spd;
+    let tx = p.pos.x + p.vel.x * T, ty = p.chestY + (p.vel.y || 0) * T * 0.5, tz = p.pos.z + p.vel.z * T;
+    if (Math.random() >= ENEMY_HIT_CHANCE) {
+      const side = (Math.random() < 0.5 ? -1 : 1) * rand(1.4, 2.6), nx = -(tz - sz0) / d, nz = (tx - sx0) / d;
+      tx += nx * side; tz += nz * side; ty += rand(-0.7, 0.9);
+    }
+    const yaw = Math.atan2(tx - sx0, tz - sz0) + sideYaw;
+    this.facing = this.ai === 'drone' ? yaw : this.facing;
+    const sx = sx0 + Math.sin(yaw) * this.r, sz = sz0 + Math.cos(yaw) * this.r;
+    const h = Math.hypot(tx - sx, tz - sz) || 1;
+    const vy = clamp(((ty - sy) / h) * spd, -spd, spd);
+    G.spawnEnemyBullet(sx, sy, sz, Math.sin(yaw) * spd, vy, Math.cos(yaw) * spd, this.dmg, r, color || this.d.color, 0, this.d.shot ? { effect: this.d.shot } : null);
+    Fx.muzzle(sx, sy, sz, this.d.color);
+  }
+
   aimYaw(lead) {
     const p = G.player;
     const d = Math.hypot(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
@@ -565,7 +586,7 @@ class Enemy {
     if (this.camp && !this.camp.alerted) { this.camp.alerted = true; Sound.play('alarm', null, G.vol(this.pos)); }
   }
 
-  // Zelda-style detection: an alarm meter fills while the player is in range (faster up close);
+  // detection: an alarm meter fills while the player is in range (faster up close);
   // when it fills, this robot and its whole camp attack.
   detect(dt, p) {
     if (this.aggro || p.dead) { this.notice = 0; this.showAlarm(0); return; }
@@ -668,7 +689,7 @@ class Enemy {
         tx = (ux * mv - uz * this.strafe * 0.8) * S; tz = (uz * mv + ux * this.strafe * 0.8) * S;
         if (Math.random() < dt * 0.4) this.strafe *= -1;
         this.facing = ang;
-        if (this.cd <= 0 && dd < 45) { this.cd = this.d.fireCd * rand(0.8, 1.3); this.fire(this.aimYaw(this.d.bulletSpeed), this.d.bulletSpeed, 0.22); Sound.play('enemyShoot', null, G.vol(this.pos)); }
+        if (this.cd <= 0 && dd < 45) { this.cd = this.d.fireCd * rand(0.8, 1.3); this.aimedShot(this.d.bulletSpeed, 0.22); Sound.play('enemyShoot', null, G.vol(this.pos)); }
         break;
       }
       case 'swarm': {
@@ -688,7 +709,7 @@ class Enemy {
           if (this.ai === 'grunt') {
             this.cd = this.d.fireCd * rand(0.8, 1.2);
             const a = this.aimYaw(this.d.bulletSpeed);
-            this.fire(a, this.d.bulletSpeed);
+            this.aimedShot(this.d.bulletSpeed);
             if (this.elite) { this.fire(a - 0.12, this.d.bulletSpeed); this.fire(a + 0.12, this.d.bulletSpeed); }
             Sound.play('enemyShoot', null, G.vol(this.pos));
           } else if (this.ai === 'tank') {
@@ -701,7 +722,7 @@ class Enemy {
         }
         if (this.burst > 0) {
           this.stateT -= dt;
-          if (this.stateT <= 0) { this.burst--; this.stateT = 0.16; this.fire(this.facing, this.d.bulletSpeed); Sound.play('enemyShoot', null, G.vol(this.pos)); }
+          if (this.stateT <= 0) { this.burst--; this.stateT = 0.16; this.aimedShot(this.d.bulletSpeed); Sound.play('enemyShoot', null, G.vol(this.pos)); }
         }
         break;
       }
@@ -716,7 +737,7 @@ class Enemy {
           setBeam(this.laser, lens.x, lens.y, lens.z, ex, ey, ez, 0.015 + k * 0.03);
           this.laser.material.opacity = 0.3 + k * 0.6;
           if (this.stateT <= 0) {
-            this.fire(this.facing, this.d.bulletSpeed * (1 + G.level * 0.05), 0.25, '#e8b8ff');
+            this.aimedShot(this.d.bulletSpeed * (1 + G.level * 0.05), 0.25, '#e8b8ff');
             Sound.play('laser', null, G.vol(this.pos));
             this.state = 'move'; this.cd = this.d.fireCd * rand(0.9, 1.2);
             this.laser.visible = false;

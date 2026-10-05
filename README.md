@@ -129,6 +129,10 @@ Saves have a version number. A save from the older portal version keeps your hot
 
 **Player:** stamina wheel for sprinting, climbing and gliding; a paraglider (Space in mid-air), with campfire and valley updrafts; and a jetpack. Fall damage grows with the drop (gliding, jetpacking and landing in water are safe). Activated beacons launch you skyward and reveal the area on your map and compass. Aim assist curves shots into nearby enemies, and plasma bombs and rockets hurt you if you're in the blast. Hidden **Scrap Sprites** (3 = a stamina vessel) sit on pillar tops, cliffs and islands.
 
+**Enemy gunfire:** about half of a gunner's shots are aimed to hit you, leading you if you're moving; the rest are fired to pass close by. Strafing and dashing cut the hit rate well below half. The odds are one constant, `ENEMY_HIT_CHANCE` in `js/data.js` (0 = never, 1 = always). Tank spreads and elite side shots are separate from this. Bullets are checked along their whole path each frame, so fast sniper rounds can't skip past you.
+
+**Weapons sound** like what they are. The laser rifle has a sharp crack, a deep bass thump and a short, dark tail. In third person, your robot swims face-down, kicking and stroking.
+
 **Music:** home base and each region have their own theme song (bouncy bells at home, a skipping whistle in the Plains, music-box bells in the snow, a brass march in the Mountains, chiptune rock in the Volcano, floating arpeggios in the sky). The song follows the region you're in, and combat and boss fights switch to action themes.
 
 ### Controls (keyboard and mouse)

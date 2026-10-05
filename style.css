@@ -728,3 +728,4 @@ body.touch #depth { top: 38%; right: calc(10px + env(safe-area-inset-right)); wi
 #pressure { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
   background: radial-gradient(ellipse at center, transparent 40%, rgba(255,40,60,0.45) 100%); }
 .lg.wreck { border: 2px solid #7fd8e8; border-radius: 0 0 6px 6px; border-top: none; width: 8px; height: 7px; }
+body.talking #keys-hint { opacity: 0; }
