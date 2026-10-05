@@ -77,7 +77,6 @@ const ZONES = [
     props: { rocks: 45, pillars: 8, crystals: 0, scrap: 25, lamps: 6 },
     beacons: 3,
     pool: [['drone', 6], ['swarmer', 2], ['grunt', 4]],
-    shop: { name: "TINKER TOM'S", color: '#6bff9e', items: ['repair', 'cell', 'scatter', 'bot_shield', 'up_armor', 'up_magnet', 'backpack'] },
     boss: { kind: 'beast', name: 'BRAMBLEBACK', title: 'Iron Boar of the Meadow', color: '#ff9f43', hp: 1500, patterns: ['charge', 'pounce', 'stomp', 'aimed'] },
   },
   {
@@ -94,7 +93,6 @@ const ZONES = [
     props: { rocks: 60, pillars: 10, crystals: 40, scrap: 15, lamps: 10 },
     beacons: 3,
     pool: [['frostdrone', 5], ['icemite', 2.5], ['snowgrunt', 4], ['sniper', 1.5]],
-    shop: { name: 'FROSTBYTE OUTFITTERS', color: '#8ae9ff', items: ['repair', 'cell', 'rifle', 'bot_tesla', 'bot_bubble', 'up_overclock', 'up_thruster', 'backpack'] },
     boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral'] },
   },
   {
@@ -111,7 +109,6 @@ const ZONES = [
     props: { rocks: 130, pillars: 18, crystals: 0, scrap: 20, lamps: 8 },
     beacons: 4,
     pool: [['drone', 3], ['grunt', 4], ['sniper', 2.5], ['shielder', 2], ['rockcrusher', 1.5]],
-    shop: { name: 'SUMMIT SUPPLY', color: '#ffcf6a', items: ['jetpack', 'fireboots', 'launcher', 'bot_rocket', 'up_split', 'up_slot', 'repair', 'cell'] },
     boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial'] },
   },
   {
@@ -129,7 +126,6 @@ const ZONES = [
     volcanoes: true,
     beacons: 4,
     pool: [['firedrone', 4], ['embermite', 3], ['magmagrunt', 4], ['shielder', 2], ['tank', 1.5], ['carrier', 1]],
-    shop: { name: 'MAGMA MARKET', color: '#ff8c42', items: ['bot_laser', 'bot_bomber', 'up_firmware', 'up_armor', 'up_slot', 'backpack', 'repair', 'cell'] },
     boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge'] },
   },
   {
@@ -146,7 +142,6 @@ const ZONES = [
     props: { rocks: 0, pillars: 0, crystals: 0, scrap: 0, lamps: 0 },
     beacons: 4,
     pool: [['hawk', 5], ['grunt', 3], ['sniper', 2], ['shielder', 1.5], ['carrier', 1]],
-    shop: { name: 'CLOUD BAZAAR', color: '#ffe14d', items: ['bot_laser', 'bot_bomber', 'bot_rocket', 'up_firmware', 'up_overclock', 'up_split', 'rifle', 'launcher', 'repair', 'cell'] },
     boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
 ];
@@ -250,6 +245,13 @@ const SHOP_ITEMS = {
   up_magnet:    { kind: 'upgrade', up: 'magnet',    price: 90 },
   up_firmware:  { kind: 'upgrade', up: 'firmware',  price: 300 },
   up_slot:      { kind: 'upgrade', up: 'slot',      price: 380 },
+  service:      { kind: 'service', name: 'Full Service', price: 30, desc: 'Hull repaired to full, and every bot with you topped up to a full battery.' },
+  buy_scrap:    { kind: 'part', part: 'scrap',   price: 6 },
+  buy_wire:     { kind: 'part', part: 'wire',    price: 9 },
+  buy_servo:    { kind: 'part', part: 'servo',   price: 18 },
+  buy_circuit:  { kind: 'part', part: 'circuit', price: 24 },
+  buy_lens:     { kind: 'part', part: 'lens',    price: 30 },
+  buy_core:     { kind: 'part', part: 'core',    price: 45 },
 };
 
 // ───────────────────────── The connected world ─────────────────────────

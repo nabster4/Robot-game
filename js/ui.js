@@ -169,8 +169,12 @@ const UI = {
   // ═════════════════════════ Stations: field kit · Mechanic · Charging · Storage · Shop ═════════════════════════
   openStation(mode, shopSpot) {
     this.mode = mode;
-    if (shopSpot) this.shopDef = ZONES[shopSpot.biome].shop;
-    const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'],
+    if (shopSpot) this.shopDef = shopSpot.def;
+    // a shop's tabs follow what it stocks
+    const SHOP_TAB = { weapon: 'gear', gear: 'gear', bot: 'bots', upgrade: 'upgrades', supply: 'supplies', service: 'supplies', part: 'parts' };
+    const shopTabs = this.shopDef ? ['sell', ...new Set(this.shopDef.items.map((id) => SHOP_TAB[SHOP_ITEMS[id].kind]))] : ['sell'];
+    if (mode === 'shop' && shopSpot) this.tab = shopTabs[1] || 'sell';
+    const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: shopTabs,
       garage: ['garage'], lab: ['research', 'memories'], command: ['quests', 'travel', 'memories'], journal: ['quests', 'memories'] }[mode];
     if (!tabs.includes(this.tab)) this.tab = tabs[0];
     this.tabs = tabs;
@@ -183,7 +187,7 @@ const UI = {
       mechanic: ['WORKSHOP BENCH', 'Build bots, base systems and new rooms from your storage and hotbar.'],
       charging: ['CHARGING BAY', 'Bots recharge here automatically when their batteries run low.'],
       storage: ['STORAGE ROOM', 'Unlimited storage. Click an item to move it between your hotbar and storage.'],
-      shop: [shop ? shop.name : 'SHOP', 'Sell salvage for Botbucks. Buy weapons, gear, premium bots and upgrades.'],
+      shop: [shop ? shop.name : 'SHOP', shop ? `${shop.keeper}: "${shop.greet}"` : 'Sell salvage for Botbucks.'],
       garage: ['GARAGE', 'Build gear from the parts in your storage and hotbar.'],
       lab: ['LAB', 'Research upgrades with rare parts. Replay the memories you have recovered.'],
       command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
@@ -284,6 +288,8 @@ const UI = {
     if (id === 'backpack' && G.gear.backpack >= S.max) return { ok: false, why: 'MAXED' };
     if (S.kind === 'upgrade' && G.up[S.up] >= UPGRADES[S.up].max) return { ok: false, why: 'MAXED' };
     if ((S.kind === 'supply' || S.kind === 'weapon') && !G.canAdd({ t: S.kind, id })) return { ok: false, why: 'HOTBAR FULL' };
+    if (S.kind === 'part' && !G.canAdd({ t: 'part', id: S.part })) return { ok: false, why: 'HOTBAR FULL' };
+    if (S.kind === 'service' && G.player.hp >= G.player.maxHp && G.companions.every((c) => !c.active || c.battery >= 99)) return { ok: false, why: 'ALL GOOD' };
     if (G.bucks < this.price(id)) return { ok: false, why: 'NEED BOTBUCKS' };
     return { ok: true };
   },
@@ -299,6 +305,8 @@ const UI = {
     G.bucks -= this.price(id);
     let msg = '';
     if (S.kind === 'supply') { G.addItem({ t: 'supply', id }); msg = `${S.name} added to your hotbar`; }
+    else if (S.kind === 'part') { G.addItem({ t: 'part', id: S.part }); msg = `+1 ${PARTS[S.part].name}`; }
+    else if (S.kind === 'service') { G.player.hp = G.player.maxHp; for (const c of G.companions) if (c.active) { c.battery = 100; c.hp = c.maxHp; } msg = 'Hull repaired and batteries topped up'; Fx.tintFlash('#6bff9e', 0.35); }
     else if (S.kind === 'weapon') { G.addItem({ t: 'weapon', id }); msg = `${WEAPONS[id].name} added to your hotbar — select its slot to use it`; }
     else if (S.kind === 'gear') {
       if (id === 'backpack') { G.gear.backpack++; msg = `Backpack upgraded — ${G.barSize} hotbar slots`; }
@@ -428,8 +436,8 @@ const UI = {
     }
     left += '</div>';
     left += `<h3>Gear</h3><div class="inv-list">
-      ${this.gearRow('jetpack', 'Jetpack', G.gear.jetpack ? 'Hold Space / JUMP in mid-air' : 'Sold in the Mountains', G.gear.jetpack)}
-      ${this.gearRow('fireboots', 'Fire Boots', G.gear.fireboots ? 'Lava-proof · Volcano access' : 'Sold in the Mountains', G.gear.fireboots)}
+      ${this.gearRow('jetpack', 'Jetpack', G.gear.jetpack ? 'Hold Space / JUMP in mid-air' : 'Sold in Highbolt, or build it in the Garage', G.gear.jetpack)}
+      ${this.gearRow('fireboots', 'Fire Boots', G.gear.fireboots ? 'Lava barely hurts' : 'Sold in Highbolt, or build it in the Garage', G.gear.fireboots)}
       ${this.gearRow('backpack', 'Backpack', `${G.barSize} hotbar slots`, G.gear.backpack > 0)}
       <div class="inv-item" style="--c:#3aff9a"><img src="${spriteIconURL()}" alt=""><div class="inv-info"><div class="inv-name">Scrap Sprites</div><div class="inv-desc">Every 3 found = +20 max stamina</div></div><div class="inv-count">${G.spritesFound}</div></div>
     </div>`;
@@ -438,7 +446,7 @@ const UI = {
 
     // middle: tabs + content
     const tabNames = { bots: 'Bots', base: 'Base & Rooms', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies',
-      garage: 'Gear', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
+      garage: 'Gear', parts: 'Buy Parts', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
     $('ws-tabs').innerHTML = this.tabs.map((t) => `<button class="tab ${t === this.tab ? 'active' : ''}" data-tab="${t}">${tabNames[t]}</button>`).join('');
     $('ws-tabs').querySelectorAll('.tab').forEach((t) => (t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); }));
     $('ws-tabs').style.display = this.tabs.length > 1 ? '' : 'none';
@@ -516,17 +524,19 @@ const UI = {
           <div class="price-list">${PART_ORDER.map((k) => `<div class="price-row" style="--c:${PARTS[k].color}"><img src="${partIconURL(k)}" alt=""><span>${PARTS[k].name}</span><b>${PARTS[k].value} BB</b></div>`).join('')}</div>
           <div class="ws-note">To sell part of a stack, drag the slider in your hotbar list to pick how many, then press <b>Sell</b>. Weapons and supplies sell for 40% of their price.</div>`;
       } else {
-        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply'] }[this.tab];
+        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply', 'service'], parts: ['part'] }[this.tab];
         const ids = (shop ? shop.items : []).filter((id) => want.includes(SHOP_ITEMS[id].kind));
         mid = ids.map((id) => {
           const S = SHOP_ITEMS[id], st = this.shopState(id), price = this.price(id);
           let name, desc, icon, color, meta = '';
           if (S.kind === 'weapon') { const W = WEAPONS[id]; name = W.name; desc = W.desc; icon = weapIconURL(id); color = W.color; meta = `<div class="meta">DMG ${W.dmg}${W.pellets > 1 ? '×' + W.pellets : ''} · ${W.rate}/S${W.rocket ? ' · SPLASH' : ''}</div>`; }
           else if (S.kind === 'bot') { const d = COMP_DEFS[S.bot]; name = d.name; desc = COMP_DESC[S.bot]; icon = compIconURL(S.bot); color = d.color; meta = `<div class="meta">PREMIUM BOT · HULL ${Math.round(d.hp * (1 + 0.3 * G.up.firmware))}${d.range ? ' · RANGE ' + d.range + 'M' : ''}</div>`; }
+          else if (S.kind === 'part') { const P = PARTS[S.part]; name = P.name; desc = P.desc + ' Goes into your hotbar.'; icon = partIconURL(S.part); color = P.color; meta = `<div class="meta">YOU HAVE ${G.partCount(S.part, true)}</div>`; }
           else if (S.kind === 'upgrade') { const U = UPGRADES[S.up]; name = U.name; desc = U.desc; icon = upgIconURL(S.up, '#3cf2ff'); color = '#3cf2ff'; meta = `<div class="pips">${Array.from({ length: U.max }, (_, i) => `<i class="${i < G.up[S.up] ? 'on' : ''}"></i>`).join('')}</div>`; }
-          else { name = S.name; desc = S.desc; color = id === 'repair' ? '#6bff9e' : id === 'cell' ? '#b98cff' : id === 'fireboots' ? '#ff6a1a' : '#ffb347'; icon = upgIconURL(id, color); if (id === 'backpack') meta = `<div class="pips">${Array.from({ length: S.max }, (_, i) => `<i class="${i < G.gear.backpack ? 'on' : ''}"></i>`).join('')}</div>`; }
+          else { name = S.name; desc = S.desc; color = id === 'repair' || id === 'service' ? '#6bff9e' : id === 'cell' ? '#b98cff' : id === 'fireboots' ? '#ff6a1a' : '#ffb347'; icon = upgIconURL(id === 'service' ? 'repair' : id, color); if (id === 'backpack') meta = `<div class="pips">${Array.from({ length: S.max }, (_, i) => `<i class="${i < G.gear.backpack ? 'on' : ''}"></i>`).join('')}</div>`; }
           return this.card({ id, ok: st.ok, why: st.why, color, icon, name, desc, meta, cost: this.priceHTML(price), act: 'buy', verb: 'Buy' });
-        }).join('') || '<div class="ws-note">Nothing of this kind here — try another biome\'s shop.</div>';
+        }).join('') || '<div class="ws-note">Nothing of this kind here — try another village.</div>';
+        if (shop && shop.note) mid += `<div class="ws-note">${shop.note}</div>`;
       }
     }
     $('ws-recipes').innerHTML = mid;
@@ -735,7 +745,7 @@ const UI = {
       obj = charging.inside ? `Defend the uplink — ${Math.floor(charging.progress * 100)}%` : 'Return to the uplink ring!';
       prog = charging.progress;
     } else if (G.objective === 'boss') obj = G.boss ? `Destroy ${G.boss.name}` : 'Something is coming…';
-    const Q = this.questT && G.time - this.questT < 0.5 ? this.quest : (this.questT = G.time, this.quest = Story.main());
+    const Q = this.questT && G.time - this.questT < 0.5 ? this.quest : (this.questT = G.time, this.vquests = Villages.sides().filter((x) => !x.done), this.quest = Story.main());
     if (!obj) { obj = Q.step; if (Q.prog && Q.id !== 'wake') { prog = Q.prog[0] / Q.prog[1]; obj += ` (${Q.prog[0]}/${Q.prog[1]})`; } }
     $('obj-zone').textContent = (Q.title || R.name).toUpperCase();
     $('obj-zone').style.color = '#ffd23f';
@@ -767,7 +777,8 @@ const UI = {
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
         mechanic: 'Use the <b>Workbench</b>', charging: 'Open the <b>Charging Bay</b>', storage: 'Open <b>Storage</b>',
         garage: 'Use the <b>Garage</b>', lab: 'Use the <b>Lab</b>', command: 'Use the <b>Command Room</b>', talk: 'Talk to <b>Wren</b>', rack: 'Take the <b>Pulse Blaster</b>',
-        shop: it.kind === 'shop' ? `Trade at <b>${ZONES[it.obj.biome].shop.name}</b>` : '',
+        shop: it.kind === 'shop' ? `Trade at <b>${it.obj.def.name}</b>` : '',
+        npc: it.kind === 'npc' ? (it.obj.find ? `Pick up <b>${it.obj.find.name}</b>` : it.obj.role === 'shop' ? `Trade with <b>${it.obj.name}</b>` : `Talk to <b>${it.obj.name}</b>${it.obj.quest && Villages.questState(it.obj.quest) !== 'done' ? ' <b class="gold">!</b>' : ''}`) : '',
       }[it.kind];
       pr.innerHTML = `${key} ${txt}`;
       pr.classList.add('show');
@@ -803,6 +814,8 @@ const UI = {
     const goal = this.goal().A;
     const Q = this.quest;
     if (Q && Q.target) M.push({ x: Q.target.x, z: Q.target.z, color: '#ffd23f', shape: 'quest', label: true, big: true });
+    for (const vq of this.vquests || []) if (vq.target) M.push({ x: vq.target.x, z: vq.target.z, color: '#ffe9a0', shape: 'quest', label: true });
+    for (const v of World.villages || []) if (near(v.x, v.z, 450)) M.push({ x: v.x, z: v.z, color: v.V.color, shape: 'square', range: 450 });
     for (const A of World.arenas) {
       if (G.progress.beaten[A.i]) continue;
       M.push({ x: A.x, z: A.z, color: A.color, shape: 'skull', label: A === goal, big: A === goal, range: A === goal ? 0 : 450 });

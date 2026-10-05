@@ -765,6 +765,7 @@ class Enemy {
       const hx = this.pos.x - HD.x, hz = this.pos.z - HD.z, hd = Math.hypot(hx, hz) || 1, R = HD.r + this.r;
       if (hd < R) { this.pos.x = HD.x + (hx / hd) * R; this.pos.z = HD.z + (hz / hd) * R; }
     }
+    Villages.keepOut(this);
     // the sealed boss dome is a one-on-one fight: other robots are kept outside it
     if (World.domeTrap) {
       const A = World.arena, ax = this.pos.x - A.x, az = this.pos.z - A.z, ad = Math.hypot(ax, az) || 1, R = A.r + 2 + this.r;
@@ -1487,9 +1488,9 @@ class Companion {
   get active() { return this.state === 'follow' || this.state === 'returning'; }
   get offline() { return this.active ? 0 : 1; }   // legacy flag for older checks
   get statusText() {
-    const home = (s) => `${s} (${Math.round(Math.hypot(this.pos.x - World.home.x, this.pos.z - World.home.z))} m from home)`;
+    const home = (s) => this.spot && !this.swapTo ? `Flying to ${this.spot.village.name} (${Math.round(Math.hypot(this.pos.x - this.spot.x, this.pos.z - this.spot.z))} m away)` : `${s} (${Math.round(Math.hypot(this.pos.x - World.home.x, this.pos.z - World.home.z))} m from home)`;
     if (this.swapTo && this.state === 'leaving') return home('Going home to swap');
-    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: home('Flying home'), charging: this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', returning: `Flying back to you (${Math.round(Math.hypot(this.pos.x - G.player.pos.x, this.pos.z - G.player.pos.z))} m)`, down: 'Knocked out' }[this.state];
+    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: home('Flying home'), charging: this.spot ? `Charging at ${this.spot.village.name}` : this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', returning: `Flying back to you (${Math.round(Math.hypot(this.pos.x - G.player.pos.x, this.pos.z - G.player.pos.z))} m)`, down: 'Knocked out' }[this.state];
   }
   // fly straight toward a point at a steady speed; returns the remaining distance
   flyTo(x, y, z, speed, dt) {
@@ -1516,9 +1517,27 @@ class Companion {
     }
   }
 
+  // the nearest place to recharge: home, or the charging post of a village you've visited
+  pickSpot() {
+    let best = null, bd = Math.hypot(this.pos.x - World.home.x, this.pos.z - World.home.z);
+    const posts = (World.chargePosts || []).filter((c) => Villages.visited(c.village));
+    const i = Math.max(0, G.companions.indexOf(this));
+    for (const c of posts) {
+      const d = Math.hypot(this.pos.x - c.x, this.pos.z - c.z);
+      if (d < bd - 1) { bd = d; best = c; }
+    }
+    // two pads per post: share them out
+    if (best) { const pads = posts.filter((c) => c.village === best.village); best = pads[i % pads.length]; }
+    this.spot = best;
+  }
+  // where this bot charges right now (swaps always go home)
+  chargePad() { return !this.swapTo && this.spot ? this.spot : this.pad(); }
+
   goCharge(why) {
     if (World.domeTrap) return;   // nobody leaves the boss dome
+    this.pickSpot();
     this.state = 'leaving'; this.stateT = 1.4; this.target = null;
+    if (this.spot) why += ` — charging at ${this.spot.village.name}`;
     UI.feed(`${this.d.name}: ${why} — returning to base`, '#ffd23f');
     Sound.play('online');
   }
@@ -1569,13 +1588,13 @@ class Companion {
         if (Math.random() < dt * 5) Fx.smoke(this.pos.x, this.pos.y, this.pos.z, 0.5, 1, rand(-0.3, 0.3), 1.2, rand(-0.3, 0.3));
         m.position.copy(this.pos); m.rotation.z = 0.8; m.userData.parts.halo.visible = false;
         if (!World.domeTrap) this.stateT -= dt;
-        if (this.stateT <= 0) { this.state = 'leaving'; this.stateT = 1.4; m.rotation.z = 0; }
+        if (this.stateT <= 0) { this.pickSpot(); this.state = 'leaving'; this.stateT = 1.4; m.rotation.z = 0; }
         return;
       }
       case 'leaving': {
         // fly all the way home to a charging pad
         m.userData.parts.halo.visible = true;
-        const pad = this.pad();
+        const pad = this.chargePad();
         const far = Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z);
         if (far > 3) this.cruise(pad.x, pad.y + 4, pad.z, dt);
         else {
@@ -1591,7 +1610,7 @@ class Companion {
       }
       case 'charging': {
         if (this.swapTo) { G.completeSwap(this); return; }
-        const pad = this.pad();
+        const pad = this.chargePad();
         this.pos.set(pad.x, pad.y + Math.sin(this.t * 2) * 0.08, pad.z);
         this.battery = Math.min(100, this.battery + this.chargeRate * 1.4 * dt);
         this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.08 * dt);
@@ -1599,7 +1618,9 @@ class Companion {
         m.position.copy(this.pos); m.rotation.set(0, this.t * 0.8, 0);
         m.userData.bodyMat.emissiveIntensity = 0.2 + 0.2 * Math.sin(this.t * 5);
         if (this.battery >= 100 && this.hp >= this.maxHp) {
-          if (hub) { this.state = 'follow'; UI.feed(`${this.d.name} fully charged`, this.d.color); Sound.play('online', null, 0.6); }
+          const near = Math.hypot(G.player.pos.x - pad.x, G.player.pos.z - pad.z) < 30;
+          this.spot = null;
+          if (hub || near) { this.state = 'follow'; UI.feed(`${this.d.name} fully charged`, this.d.color); Sound.play('online', null, 0.6); }
           else { this.state = 'returning'; UI.feed(`${this.d.name} is charged and flying back to you`, this.d.color); }
         }
         return;
@@ -1621,7 +1642,7 @@ class Companion {
       this.battery = Math.max(0, this.battery - 0.45 * dt);
       if (this.battery < 15 && !World.domeTrap) { this.goCharge('battery low'); return; }
     }
-    if (hub && this.state === 'follow' && (this.battery < 95 || this.hp < this.maxHp * 0.95)) { this.state = 'leaving'; return; }
+    if (hub && this.state === 'follow' && (this.battery < 95 || this.hp < this.maxHp * 0.95)) { this.spot = null; this.state = 'leaving'; return; }
     if (this.state === 'returning') this.state = 'follow';
     this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.01 * dt);
 

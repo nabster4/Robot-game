@@ -27,6 +27,7 @@ const STORY = {
   map: [
     L("See those five domes? Each one holds a Warden — great machines that used to guard this valley. The Static has them now."),
     L("The nearest is Brambleback, in the Green Plains to the south. Its signal beacons keep its dome sealed. Power them up and… well. Be careful, Rivet."),
+    L("There are robot villages out there too — friendly ones, the Static hasn't reached them. Trade with them, help them, and their charging posts will look after your bots."),
   ],
   // Wren's reaction each time you come home after freeing a Warden
   report: [
@@ -49,6 +50,8 @@ const STORY = {
     L("If you're hurt, come home. Walking through that door patches you right up."),
     L("Caves are the best place for old salvage. And old secrets."),
     L("Don't forget the map — markers are free, getting lost isn't."),
+    L("Met Mayor Tinsel in Brassbrook yet? Tell Tinsel that Wren says hello."),
+    L("A wandering archivist called Quill has been asking about you. Odd sort. Knows a lot about the Wardens."),
   ],
 };
 
@@ -300,6 +303,7 @@ const Story = {
       { id: 'echoes', title: 'Echoes in the Dark', step: 'Find memory fragments hidden in caves', prog: [Math.min(S.logs, LORE_LOGS.length), LORE_LOGS.length], done: S.logs >= LORE_LOGS.length },
       { id: 'home', title: 'A Proper Home', step: 'Build the Garage, Lab and Command Room at the workbench', prog: [nRooms, 3], done: nRooms >= 3 },
       { id: 'parts', title: 'Lost and Found', step: 'Collect lost bot parts — every three make a premium bot', prog: [S.botparts % 3, 3], done: false },
+      ...Villages.sides().map((q) => Object.assign(q, { title: `${q.title}${q.village ? ' · ' + q.village : ''}` })),
       { id: 'sprites', title: 'Little Lights', step: 'Find Scrap Sprites — every three add a stamina vessel', prog: [G.spritesFound, World.sprites.length], done: G.spritesFound >= World.sprites.length },
     ];
   },

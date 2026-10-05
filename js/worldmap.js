@@ -177,11 +177,14 @@ const WorldMap = {
       g.fillStyle = '#3cf2ff'; g.beginPath(); g.moveTo(x, y - fs(9)); g.lineTo(x + fs(9), y); g.lineTo(x + fs(6), y); g.lineTo(x + fs(6), y + fs(7)); g.lineTo(x - fs(6), y + fs(7)); g.lineTo(x - fs(6), y); g.lineTo(x - fs(9), y); g.closePath(); g.fill();
       label('HOME', x, y + fs(17), '#3cf2ff', 12, 900);
     }, true);
-    // shops
-    for (const S of World.shops) icon(S.x, S.z, (x, y) => {
-      g.fillStyle = '#ffd23f'; g.fillRect(x - fs(6), y - fs(6), fs(12), fs(12));
-      g.fillStyle = '#3a2a00'; g.font = `900 ${fs(10)}px Rajdhani, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('$', x, y + 0.5);
+    // villages
+    for (const v of World.villages || []) icon(v.x, v.z, (x, y) => {
+      g.fillStyle = v.V.color; g.beginPath(); g.arc(x, y, fs(7), 0, TAU); g.fill();
+      g.fillStyle = '#05060a'; g.beginPath(); g.moveTo(x, y - fs(4.5)); g.lineTo(x + fs(4.5), y); g.lineTo(x + fs(3), y); g.lineTo(x + fs(3), y + fs(4)); g.lineTo(x - fs(3), y + fs(4)); g.lineTo(x - fs(3), y); g.lineTo(x - fs(4.5), y); g.closePath(); g.fill();
+      label(v.name, x, y - fs(14), v.V.color, 12, 900);
     });
+    // village quest goals
+    for (const q of Villages.sides()) if (!q.done && q.target) icon(q.target.x, q.target.z, (x, y) => { this.star(g, x, y, fs(6), '#ffe9a0'); label(q.target.label, x, y + fs(13), '#ffe9a0', 11, 700); }, true);
     // beacons
     for (const b of World.beacons) icon(b.x, b.z, (x, y) => {
       g.fillStyle = b.state === 'done' ? '#6bff9e' : '#ffb347';

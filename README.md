@@ -29,7 +29,7 @@ The regions blend into each other along their borders: the sky, fog, light, weat
 
 **World map** (`M`, or **MAP** on touch): a shaded relief of the world under fog of war that clears as you explore. It marks:
 - home, the Warden domes and their beacon progress
-- beacons and shops you've seen
+- beacons and villages you've seen, and village quest goals
 - discovered caves (a **?** means a secret is still inside) and secrets you've found
 - your squad, and up to 12 markers of your own (click or tap to place one, click it again to remove it)
 
@@ -73,12 +73,37 @@ Saves have a version number. A save from the older portal version keeps your hot
 
 **Robot camps** sit all over the world around scrap braziers. They come to life as you approach and pack up when you're far away; a camp you wipe out comes back after a few minutes. An alarm meter ("?") fills over a robot's head while it notices you. When it's full, the whole camp attacks. Robots get tougher in the farther regions (Plains < Snow and Coast < Mountains < Volcano < Sky).
 
-**Economy and inventory**
-- **Hotbar:** 9 slots (more with Backpacks). Parts and supplies stack up to 20 per slot; weapons take a slot each. Select with `1`–`9`, `0` or the mouse wheel (tap a slot on touch), and drop one with `X`.
-- **Shops:** each region has a roadside shop on the way out from home. Sell materials there (a slider picks how many from a stack) and buy weapons (**Scatter Blaster, Laser Rifle, Rocket Launcher**), gear (**Jetpack, Fire Boots, Backpack**), supplies, upgrades and premium bots.
-- **Fire Boots** make lava bearable. The **Jetpack** (hold Space in mid-air) helps with the Sky Islands.
+**Robot villages.** Each region has a village of friendly robots that the Static hasn't reached. Walking into one saves the game, and its **charging post** starts serving your bots.
 
-**Companions:** bots drain their battery while you're away from home. As it drains they take more damage and aim worse. Below 15% a bot **flies all the way home** across the world, charges on a pad, then flies back to you. You can see how far away it is in the Charging Room.
+| Village | Region | Shops |
+| --- | --- | --- |
+| **Brassbrook** | Plains | Dot's Oil Bar (repairs), Ruby's Exchange (parts), Flint & Barrel (weapons) |
+| **Glimmerdrift** | Snow | Sleet Plating (armor), Koba's Botwright (premium bots) |
+| **Highbolt** | Mountains | Vela's Tuning (upgrades), Crank Outfitters (gear), Summit Arms (weapons) |
+| **Cinderwell** | Volcano | Slag Ironworks (armor), Tempra's Kiln (upgrades), The Sooty Kettle (repairs) |
+| **Saltpin Harbor** | Coast | Tidewright Diving (diving gear, coming with the underwater update), Pebble's Galley (repairs), Barnacle Bea's (parts), Driftwood Bots (premium bots) |
+
+- **Shop types:**
+  - **Oil & Repairs:** Full Service (full hull and full bot batteries), repair kits, plasma cells.
+  - **Parts Exchange:** buy parts.
+  - **Weapons**, **Armor**, **Upgrades**, **Gear** (jetpack, fire boots, backpack), and **Botwright** (premium bots).
+  - Every shop buys your salvage, with a slider to choose how many from a stack.
+- **Villagers:** every shopkeeper and villager has a name and talks to you, and their lines change as you free Wardens. Talk to a shopkeeper (or step up to the counter) to trade.
+- **Village quests**, each from a village elder:
+  - **Trouble Next Door** (Mayor Tinsel): clear the robot camp raiding Brassbrook.
+  - **Light for the Relay** (Lumen): bring 3 Focus Lenses. The reward marks every Warden beacon on your map.
+  - **The Lost Scout** (Old Piston): find Wisp on a ledge above Highbolt.
+  - **Cooling the Forge** (Forgemistress Ashby): bring Power Cores and Copper Coils.
+  - **Message in a Bottle** (Captain Brine): find a bottle on the beach. It holds a memory fragment.
+  - Active village quests show in the quest log, as markers on the compass, and as stars on the map.
+- **Quill**, a wandering archivist, shows up in a different village each time you free a Warden. Quill fills in what the archives say about the Wardens' lost leader.
+
+**Inventory and Botbucks**
+- **Hotbar:** 9 slots (more with Backpacks). Parts and supplies stack up to 20 per slot; weapons take a slot each. Select with `1`–`9`, `0` or the mouse wheel (tap a slot on touch), and drop one with `X`.
+- **Botbucks** come from selling salvage and from robots, caches, beacons, bosses and quests.
+- **Fire Boots** make lava bearable. The **Jetpack** (hold Space in mid-air) helps with the Sky Islands. Both are sold in Highbolt or built in the Garage.
+
+**Companions:** bots drain their battery while you're away from home. As it drains they take more damage and aim worse. Below 15% a bot **flies to the nearest charging spot** — home, or the charging post of a village you've visited — charges there, then flies back to you. You can see how far away it is in the Charging Room.
 **Swapping:** when your squad is full, new bots wait at home. Pick a squad bot to swap out. It flies home first, then the other bot flies out to you.
 
 **Player:** stamina wheel for sprinting, climbing and gliding; a paraglider (Space in mid-air), with campfire and valley updrafts; and a jetpack. Fall damage grows with the drop (gliding, jetpacking and landing in water are safe). Activated beacons launch you skyward and reveal the area on your map and compass. Aim assist curves shots into nearby enemies, and plasma bombs and rockets hurt you if you're in the blast. Hidden **Scrap Sprites** (3 = a stamina vessel) sit on pillar tops, cliffs and islands.
@@ -113,7 +138,7 @@ Touch controls turn on automatically.
 - **FIRE:** hold to shoot, and drag it to aim at the same time.
 - **JUMP:** tap it again in mid-air to glide, hold it for the jetpack, and use it to leap off a climb.
 - **DASH** and **BOMB** show cooldown rings.
-- **USE** lights up next to Wren, rooms, shops, caches and beacons. Tap the dialogue box to hurry it, and tap the quest tracker for the quest log.
+- **USE** lights up next to Wren, villagers, rooms, shops, caches and beacons. Tap the dialogue box to hurry it, and tap the quest tracker for the quest log.
 - **MAP** opens the world map (tap to place markers). **VIEW** switches the camera, **FIX** uses a repair kit, **CRAFT** opens the field kit, and **❚❚** pauses.
 - Light aim assist is on. Performance mode is on by default: no shadows, lower resolution, shorter view distance and fewer props.
 - Add `?touch=1` or `?touch=0` to the URL to force touch controls on or off.
@@ -131,7 +156,8 @@ The ground is split into chunks, and static props are merged into a few large me
 ```
 js/terrain.js   world size, blended biome height functions (plateaus, terraces, ridges, volcanoes, coast), rivers, prop batching
 js/world.js     builds the world: ground chunks, water & lava, waterfalls, caves & secrets, the Halloway Works base, Warden domes & beacons,
-                         sky islands, shops, props, flora, camp sites, and the sky/fog/light blend between regions
+                         sky islands, props, flora, camp sites, and the sky/fog/light blend between regions
+js/villages.js  robot villages: layout, shops, villagers, charging posts, village quests, Quill
 js/worldmap.js  full-screen world map with fog of war and player markers
 js/models.js    low-poly robot, boss, companion, weapon, pickup and secret models
 js/entities.js  Player controller (cliff climbing, caves), Enemy AI, Boss patterns, Companions

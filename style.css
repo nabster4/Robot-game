@@ -711,3 +711,4 @@ body.touch #objective { cursor: pointer; }
 .span-all { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
 .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
 .quest-grid .quest { margin: 0; }
+.lg.village { background: #6bff9e; border-radius: 50%; }

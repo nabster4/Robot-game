@@ -624,6 +624,10 @@ function applyWorldProgress() {
   World.sprites.forEach((sp, k) => { sp.found = W.sprites.includes(k); sp.model.visible = !sp.found; });
   World.secrets.forEach((s) => { s.found = W.secrets.includes(s.id); s.model.visible = !s.found; });
   World.caves.forEach((c) => { c.found = W.caves.includes(c.id); });
+  const VS = Villages.state();
+  World.questCamp = VS.camp !== undefined ? World.campSites.find((c) => c.id === VS.camp) : null;
+  Villages.here = null;
+  Villages.apply();
 }
 function remember(list, v) {
   const W = G.progress.world;
@@ -729,6 +733,7 @@ function streamCamps(dt) {
       c.live = false; c.alerted = false;
     } else if (!G.enemies.some((e) => e.camp === c && !e.dead)) {
       c.live = false; c.alerted = false; c.respawnAt = G.time + CAMP_RESPAWN;
+      Villages.event('campCleared', c);
     }
   }
 }
@@ -751,7 +756,9 @@ function nextInteractable() {
   for (const t of World.terminals) if (!t.locked) near(t.x, t.z, 2.6, t.kind, t);
   if (World.wren) near(World.wren.x, World.wren.z, 2.8, 'talk', World.wren);
   if (World.rack && !Story.F.armed) near(World.rack.x, World.rack.z, 2.4, 'rack', World.rack);
-  for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 3.4, 'shop', S);
+  for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 2.2, 'shop', S);
+  const npc = Villages.nearestNpc(p);
+  if (npc) { const d = npc.find ? 0 : Math.hypot(npc.x - p.pos.x, npc.z - p.pos.z); if (d < bd) { bd = d; best = { kind: 'npc', obj: npc }; } }
   const busy = World.beacons.some((b) => b.state === 'charging');
   for (const b of World.beacons) {
     if (!cell(b.x, b.z, 7)) continue;
@@ -773,6 +780,7 @@ function interact(it) {
     case 'shop': UI.openStation('shop', it.obj); break;
     case 'mechanic': case 'storage': case 'charging': case 'garage': case 'lab': case 'command': UI.openStation(it.kind); break;
     case 'talk': Story.talk(); break;
+    case 'npc': Villages.talk(it.obj); break;
     case 'rack': Story.takeBlaster(); break;
   }
 }

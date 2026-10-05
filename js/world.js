@@ -41,7 +41,7 @@ const World = {
     Batch.start(this.group, 400);
     this.buildHub();
     for (const A of this.arenaPlans) this.buildArena(A);
-    for (const S of this.shopPlans) this.buildShop(S.x, S.z, S.y, S.biome);
+    Villages.build(this);
     this.buildSkyRegion();
     this.buildCaves();
     this.buildWaterfalls();
@@ -80,7 +80,7 @@ const World = {
     const flats = [{ x: 0, z: 0, r: 62, h: 8 }];
     const free = (x, z, r) => flats.every((f) => Math.hypot(f.x - x, f.z - z) > f.r + r + 25);
     const okGround = (x, z, i) => Terra.raw(x, z) > (i === 3 ? WORLD.lava + 4 : WORLD.water + 1.5) && Terra.weights(x, z)[i] > 0.45;
-    this.arenaPlans = []; this.beaconPlans = []; this.shopPlans = [];
+    this.arenaPlans = []; this.beaconPlans = [];
     for (let i = 0; i < 4; i++) {
       const T = TERRA[i];
       let ax = T.cx * 0.9, az = T.cz * 0.9;
@@ -104,17 +104,8 @@ const World = {
           break;
         }
       }
-      // the biome's shop sits on the road from home base to its arena
-      for (let t = 0; t < 40; t++) {
-        const k = rand(0.42, 0.58), side = rand(-40, 40);
-        const L = Math.hypot(ax, az), px = -az / L, pz = ax / L;
-        const x = ax * k + px * side, z = az * k + pz * side;
-        if (Terra.raw(x, z) < WORLD.water + 1.5 || !free(x, z, 10)) continue;
-        flats.push({ x, z, r: 12, h: Math.max(WORLD.water + 2.5, Terra.raw(x, z)) });
-        this.shopPlans.push({ x, z, biome: i });
-        break;
-      }
     }
+    Villages.plan(this, flats, free);
     this.flats = flats;
   },
 
@@ -133,7 +124,6 @@ const World = {
     const N = this.N, W = N + 1, s = this.seg, half = this.half;
     this.heights = new Float32Array(W * W);
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) this.heights[j * W + i] = this.shapedHeight(-half + i * s, -half + j * s);
-    for (const S of this.shopPlans) S.y = this.heightAt(S.x, S.z);
     for (const A of this.arenaPlans) A.y = this.heightAt(A.x, A.z);
   },
 
@@ -1297,7 +1287,6 @@ const World = {
     const AP = this.arenaPlans[this.arenaPlans.length - 1];
     for (const b of beaconI) this.beaconPlans.push({ x: b.x, z: b.z, y: b.top, biome: 4, arena: AP, island: b });
     this.buildArena(AP);
-    this.buildShop(landing.x, landing.z + landing.r * 0.35, landing.top, 4);
     // decorate islands
     const F = ZONES[4].flora, trees = [], ground = [];
     for (const is of this.islands) {
@@ -1391,45 +1380,6 @@ const World = {
     }
   },
 
-  // ═════════════════════ Shops ═════════════════════
-  buildShop(x, z, y, biome) {
-    const S = ZONES[biome].shop;
-    const face = Math.atan2(-x, -z);   // facing home base
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = face; this.group.add(g);
-    const wood = Mat.std('#8a5a32', { rough: 0.8, metal: 0.05 });
-    const woodD = Mat.std('#5a3a22', { rough: 0.8, metal: 0.05 });
-    mesh(Geo.box(6, 0.3, 4.4), woodD, 0, 0.15, 0, g).receiveShadow = true;
-    mesh(Geo.box(5.2, 1.2, 0.9), wood, 0, 0.9, 1.3, g);
-    mesh(Geo.box(5.4, 0.12, 1.1), woodD, 0, 1.55, 1.3, g);
-    for (const s of [-1, 1]) for (const zz of [-1.9, 1.9]) mesh(Geo.box(0.22, 3.6, 0.22), woodD, s * 2.8, 1.8, zz, g);
-    for (let i = 0; i < 6; i++) {
-      const st = mesh(Geo.box(1, 0.12, 4.8), Mat.std(i % 2 ? '#fff6e8' : S.color, { rough: 0.7, metal: 0 }), -2.5 + i, 3.75, 0.3, g);
-      st.rotation.x = -0.2;
-    }
-    const goods = ['#ff5a7a', '#ffd23f', '#3cf2ff', '#b98cff', '#6bff9e'];
-    for (let i = 0; i < 7; i++) mesh(Geo.box(0.4, 0.4, 0.4), Mat.std(pick(goods), { rough: 0.4, metal: 0.4, emissive: pick(goods), ei: 0.3 }), -2.2 + i * 0.72, 1.82, 1.25, g).rotation.y = rand(0, 1);
-    mesh(Geo.box(5.2, 2.2, 0.3), woodD, 0, 1.4, -1.9, g);
-    const bot = new THREE.Group(); bot.position.set(0, 0.3, -0.4); g.add(bot);
-    const shell = Mat.std('#e8e0d0', { metal: 0.5, rough: 0.35 });
-    mesh(Geo.box(0.9, 1.1, 0.7), shell, 0, 1.2, 0, bot);
-    const head = new THREE.Group(); head.position.y = 2.1; bot.add(head);
-    mesh(Geo.box(0.8, 0.6, 0.6), shell, 0, 0, 0, head);
-    mesh(Geo.box(0.6, 0.18, 0.05), Mat.glow(S.color, 3), 0, 0.03, 0.31, head);
-    mesh(Geo.cyl(0.4, 0.45, 0.12, 10), Mat.std('#3a2a1a'), 0, 0.36, 0, head);
-    mesh(Geo.cyl(0.28, 0.3, 0.4, 10), Mat.std('#3a2a1a'), 0, 0.56, 0, head);
-    for (const s of [-1, 1]) { const arm = mesh(Geo.box(0.2, 0.8, 0.2), shell, s * 0.6, 1.2, 0.1, bot); arm.rotation.x = -0.5; }
-    const sign = this.makeLabel(S.name, S.color, 640, 128); sign.position.set(0, 5, 0.5); sign.scale.set(6, 1.2, 1); g.add(sign);
-    const icon = this.makeLabel('SHOP', '#ffd23f', 256, 96); icon.position.set(0, 6.3, 0.5); icon.scale.set(2.4, 0.9, 1); g.add(icon);
-    const fwd = new THREE.Vector3(0, 0, 1.3).applyAxisAngle(new THREE.Vector3(0, 1, 0), face);
-    const shop = { x: x + fwd.x * 1.6, z: z + fwd.z * 1.6, y, head, t: 0, color: S.color, biome };
-    this.shops.push(shop);
-    for (const s of [-2, 0, 2]) {
-      const w = new THREE.Vector3(s, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), face);
-      this.addCollider(x + w.x, z + w.z, 1.2, y + 1.6, 'wall', y - 1);
-    }
-    return shop;
-  },
-  // ─────────── Text signs ───────────
   makeLabel(text, color = '#ffffff', w = 512, h = 96) {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const tex = new THREE.CanvasTexture(c);
@@ -1525,7 +1475,7 @@ const World = {
 
     // lamps along the roads out of home base
     const pole = Mat.std('#22242c', { metal: 0.8 });
-    for (const S of this.shopPlans) {
+    for (const S of this.villagePlans) {
       for (let k = 1; k <= 6; k++) {
         const t = k / 7, x = S.x * t + 6, z = S.z * t + 6;
         if (!this.isClear(x, z, 0.5)) continue;
@@ -1848,7 +1798,7 @@ const World = {
       s.model.position.y = s.y + Math.sin(time * 2 + s.ph) * 0.15;
       s.model.rotation.y += dt * 1.5;
     }
-    for (const S of this.shops) if (near(S.x, S.z, 120)) S.head.rotation.y = Math.sin(time * 0.8 + S.x) * 0.5;
+    Villages.update(dt, time);
     for (const pad of this.chargePads) pad.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + pad.x));
     // Wren turns to look at you when you're close
     if (this.wren && near(this.wren.x, this.wren.z, 30) && G.player) {
