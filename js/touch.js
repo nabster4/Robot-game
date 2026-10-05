@@ -168,7 +168,7 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE', npc: it.obj && it.obj.find ? 'TAKE' : it.obj && it.obj.role === 'shop' ? 'SHOP' : 'TALK' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE', mirror: 'TURN', frostkey: 'TAKE', lift: 'RIDE', npc: it.obj && it.obj.find ? 'TAKE' : it.obj && it.obj.role === 'shop' ? 'SHOP' : 'TALK' })[it.kind] : 'USE';
     document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };

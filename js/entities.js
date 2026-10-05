@@ -274,7 +274,9 @@ class Player {
     // hazard (fire boots make lava bearable)
     if (inHaz && liq.dmg) {
       this.hazardT -= dt;
-      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(liq.dmg * 0.5 * (G.gear.fireboots ? 0.15 : 1), null, true); }
+      const moat = Wardens.moatAt(this.pos.x, this.pos.z);
+      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(liq.dmg * 0.5 * (moat ? 2.5 : G.gear.fireboots ? 0.15 : 1), null, true); }
+      if (moat && G.hint) G.hint("Infernus's moat burns through any boots — Ashby in Cinderwell could build a cooling bridge");
       if (Math.random() < dt * 20) Fx.glowBurst(this.pos.x + rand(-0.6, 0.6), WORLD.lava + 0.1, this.pos.z + rand(-0.6, 0.6), liq.glow, 0.5, 0.4, 2);
       if (!G.gear.fireboots && G.hint) G.hint('Lava burns! Fire Boots make it bearable');
     }
@@ -343,7 +345,11 @@ class Player {
     const g = World.gradAt(this.pos.x + c.ux * 0.8, this.pos.z + c.uz * 0.8);
     if (g.s > 0.3) { c.ux = lerp(c.ux, g.x, 0.1); c.uz = lerp(c.uz, g.z, 0.1); const l = Math.hypot(c.ux, c.uz) || 1; c.ux /= l; c.uz /= l; }
     c.x = this.pos.x + c.ux * 5; c.z = this.pos.z + c.uz * 5;
-    if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
+    // the summit route's ledges let you hang on and get your breath back
+    if (Wardens.restingAt(this) && !climbV && !mr) {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 35 * dt); this.exhausted = false;
+      if (G.hint) G.hint('Resting on a ledge — your stamina refills here');
+    } else if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
     this.walk += Math.abs(climbV) * dt * 2;
     if (!this.climbing) return;
     const ahead = World.heightAt(this.pos.x + c.ux * 1.2, this.pos.z + c.uz * 1.2);

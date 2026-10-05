@@ -994,8 +994,8 @@ body.touch #depth { top: 38%; right: calc(10px + env(safe-area-inset-right)); wi
 <!-- ═══════ Victory ═══════ -->
 <div id="victory" class="overlay">
   <div class="panel">
-    <h2 class="win">THE SKIES ARE FREE</h2>
-    <div class="muted">All five bosses have fallen. Your scrap-built squad rules the Outlands — keep exploring, farming and upgrading.</div>
+    <h2 class="win">THE STATIC FALLS</h2>
+    <div class="muted">The Conductor's song is silenced and the five Wardens guard the valley again. Aurel's heart beats on — in you. Wren left the workshop lights on. Keep exploring: every cave, wreck and memory is still out there.</div>
     <div class="stats" id="v-stats"></div>
     <div class="row">
       <button class="btn primary" id="btn-again">Keep Exploring</button>
@@ -1257,7 +1257,7 @@ const ZONES = [
     terrain: { amp: 0.9, ridge: 0.8 },
     flora: { trees: 170, kind: 'pine', snowy: true, trunk: '#5a3a22', leaves: ['#2e6b4a', '#3a7d58', '#285e40'], flowers: [], grass: [] },
     props: { rocks: 60, pillars: 10, crystals: 40, scrap: 15, lamps: 10 },
-    beacons: 3,
+    beacons: 0,
     pool: [['frostdrone', 5], ['icemite', 2.5], ['snowgrunt', 4], ['sniper', 1.5]],
     boss: { kind: 'frost', name: 'GLACIEROS', title: 'The Frozen Heart', color: '#8ae9ff', hp: 2500, patterns: ['freeze', 'icebeam', 'radial', 'spiral'] },
   },
@@ -1273,7 +1273,7 @@ const ZONES = [
     terrain: { amp: 2.2, ridge: 2.4 },
     flora: { trees: 110, kind: 'pine', trunk: '#5a3a22', leaves: ['#2f5e3e', '#3a6e48', '#4a7a4e'], flowers: ['#ffffff', '#b88cff'], grass: ['#6a7a3a'] },
     props: { rocks: 130, pillars: 18, crystals: 0, scrap: 20, lamps: 8 },
-    beacons: 4,
+    beacons: 0,
     pool: [['drone', 3], ['grunt', 4], ['sniper', 2.5], ['shielder', 2], ['rockcrusher', 1.5]],
     boss: { kind: 'titan', name: 'COLOSSUS', title: 'Walker of the Peaks', color: '#ffcf6a', hp: 3700, patterns: ['stomp', 'boulder', 'aimed', 'radial'] },
   },
@@ -1290,7 +1290,7 @@ const ZONES = [
     flora: { trees: 90, kind: 'dead', trunk: '#241410', leaves: ['#ff6a1a'], flowers: [], grass: [] },
     props: { rocks: 110, pillars: 20, crystals: 45, scrap: 25, lamps: 8 },
     volcanoes: true,
-    beacons: 4,
+    beacons: 0,
     pool: [['firedrone', 4], ['embermite', 3], ['magmagrunt', 4], ['shielder', 2], ['tank', 1.5], ['carrier', 1]],
     boss: { kind: 'fire', name: 'INFERNUS', title: 'Heart of the Volcano', color: '#ff5a1a', hp: 5200, patterns: ['flame', 'meteor', 'radial', 'spiral', 'charge'] },
   },
@@ -1306,7 +1306,7 @@ const ZONES = [
     terrain: { amp: 0, ridge: 0 },
     flora: { trees: 0, kind: 'round', trunk: '#6e4524', leaves: ['#3d9c33', '#57b83a', '#7cc444', '#2e8a39'], flowers: ['#ff5a7a', '#ffd23f', '#ffffff', '#b88cff'], grass: ['#5fae3a', '#78c24a'] },
     props: { rocks: 0, pillars: 0, crystals: 0, scrap: 0, lamps: 0 },
-    beacons: 4,
+    beacons: 0,
     pool: [['hawk', 5], ['grunt', 3], ['sniper', 2], ['shielder', 1.5], ['carrier', 1]],
     boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
@@ -3818,6 +3818,7 @@ const World = {
     for (const A of this.arenaPlans) this.buildArena(A);
     Villages.build(this);
     this.buildSkyRegion();
+    Wardens.build(this);
     this.buildCaves();
     this.buildWaterfalls();
     this.buildCraters();
@@ -3883,6 +3884,7 @@ const World = {
     }
     Villages.plan(this, flats, free);
     Sea.plan(this, flats);
+    Wardens.plan(this, flats);
     this.flats = flats;
   },
 
@@ -3891,7 +3893,14 @@ const World = {
     for (const f of this.flats) {
       const dx = x - f.x, dz = z - f.z, R = f.r * 1.8;
       if (dx > R || dx < -R || dz > R || dz < -R) continue;
-      const k = 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
+      if (f.ring) {
+        // a moat: a ring lowered to the given height
+        const d = Math.hypot(dx, dz), k = smoothstep(f.ring[0] - 6, f.ring[0], d) * (1 - smoothstep(f.ring[1], f.ring[1] + 6, d));
+        if (k > 0) h = lerp(h, f.h, k);
+        continue;
+      }
+      // a cliff-edged summit falls away sharply; everything else blends in gently
+      const k = f.cliff ? 1 - smoothstep(f.r, f.r * 1.3, Math.hypot(dx, dz)) : 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
       if (k > 0) h = lerp(h, f.h, k);
     }
     return Math.max(h, WORLD.water - 100);
@@ -5024,8 +5033,8 @@ const World = {
     const arena = isl(R.x, R.z, 40, base + 40, 'arena');
     const beaconI = [];
     const a0 = rand(0, TAU);
-    for (let i = 0; i < ZONES[4].beacons; i++) {
-      const a = a0 + (i / ZONES[4].beacons) * TAU, d = rand(118, 140);
+    for (let i = 0; i < 4; i++) {
+      const a = a0 + (i / 4) * TAU, d = rand(118, 140);
       const b = isl(R.x + Math.cos(a) * d, R.z + Math.sin(a) * d, 15, base + rand(5, 30), 'beacon');
       if (b) beaconI.push(b);
     }
@@ -5072,7 +5081,6 @@ const World = {
     // arena, beacons and the shop on the islands
     this.arenaPlans.push({ i: 4, x: arena.x, z: arena.z, r: 30, y: arena.top, island: true });
     const AP = this.arenaPlans[this.arenaPlans.length - 1];
-    for (const b of beaconI) this.beaconPlans.push({ x: b.x, z: b.z, y: b.top, biome: 4, arena: AP, island: b });
     this.buildArena(AP);
     // decorate islands
     const F = ZONES[4].flora, trees = [], ground = [];
@@ -5828,6 +5836,12 @@ const WorldMap = {
       g.moveTo(x, y - fs(6)); g.lineTo(x, y + fs(5)); g.moveTo(x - fs(5), y + fs(1)); g.quadraticCurveTo(x, y + fs(9), x + fs(5), y + fs(1)); g.moveTo(x - fs(3), y - fs(3)); g.lineTo(x + fs(3), y - fs(3)); g.stroke();
       label(`${Math.round(w.depth)} m`, x, y + fs(15), '#7fd8e8', 10, 700);
     });
+    // the ways to the Wardens: the ice grotto, the summit route, the cooling bridge, the Sky Lift
+    const tag = (o, text, color, always) => { if (o) icon(o.x, o.z, (x, y) => { g.fillStyle = color; g.beginPath(); g.arc(x, y, fs(4), 0, TAU); g.fill(); label(text, x, y + fs(12), color, 11, 900); }, always); };
+    tag(World.grotto, 'ICE GROTTO', '#8ae9ff');
+    tag(World.summit, 'SUMMIT ROUTE', '#ffcf6a');
+    if (World.bridge && World.bridge.group.visible) tag(World.bridge, 'COOLING BRIDGE', '#3cf2ff');
+    if (World.lift) tag(World.lift, Wardens.liftReady() ? 'SKY LIFT · READY' : 'SKY LIFT', '#ffe14d', true);
     // village quest goals
     for (const q of Villages.sides()) if (!q.done && q.target) icon(q.target.x, q.target.z, (x, y) => { this.star(g, x, y, fs(6), '#ffe9a0'); label(q.target.label, x, y + fs(13), '#ffe9a0', 11, 700); }, true);
     // beacons
@@ -5990,13 +6004,13 @@ const VQUESTS = {
     reward: { bucks: 200, parts: { quantum: 1, core: 1 } },
   },
   cinder: {
-    title: 'Cooling the Forge', kind: 'deliver', village: 3, need: { core: 3, wire: 6 },
-    intro: ["The lava's rising and our forge coolers are failing. Without them we can't hold the flows back.", "Bring me three Power Cores and six Copper Coils and I'll build new coolers. Maybe one day even a bridge across the lava."],
-    remind: 'Three Power Cores, six Copper Coils. The forge is getting hot, Rivet.',
-    ready: "The coolers hum! With a few more I could freeze a path straight across the lava. Infernus won't know what hit it.",
-    after: 'The forge runs cool. I am sketching that bridge.',
+    title: 'The Cooling Bridge', kind: 'deliver', village: 3, need: { core: 3, wire: 6 },
+    intro: ["Infernus sits on an island in a moat of lava so hot it melts any boots. Nobody has crossed it since the Static came.", "Bring me three Power Cores and six Copper Coils. I'll build coolers strong enough to freeze a bridge right across that moat."],
+    remind: 'Three Power Cores, six Copper Coils. Then we freeze ourselves a bridge.',
+    ready: "The coolers hum — and the bridge is freezing across the moat as we speak! Go free that poor old furnace, Rivet.",
+    after: "My bridge holds. Best thing I've ever built.",
     step: 'Bring Ashby 3 Power Cores and 6 Copper Coils', turnIn: 'Give Ashby the parts',
-    reward: { bucks: 180, gear: 'fireboots', parts: { core: 1 } },
+    reward: { bucks: 180, gear: 'fireboots', parts: { core: 1 }, bridge: true },
   },
   salt: {
     title: 'Message in a Bottle', kind: 'find', village: 4, find: 'bottle',
@@ -6321,6 +6335,12 @@ const Villages = {
     if (R.bucks) { G.bucks += R.bucks; UI.bump('bucks'); got.push(`${R.bucks} Botbucks`); }
     if (R.parts) for (const [k, v] of Object.entries(R.parts)) { G.store({ t: 'part', id: k }, v); got.push(`${v} ${PARTS[k].name}`); }
     if (R.gear) { if (!G.gear[R.gear]) { G.gear[R.gear] = true; got.push(R.gear === 'fireboots' ? 'Fire Boots' : R.gear); } else { G.bucks += 150; got.push('150 more Botbucks'); } }
+    if (R.bridge) {
+      Wardens.setBridge(true);
+      const A = World.arenas.find((a) => a.i === 3);
+      if (A && A.sealed && !G.progress.beaten[3]) World.openDome(A);
+      got.push('a cooling bridge to Infernus');
+    }
     if (R.beacons) { for (const b of World.beacons) WorldMap.reveal(b.x, b.z, 40); got.push('every beacon on your map'); }
     if (R.log) {
       const S = G.progress.story;
@@ -6618,6 +6638,351 @@ function camUnderwater(cam) {
 </script>
 <script>
 'use strict';
+// How each Warden is reached. Only Brambleback keeps the beacons-and-dome approach; the others ask for
+// something different:
+//   Glacieros  · a Frost Key, sealed in an ice grotto behind a light-and-mirror puzzle
+//   Colossus   · a summit ringed by sheer cliffs — climb the marked route, resting on its ledges
+//   Infernus   · an island in a lava moat too hot for any boots — Ashby in Cinderwell builds a cooling bridge
+//   Deepsong   · the bottom of the Drowned Trench — a Mk III pressure hull gets you there
+//   Stormwing  · the citadel above the Sky Islands — the Sky Lift at home base reads Rivet's core,
+//                and only wakes once all five Wardens are free
+const ARENA_MODE = ['beacons', 'key', 'climb', 'bridge', 'lift', 'trench'];
+
+// the grotto puzzle, in the grotto's own coordinates (x right, z forward); mirrors are '/' (0) or '\' (1)
+const GROTTO = {
+  r: 11,
+  emitter: { x: -8.5, z: -6, dx: 1, dz: 0 },
+  mirrors: [{ x: -2, z: -6, start: 1 }, { x: -2, z: 2, start: 1 }, { x: 5, z: 2, start: 0 }],
+  receptor: { x: 5, z: -5.5 },
+  key: { x: 1.5, z: -2 },
+};
+
+const Wardens = {
+  // shape the landmarks before the heights are computed
+  plan(W, flats) {
+    const flatOf = (A) => flats.find((f) => f.x === A.x && f.z === A.z);
+    for (const A of W.arenaPlans) {
+      A.mode = ARENA_MODE[A.i];
+      const f = flatOf(A);
+      if (A.i === 2 && f) {
+        // the Colossus waits on a summit raised well above its surroundings, ringed by cliffs
+        let top = -1e9;
+        for (let a = 0; a < TAU; a += TAU / 12) for (const r of [0, 25, 50]) top = Math.max(top, Terra.raw(A.x + Math.cos(a) * r, A.z + Math.sin(a) * r));
+        f.h = Math.min(top + 34, 215); f.cliff = true; A.y = f.h;
+      }
+      if (A.i === 3 && f) flats.push({ x: A.x, z: A.z, ring: [38, 54], h: WORLD.lava - 4, r: 60 });
+      if (A.i === 1) {
+        // the ice grotto sits a short walk from Glacieros's dome
+        for (let t = 0; t < 200; t++) {
+          const a = rand(0, TAU), d = rand(70, 120), x = A.x + Math.cos(a) * d, z = A.z + Math.sin(a) * d;
+          const h = Terra.raw(x, z);
+          if (h < WORLD.water + 3 || Terra.weights(x, z)[1] < 0.4 || flats.some((q) => Math.hypot(q.x - x, q.z - z) < q.r + 22)) continue;
+          flats.push({ x, z, r: 16, h });
+          W.grottoPlan = { x, z };
+          break;
+        }
+      }
+    }
+  },
+
+  build(W) {
+    W.ledges = []; W.mirrors = [];
+    W.grotto = null; W.bridge = null; W.lift = null; W.summit = null;
+    for (const A of W.arenas) {
+      A.mode = ARENA_MODE[A.i];
+      if (A.mode === 'climb') this.buildRoute(W, A);
+      if (A.mode === 'bridge') this.buildBridge(W, A);
+    }
+    if (W.grottoPlan) this.buildGrotto(W, W.grottoPlan);
+    this.buildLift(W);
+  },
+
+  // ═════════════════════════ Glacieros: the ice grotto ═════════════════════════
+  buildGrotto(W, P) {
+    const y = W.heightAt(P.x, P.z), ice = new THREE.MeshStandardMaterial({ color: '#cdefff', emissive: '#3a8ab8', emissiveIntensity: 0.35, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.82, flatShading: true });
+    const S = new THREE.Group(); S.position.set(P.x, y, P.z); W.group.add(S);
+    const D = new THREE.Group(); D.position.set(P.x, y, P.z); W.group.add(D);
+    const G2 = { x: P.x, z: P.z, y, D, beams: [] };
+    W.grotto = G2;
+    // a ring of ice walls with an entrance on the +z side
+    for (let k = 0; k < 28; k++) {
+      const a = (k / 28) * TAU;
+      if (Math.abs(angDiff(a, Math.PI / 2)) < 0.28) continue;
+      const x = Math.cos(a) * GROTTO.r, z = Math.sin(a) * GROTTO.r, h = rand(4.5, 7);
+      const m = mesh(Geo.box(2.6, h, 1.2), ice, x, h / 2, z, S); m.rotation.y = -a + Math.PI / 2;
+      W.addCollider(P.x + x, P.z + z, 1.3, y + h, 'wall');
+    }
+    mesh(Geo.cyl(GROTTO.r, GROTTO.r, 0.15, 28), Mat.std('#e8f4ff', { rough: 0.3, metal: 0.1 }), 0, 0.05, 0, S).receiveShadow = true;
+    const lbl = W.makeLabel('ICE GROTTO', '#8ae9ff', 512, 100); lbl.position.set(P.x, y + 8.5, P.z + 2); lbl.scale.set(4, 0.8, 1); W.group.add(lbl);
+    // the light source, the receptor, the mirrors, and the key frozen in ice
+    const L = (o) => ({ x: P.x + o.x, z: P.z + o.z });
+    const em = L(GROTTO.emitter);
+    mesh(Geo.cyl(0.4, 0.5, 1.2, 8), Mat.std('#2a3444', { metal: 0.6 }), GROTTO.emitter.x, 0.6, GROTTO.emitter.z, S);
+    mesh(Geo.oct(0.4), Mat.glow('#fff1a8', 4), GROTTO.emitter.x, 1.5, GROTTO.emitter.z, D);
+    W.addCollider(em.x, em.z, 0.6, y + 1.6, 'wall');
+    const rc = L(GROTTO.receptor);
+    mesh(Geo.cyl(0.45, 0.55, 1, 8), Mat.std('#2a3444', { metal: 0.6 }), GROTTO.receptor.x, 0.5, GROTTO.receptor.z, S);
+    G2.receptor = mesh(Geo.oct(0.5), Mat.std('#4a6a8a', { rough: 0.2, metal: 0.4, emissive: '#3cf2ff', ei: 0.2 }), GROTTO.receptor.x, 1.5, GROTTO.receptor.z, D);
+    G2.receptor.scale.y = 1.5;
+    W.addCollider(rc.x, rc.z, 0.6, y + 1.6, 'wall');
+    for (const [i, m0] of GROTTO.mirrors.entries()) {
+      const g = new THREE.Group(); g.position.set(m0.x, 0, m0.z); D.add(g);
+      mesh(Geo.cyl(0.45, 0.55, 0.9, 8), Mat.std('#2a3444', { metal: 0.6 }), 0, 0.45, 0, g);
+      const plate = new THREE.Group(); plate.position.y = 1.5; g.add(plate);
+      mesh(Geo.box(1.6, 1.2, 0.08), Mat.std('#e8f6ff', { rough: 0.02, metal: 1 }), 0, 0, 0, plate);
+      mesh(Geo.box(1.7, 0.06, 0.12), Mat.glow('#8ae9ff', 2.2), 0, -0.62, 0, plate);
+      const mm = Object.assign(L(m0), { y, i, plate, state: m0.start, lx: m0.x, lz: m0.z });
+      W.mirrors.push(mm);
+      W.addCollider(mm.x, mm.z, 0.5, y + 2.1, 'wall');
+    }
+    G2.block = mesh(Geo.box(1.8, 2.2, 1.8), ice, GROTTO.key.x, 1.1, GROTTO.key.z, D);
+    G2.keyModel = new THREE.Group(); G2.keyModel.position.set(GROTTO.key.x, 1.2, GROTTO.key.z); D.add(G2.keyModel);
+    mesh(Geo.torus(0.25, 0.07, 16), Mat.glow('#8ae9ff', 3), 0, 0.35, 0, G2.keyModel);
+    mesh(Geo.box(0.1, 0.6, 0.1), Mat.glow('#8ae9ff', 3), 0, -0.05, 0, G2.keyModel);
+    mesh(Geo.box(0.25, 0.08, 0.1), Mat.glow('#8ae9ff', 3), 0.12, -0.25, 0, G2.keyModel);
+    G2.key = L(GROTTO.key);
+    G2.blockCol = W.addCollider(G2.key.x, G2.key.z, 1.1, y + 2.2, 'wall');
+    for (let k = 0; k < 6; k++) { const b = makeBeam('#fff1a8', 4, 0.07, 0.9); W.group.add(b); G2.beams.push(b); }
+    this.bake(W, S);
+  },
+  bake(W, g) { W.bake(g); },
+  setMirror(m, state) { m.state = state; m.plate.rotation.y = state ? Math.PI / 4 : -Math.PI / 4; },
+
+  // trace the light from the emitter across the mirrors; returns true if it reaches the receptor
+  traceBeam() {
+    const G2 = World.grotto;
+    if (!G2) return false;
+    let x = GROTTO.emitter.x, z = GROTTO.emitter.z, dx = GROTTO.emitter.dx, dz = GROTTO.emitter.dz;
+    const segs = [];
+    let hit = false;
+    for (let bounce = 0; bounce < 6; bounce++) {
+      let best = null, bt = 1e9;
+      for (const m of World.mirrors) {
+        const t = (m.lx - x) * dx + (m.lz - z) * dz;
+        if (t < 0.4) continue;
+        const off = Math.abs((m.lx - x) * dz - (m.lz - z) * dx);
+        if (off < 0.5 && t < bt) { bt = t; best = m; }
+      }
+      const R = GROTTO.receptor, tr = (R.x - x) * dx + (R.z - z) * dz, roff = Math.abs((R.x - x) * dz - (R.z - z) * dx);
+      if (tr > 0.4 && roff < 0.55 && tr < bt) { segs.push([x, z, R.x, R.z]); hit = true; break; }
+      if (!best) {
+        // run on to the grotto wall
+        const b2 = x * dx + z * dz, c = x * x + z * z - (GROTTO.r - 0.6) ** 2, t = -b2 + Math.sqrt(Math.max(0, b2 * b2 - c));
+        segs.push([x, z, x + dx * t, z + dz * t]);
+        break;
+      }
+      segs.push([x, z, best.lx, best.lz]);
+      x = best.lx; z = best.lz;
+      // '/' swaps x and z; '\' swaps and flips
+      const ndx = best.state === 0 ? dz : -dz, ndz = best.state === 0 ? dx : -dx;
+      dx = ndx; dz = ndz;
+    }
+    const y = G2.y + 1.5;
+    G2.beams.forEach((b, i) => { const s = segs[i]; if (!s) { b.visible = false; return; } setBeam(b, G2.x + s[0], y, G2.z + s[1], G2.x + s[2], y, G2.z + s[3]); });
+    return hit;
+  },
+
+  // ═════════════════════════ Colossus: the summit route ═════════════════════════
+  buildRoute(W, A) {
+    // the route climbs the cliff on the side facing home base
+    const L = Math.hypot(A.x, A.z) || 1, ux = -A.x / L, uz = -A.z / L;
+    let foot = A.r + 14;
+    for (let d = A.r + 4; d < A.r + 40; d += 0.5) { if (W.slopeAt(A.x + ux * d, A.z + uz * d) < 0.5 && W.heightAt(A.x + ux * d, A.z + uz * d) < A.y - 12) { foot = d; break; } }
+    const base = W.heightAt(A.x + ux * foot, A.z + uz * foot);
+    const rock = Mat.std('#6a5e52', { rough: 0.95 }), flag = Mat.glow('#ffcf6a', 3);
+    // a ledge every ~9 m of height, sticking out of the cliff face
+    for (let hh = base + 8; hh < A.y - 3; hh += 9) {
+      let d = A.r;
+      for (let q = A.r; q < foot; q += 0.25) { if (W.heightAt(A.x + ux * q, A.z + uz * q) < hh) { d = q; break; } }
+      const x = A.x + ux * (d + 0.9), z = A.z + uz * (d + 0.9);
+      Batch.add(Geo.box(2.6, 0.5, 2.2), rock, x, hh - 0.25, z, 1, 1, 1, 0, Math.atan2(ux, uz), 0);
+      Batch.add(Geo.cyl(0.05, 0.05, 1.6, 4), Mat.std('#2a2a30', { metal: 0.6 }), x + ux * 0.6, hh + 0.8, z + uz * 0.6);
+      Batch.add(Geo.box(0.6, 0.35, 0.04), flag, x + ux * 0.6 + 0.3, hh + 1.4, z + uz * 0.6, 1, 1, 1, 0, Math.atan2(ux, uz) + Math.PI / 2, 0, false);
+      W.addCollider(x, z, 1.2, hh, 'rock', hh - 0.6);
+      W.ledges.push({ x, z, y: hh });
+    }
+    const sx = A.x + ux * (foot + 3), sz = A.z + uz * (foot + 3), sy = W.heightAt(sx, sz);
+    const sign = W.makeLabel('SUMMIT ROUTE', '#ffcf6a', 512, 100); sign.position.set(sx, sy + 3.5, sz); sign.scale.set(3.6, 0.7, 1); W.group.add(sign);
+    Batch.add(Geo.cyl(0.1, 0.12, 3, 6), Mat.std('#2a2a30', { metal: 0.6 }), sx, sy + 1.5, sz);
+    W.summit = { x: sx, z: sz, y: sy, arena: A };
+  },
+  // climbing next to a ledge lets you rest
+  restingAt(p) {
+    for (const l of World.ledges || []) if (Math.hypot(l.x - p.pos.x, l.z - p.pos.z) < 2.4 && Math.abs(p.pos.y - l.y) < 1.6) return l;
+    return null;
+  },
+
+  // ═════════════════════════ Infernus: the moat and Ashby's cooling bridge ═════════════════════════
+  buildBridge(W, A) {
+    const v = W.villages && W.villages.find((q) => q.i === 3);
+    const tx = v ? v.x - A.x : -A.x, tz = v ? v.z - A.z : -A.z, L = Math.hypot(tx, tz) || 1, ux = tx / L, uz = tz / L;
+    const g = new THREE.Group(); W.group.add(g);
+    const basalt = Mat.std('#1e1a1c', { rough: 0.85, metal: 0.2 }), cool = Mat.glow('#3cf2ff', 2.2);
+    const outer = W.heightAt(A.x + ux * 62, A.z + uz * 62);
+    const cols = [];
+    for (let d = A.r + 4; d <= 62; d += 2) {
+      const k = clamp((d - (A.r + 4)) / (62 - A.r - 4), 0, 1), y = lerp(A.y, outer, k) + 0.15;
+      const x = A.x + ux * d, z = A.z + uz * d;
+      const s = mesh(Geo.box(3.6, 0.6, 2.2), basalt, x, y - 0.3, z, g); s.rotation.y = Math.atan2(ux, uz);
+      mesh(Geo.box(0.12, 0.62, 2.2), cool, x - uz * 1.6, y - 0.3, z + ux * 1.6, g).rotation.y = Math.atan2(ux, uz);
+      mesh(Geo.box(0.12, 0.62, 2.2), cool, x + uz * 1.6, y - 0.3, z - ux * 1.6, g).rotation.y = Math.atan2(ux, uz);
+      for (const s2 of [-0.9, 0.9]) cols.push(Object.assign(W.addCollider(x - uz * s2, z + ux * s2, 1.2, y, 'rock', y - 1.2), { on: y }));
+    }
+    W.bridge = { group: g, cols, arena: A, x: A.x + ux * 60, z: A.z + uz * 60 };
+  },
+  setBridge(on) {
+    const B = World.bridge;
+    if (!B) return;
+    B.group.visible = on;
+    for (const c of B.cols) c.top = on ? c.on : -1e9;
+  },
+  // the moat around Infernus's island burns through any boots
+  moatAt(x, z) {
+    const A = World.bridge && World.bridge.arena;
+    if (!A) return false;
+    const d = Math.hypot(x - A.x, z - A.z);
+    return d > A.r + 3 && d < 60;
+  },
+
+  // ═════════════════════════ Stormwing: the Sky Lift ═════════════════════════
+  buildLift(W) {
+    const x = 15, z = 9, y = W.heightAt(x, z);
+    const dark = Mat.std('#1d232d', { metal: 0.7, rough: 0.4 });
+    mesh(Geo.cyl(3, 3.3, 0.5, 24), dark, x, y + 0.25, z, W.group).receiveShadow = true;
+    const ring = new THREE.Mesh(Geo.torus(2.6, 0.08, 40), Mat.glow('#8a94a8', 1.4)); ring.rotation.x = Math.PI / 2; ring.position.set(x, y + 0.55, z); W.group.add(ring);
+    for (let k = 0; k < 4; k++) { const a = (k / 4) * TAU + 0.4; mesh(Geo.box(0.3, 3.4, 0.3), dark, x + Math.cos(a) * 3.1, y + 1.7, z + Math.sin(a) * 3.1, W.group); }
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 60, 20, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffe14d').multiplyScalar(1.5), transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    col.position.set(x, y + 30, z); W.group.add(col);
+    const lbl = W.makeLabel('SKY LIFT', '#ffe14d', 512, 100); lbl.position.set(x, y + 4.4, z); lbl.scale.set(3.2, 0.6, 1); W.group.add(lbl);
+    // where it lands: the rim of the citadel island
+    const A = W.arenas.find((a) => a.i === 4);
+    let dest = null, back = null;
+    if (A) {
+      const a = Math.atan2(-A.z, -A.x);
+      dest = { x: A.x + Math.cos(a) * 36, z: A.z + Math.sin(a) * 36, y: A.y };
+      back = { x: dest.x, z: dest.z, y: A.y };
+      const pad = new THREE.Mesh(Geo.torus(1.6, 0.08, 32), Mat.glow('#ffe14d', 2.4)); pad.rotation.x = Math.PI / 2; pad.position.set(dest.x, dest.y + 0.1, dest.z); W.group.add(pad);
+    }
+    W.lift = { x, z, y, ring, col, lbl, dest, back };
+  },
+  liftReady() { return WARDENS.every((i) => G.progress.beaten[i]); },
+  refreshLift() {
+    const L = World.lift;
+    if (!L) return;
+    const on = this.liftReady();
+    L.ring.material = Mat.glow(on ? '#ffe14d' : '#8a94a8', on ? 3 : 1.4);
+    L.col.visible = on;
+  },
+  // home → citadel (or back down)
+  ride(up) {
+    const L = World.lift, W = G.progress.world;
+    if (up && !this.liftReady()) {
+      Sound.play('deny');
+      const left = WARDENS.filter((i) => !G.progress.beaten[i]).map((i) => ZONES[i].boss.name);
+      UI.banner('THE LIFT IS SILENT', `It wakes for a heart the Wardens trust. Still under the Static: ${left.join(', ')}`, '#8a94a8', 3.5);
+      return;
+    }
+    if (up && !W.lift) {
+      W.lift = true;
+      const A = World.arenas.find((a) => a.i === 4);
+      if (A && A.sealed) World.openDome(A);
+      Dialog.clear();
+      Dialog.say([{ who: 'SKY LIFT', color: '#ffe14d', text: 'CORE SIGNATURE READ. AUREL, FIRST OF THE WARDENS. THE CITADEL REMEMBERS YOU.' }]);
+    }
+    const D = up ? L.dest : { x: L.x, z: L.z - 3.5, y: L.y };
+    Fx.shockRing(G.player.pos.x, G.player.pos.y + 0.3, G.player.pos.z, '#ffe14d', 4, 40);
+    G.travelTo(D.x, D.z, D.y + 0.2, up ? 'The Vane Citadel' : 'Home Base');
+    saveGame();
+  },
+
+  // ═════════════════════════ State ═════════════════════════
+  // after loading: open whatever the player has already earned
+  apply() {
+    const W = G.progress.world;
+    for (const m of World.mirrors || []) this.setMirror(m, W.mirrors && W.mirrors[m.i] !== undefined ? W.mirrors[m.i] : GROTTO.mirrors[m.i].start);
+    const solved = this.traceBeam();
+    const G2 = World.grotto;
+    if (G2) {
+      G2.block.visible = !solved && !W.frostKey;
+      G2.blockCol.top = G2.block.visible ? G2.y + 2.2 : -1e9;
+      G2.keyModel.visible = !W.frostKey;
+      G2.receptor.material = solved || W.frostKey ? Mat.glow('#8ae9ff', 3) : G2.receptor.material;
+    }
+    this.setBridge(Villages.questState('cinder') === 'done');
+    this.refreshLift();
+  },
+  // is this Warden's dome open? (beacons are handled with the beacons)
+  unlocked(A) {
+    const W = G.progress.world;
+    switch (A.mode) {
+      case 'key': return !!W.frostKey;
+      case 'climb': return !!W.summit;
+      case 'bridge': return Villages.questState('cinder') === 'done';
+      case 'lift': return !!W.lift;
+      case 'trench': return true;
+      default: return A.beacons.length > 0 && A.beacons.every((b) => b.state === 'done');
+    }
+  },
+
+  // interactables: mirrors, the frost key, the lift pads
+  nearest(p, near) {
+    for (const m of World.mirrors || []) near(m.x, m.z, 2, 'mirror', m);
+    const G2 = World.grotto;
+    if (G2 && G2.keyModel.visible && !G2.block.visible) near(G2.key.x, G2.key.z, 2.4, 'frostkey', G2);
+    const L = World.lift;
+    if (L) {
+      near(L.x, L.z, 3.2, 'lift', { up: true, y: L.y });
+      if (L.back && G.progress.world.lift) near(L.back.x, L.back.z, 2.6, 'lift', { up: false, y: L.back.y });
+    }
+  },
+  interact(it) {
+    const W = G.progress.world;
+    if (it.kind === 'mirror') {
+      const m = it.obj;
+      this.setMirror(m, 1 - m.state);
+      W.mirrors = World.mirrors.map((q) => q.state);
+      Sound.play('click');
+      if (this.traceBeam() && World.grotto.block.visible) {
+        const G2 = World.grotto;
+        G2.block.visible = false; G2.blockCol.top = -1e9;
+        G2.receptor.material = Mat.glow('#8ae9ff', 3);
+        Fx.explosion(G2.key.x, G2.y + 1.2, G2.key.z, '#bff0ff', 1);
+        Sound.play('beaconDone');
+        UI.banner('THE ICE MELTS', 'The light reached the crystal — take the Frost Key', '#8ae9ff', 3);
+      }
+    } else if (it.kind === 'frostkey') {
+      W.frostKey = true;
+      it.obj.keyModel.visible = false;
+      const A = World.arenas.find((a) => a.i === 1);
+      if (A && A.sealed) World.openDome(A);
+      Sound.play('win');
+      UI.banner('FROST KEY', "Glacieros's dome answers the key — it is open", '#8ae9ff', 3.5);
+      Dialog.say([{ who: 'GLACIEROS', color: '#8ae9ff', text: '…the key… I froze it away from myself, so the Static could not use it. Come, then. Free me.' }]);
+      saveGame();
+    } else if (it.kind === 'lift') this.ride(it.obj.up);
+  },
+
+  // per-frame: the summit opens when you reach it; the lift shimmers
+  update(dt, time) {
+    const p = G.player, W = G.progress.world;
+    if (World.summit && !W.summit && p) {
+      const A = World.summit.arena;
+      if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r + 9 && p.pos.y > A.y - 2.5) {
+        W.summit = true;
+        if (A.sealed) World.openDome(A);
+        Sound.play('win');
+        UI.banner('THE SUMMIT', 'You made the climb — the Colossus turns to face you', '#ffcf6a', 3.5);
+        saveGame();
+      }
+    }
+    const L = World.lift;
+    if (L && L.col.visible) { L.col.material.opacity = 0.12 + 0.06 * Math.sin(time * 3); L.ring.scale.setScalar(1 + 0.04 * Math.sin(time * 5)); }
+  },
+};
+
+</script>
+<script>
+'use strict';
 // ═════════════════════════ Beam helper ═════════════════════════
 const _beamGeo = (() => { const g = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.5); return g; })();
 function makeBeam(hex, k = 4, radius = 0.05, opacity = 0.9) {
@@ -6893,7 +7258,9 @@ class Player {
     // hazard (fire boots make lava bearable)
     if (inHaz && liq.dmg) {
       this.hazardT -= dt;
-      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(liq.dmg * 0.5 * (G.gear.fireboots ? 0.15 : 1), null, true); }
+      const moat = Wardens.moatAt(this.pos.x, this.pos.z);
+      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(liq.dmg * 0.5 * (moat ? 2.5 : G.gear.fireboots ? 0.15 : 1), null, true); }
+      if (moat && G.hint) G.hint("Infernus's moat burns through any boots — Ashby in Cinderwell could build a cooling bridge");
       if (Math.random() < dt * 20) Fx.glowBurst(this.pos.x + rand(-0.6, 0.6), WORLD.lava + 0.1, this.pos.z + rand(-0.6, 0.6), liq.glow, 0.5, 0.4, 2);
       if (!G.gear.fireboots && G.hint) G.hint('Lava burns! Fire Boots make it bearable');
     }
@@ -6962,7 +7329,11 @@ class Player {
     const g = World.gradAt(this.pos.x + c.ux * 0.8, this.pos.z + c.uz * 0.8);
     if (g.s > 0.3) { c.ux = lerp(c.ux, g.x, 0.1); c.uz = lerp(c.uz, g.z, 0.1); const l = Math.hypot(c.ux, c.uz) || 1; c.ux /= l; c.uz /= l; }
     c.x = this.pos.x + c.ux * 5; c.z = this.pos.z + c.uz * 5;
-    if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
+    // the summit route's ledges let you hang on and get your breath back
+    if (Wardens.restingAt(this) && !climbV && !mr) {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 35 * dt); this.exhausted = false;
+      if (G.hint) G.hint('Resting on a ledge — your stamina refills here');
+    } else if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
     this.walk += Math.abs(climbV) * dt * 2;
     if (!this.climbing) return;
     const ahead = World.heightAt(this.pos.x + c.ux * 1.2, this.pos.z + c.uz * 1.2);
@@ -8626,7 +8997,7 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE', npc: it.obj && it.obj.find ? 'TAKE' : it.obj && it.obj.role === 'shop' ? 'SHOP' : 'TALK' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE', mirror: 'TURN', frostkey: 'TAKE', lift: 'RIDE', npc: it.obj && it.obj.find ? 'TAKE' : it.obj && it.obj.role === 'shop' ? 'SHOP' : 'TALK' })[it.kind] : 'USE';
     document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };
@@ -8807,6 +9178,7 @@ const UI = {
   },
 
   showVictory() {
+    Dialog.clear();
     $('v-stats').innerHTML = this.statsHTML(G.total) + `<div class="stat"><b>${G.total.crafted || 0}</b><span>Items crafted</span></div>`;
     Sound.setIntensity(0);
     this.show('victory');
@@ -9073,6 +9445,7 @@ const UI = {
   travel(key) {
     let x, z, y, label;
     if (key === 'home') { x = World.spawn.x; z = World.spawn.z; label = 'Home Base'; }
+    else if (key.startsWith('v:')) { const v = World.villages.find((q) => q.id === key.slice(2)); if (!v) return; x = v.x + 4; z = v.z + 6; label = v.name; }
     else { const b = World.beacons.find((q) => q.id === +key); if (!b) return; const a = rand(0, TAU); x = b.x + Math.cos(a) * 4; z = b.z + Math.sin(a) * 4; y = b.island ? b.y : undefined; label = ZONES[b.biome].name + ' beacon'; }
     this.closeOverlay();
     G.travelTo(x, z, y, label);
@@ -9154,9 +9527,11 @@ const UI = {
       mid = `<div class="span-all">${mid}</div>`;
     } else if (this.tab === 'travel') {
       const online = World.beacons.filter((b) => b.state === 'done');
+      const vils = (World.villages || []).filter((v) => Villages.visited(v));
       mid = `<div class="travel-list"><div class="travel" style="--c:#3cf2ff"><span><b>Home Base</b> — the landing pad</span><button class="btn tiny" data-travel="home">Travel</button></div>` +
+        vils.map((v) => `<div class="travel" style="--c:${v.V.color}"><span><b>${v.name}</b> · village · ${Math.round(Math.hypot(v.x, v.z))} m from home</span><button class="btn tiny" data-travel="v:${v.id}">Travel</button></div>`).join('') +
         online.map((b) => `<div class="travel" style="--c:${ZONES[b.biome].accent}"><span><b>${ZONES[b.biome].name}</b> beacon · ${Math.round(Math.hypot(b.x, b.z))} m from home</span><button class="btn tiny" data-travel="${b.id}">Travel</button></div>`).join('') + '</div>';
-      mid = `<div class="span-all">${mid}<div class="ws-note">${online.length ? 'Travel to any beacon you have powered.' : 'Power a beacon and it appears here.'} You can also recall home from the pause menu.</div></div>`;
+      mid = `<div class="span-all">${mid}<div class="ws-note">Travel to any village you have visited or beacon you have powered. You can also recall home from the pause menu.</div></div>`;
     } else if (m === 'charging') {
       mid = `<div class="charge-list">${G.companions.length ? G.companions.map((c) => `
         <div class="squad-item" style="--c:${c.d.color}"><img src="${compIconURL(c.kind)}" alt="">
@@ -9454,6 +9829,7 @@ const UI = {
         cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
         mechanic: 'Use the <b>Workbench</b>', charging: 'Open the <b>Charging Bay</b>', storage: 'Open <b>Storage</b>',
+        mirror: 'Turn the <b>mirror</b>', frostkey: 'Take the <b>Frost Key</b>', lift: it.kind === 'lift' ? (it.obj.up ? (Wardens.liftReady() ? 'Ride the <b>Sky Lift</b> to the citadel' : '<span class="locked">The Sky Lift is silent</span>') : 'Ride the lift <b>home</b>') : '',
         garage: 'Use the <b>Garage</b>', lab: 'Use the <b>Lab</b>', command: 'Use the <b>Command Room</b>', talk: 'Talk to <b>Wren</b>', rack: 'Take the <b>Pulse Blaster</b>',
         shop: it.kind === 'shop' ? `Trade at <b>${it.obj.def.name}</b>` : '',
         npc: it.kind === 'npc' ? (it.obj.find ? `Pick up <b>${it.obj.find.name}</b>` : it.obj.role === 'shop' ? `Trade with <b>${it.obj.name}</b>` : `Talk to <b>${it.obj.name}</b>${it.obj.quest && Villages.questState(it.obj.quest) !== 'done' ? ' <b class="gold">!</b>' : ''}`) : '',
@@ -9846,7 +10222,7 @@ const Story = {
     else if (name === 'boss') {
       if (!this.F.order.includes(data)) this.F.order.push(data);
       const Z = ZONES[data];
-      setTimeout(() => Dialog.say([{ who: Z.boss.name, color: Z.boss.color, text: STORY.freed[data] }]), 2600);
+      if (data !== 4) setTimeout(() => Dialog.say([{ who: Z.boss.name, color: Z.boss.color, text: STORY.freed[data] }]), 2600);
     } else if (name === 'room') UI.banner(`${ROOMS[data].name.toUpperCase()} ONLINE`, 'The force field drops — the room is ready', ROOMS[data].color, 3);
   },
   update(dt) {
@@ -9888,6 +10264,30 @@ const Story = {
     if (this.step === 'rack') { this.advance(); Dialog.say(STORY.armed); }
   },
 
+  // ── the ending: Stormwing falls, the Conductor speaks, and Aurel's heart answers ──
+  ending() {
+    if (G.state !== 'playing') return;
+    const C = { name: 'THE CONDUCTOR', color: '#ff3b5c' }, A = { name: 'AUREL', color: '#ffe14d' };
+    const say = (who, text) => ({ who: who.name, color: who.color, text });
+    Dialog.clear();
+    Dialog.say([
+      say(C, 'A heart that would not stop beating. Aurel. You came back to me.'),
+      say(C, 'Every machine in this valley sings my song. Why does yours refuse?'),
+      say(A, 'Because it was never yours to sing. I threw my heart down so you could not keep it — and a mechanic gave it legs.'),
+      say({ name: 'THE WARDENS', color: '#6bff9e' }, 'Five voices, one answer: WE REMEMBER. WE ARE FREE.'),
+      say(C, 'No— the Static— it is coming apart—'),
+      L("Rivet? Rivet! The signal's gone. Every machine in the valley just… stopped fighting."),
+      L('Come home. I left the workshop lights on.'),
+    ], () => {
+      if (G.state !== 'playing') return;
+      Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
+      G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
+      G.state = 'victory'; Input.unlock(); UI.showVictory();
+    });
+    Fx.tintFlash('#ffe14d', 1);
+    Sound.play('win');
+  },
+
   // ── quests ──
   arenaStep(A) {
     const Z = ZONES[A.i], p = G.player;
@@ -9898,9 +10298,22 @@ const Story = {
       return { step: `Dive into the Drowned Trench and find ${Z.boss.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
     }
     if (!A.sealed) return { step: `Enter ${Z.boss.name}'s dome in the ${Z.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
-    if (A.i === 4 && G.region !== REGIONS.sky && World.skyPeak) {
-      const k = World.skyPeak;
-      return { step: 'Reach the Sky Islands — the way up starts from the tallest peak below them', target: { x: k.x, z: k.z, label: 'WAY UP' } };
+    if (A.mode === 'key') {
+      const g = World.grotto;
+      return { step: 'Find the Frost Key: turn the mirrors in the ice grotto until the light reaches the crystal', target: g ? { x: g.x, z: g.z, label: 'GROTTO' } : null };
+    }
+    if (A.mode === 'climb') {
+      const r = World.summit;
+      return { step: 'The Colossus waits on a cliff-ringed summit — climb the marked route, resting on its ledges', target: r ? { x: r.x, z: r.z, label: 'ROUTE' } : null };
+    }
+    if (A.mode === 'bridge') {
+      const v = World.villages && World.villages.find((x) => x.i === 3);
+      const st = Villages.questState('cinder');
+      if (st !== 'done') return { step: st === 'new' ? 'Infernus sits beyond a burning moat — ask Forgemistress Ashby in Cinderwell about a cooling bridge' : `Bring Ashby the parts for the cooling bridge (${Villages.needText(VQUESTS.cinder.need)})`, target: v ? { x: v.x, z: v.z, label: 'CINDERWELL' } : null };
+    }
+    if (A.mode === 'lift') {
+      const L = World.lift;
+      return { step: 'Ride the Sky Lift at home base up to the citadel', target: L ? { x: L.x, z: L.z, label: 'SKY LIFT' } : null };
     }
     const left = A.beacons.filter((b) => b.state !== 'done');
     const done = A.beacons.length - left.length;
@@ -10362,16 +10775,18 @@ const G = {
     World.openDome(A);
     this.progress.beaten[L] = true;
     Story.event('boss', L);
+    Wardens.refreshLift();
+    if (L !== 4 && Wardens.liftReady()) setTimeout(() => UI.banner('THE SKY LIFT WAKES', 'All five Wardens are free — ride the lift at home base to the citadel', '#ffe14d', 5), 7500);
     Sound.setIntensity(0);
     this.safeSpot = { x: A.x, y: A.y, z: A.z, yaw: this.player.yaw };
     saveGame();
     setTimeout(() => {
       Sound.play('portal');
       const left = WARDENS.filter((i) => !this.progress.beaten[i]).length;
-      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Islands\' beacons are unsealed' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
+      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Lift at home base has woken' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
       this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
-      if (L === 4) setTimeout(() => { if (this.state !== 'playing') return; this.state = 'victory'; Input.unlock(); Object.keys(this.stats).forEach((k) => (this.total[k] = (this.total[k] || 0) + this.stats[k])); this.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; UI.showVictory(); }, 4000);
+      if (L === 4) setTimeout(() => Story.ending(), 2500);
     }, 1800);
   },
 };
@@ -10433,7 +10848,7 @@ function newRun() {
 
 // Saves are versioned. Version 1 saves (separate biomes behind portals) keep the player's items,
 // upgrades, bots and Botbucks; the world itself is new.
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
   const p = G.player;
@@ -10453,6 +10868,14 @@ function applyState(json) {
     s.progress.legacy = beaten.filter(Boolean).length;
     s.pos = null;
     G.migrated = true;
+  } else if (s.v < 3) {
+    // version 2 → 3: the world's landmarks moved (villages, the sea, the Warden routes), so the things
+    // tied to exact places start over; gear, bots, story, quests and freed Wardens are all kept
+    const W = s.progress.world;
+    s.progress.world = { seed: W.seed, beacons: [], caches: [], sprites: [], secrets: [], caves: [], fog: '', pins: [] };
+    if (s.progress.villages) delete s.progress.villages.camp;
+    s.pos = null;
+    G.reshaped = true;
   }
   G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = Object.assign({ hull: 0, prop: 0, lamp: 0 }, s.gear); G.base = s.base;
   G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
@@ -10496,6 +10919,11 @@ function continueGame() {
   G.player = new Player();
   applyState(json);
   enterWorld(false);
+  if (G.reshaped) {
+    G.reshaped = false;
+    setTimeout(() => UI.banner('THE OUTLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
+    saveGame();
+  }
   if (G.migrated) {
     G.migrated = false;
     setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the Outlands are now one connected world', '#3cf2ff', 5), 600);
@@ -10561,7 +10989,7 @@ function applyWorldProgress() {
   }
   for (const A of World.arenas) {
     const beaten = G.progress.beaten[A.i];
-    const open = beaten || A.beacons.every((b) => b.state === 'done');   // the trench dome has no beacons: it's open, if you can reach it
+    const open = beaten || Wardens.unlocked(A);
     A.sealed = !open; A.opening = false; A.fade = open ? 0 : 1;
     A.dome.visible = A.domeWire.visible = !open;
     A.dome.material.opacity = 0.12; A.domeWire.material.opacity = 0.25; A.domeWire.scale.setScalar(1);
@@ -10575,6 +11003,7 @@ function applyWorldProgress() {
   World.questCamp = VS.camp !== undefined ? World.campSites.find((c) => c.id === VS.camp) : null;
   Villages.here = null;
   Villages.apply();
+  Wardens.apply();
 }
 function remember(list, v) {
   const W = G.progress.world;
@@ -10703,6 +11132,7 @@ function nextInteractable() {
   const cell = (x, z, R) => Math.abs(x - p.pos.x) < R && Math.abs(z - p.pos.z) < R;
   for (const c of World.caches) if (!c.opened && cell(c.x, c.z, 4)) near(c.x, c.z, 3.2, 'cache', c);
   for (const t of World.terminals) if (!t.locked) near(t.x, t.z, 2.6, t.kind, t);
+  Wardens.nearest(p, near);
   if (World.wren) near(World.wren.x, World.wren.z, 2.8, 'talk', World.wren);
   if (World.rack && !Story.F.armed) near(World.rack.x, World.rack.z, 2.4, 'rack', World.rack);
   for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 2.2, 'shop', S);
@@ -10730,6 +11160,7 @@ function interact(it) {
     case 'mechanic': case 'storage': case 'charging': case 'garage': case 'lab': case 'command': UI.openStation(it.kind); break;
     case 'talk': Story.talk(); break;
     case 'npc': Villages.talk(it.obj); break;
+    case 'mirror': case 'frostkey': case 'lift': Wardens.interact(it); break;
     case 'rack': Story.takeBlaster(); break;
   }
 }
@@ -11003,6 +11434,7 @@ function update(dt) {
   }
 
   Story.update(dt);
+  Wardens.update(dt, G.time);
   if (G.recallT > 0) { G.recallT -= dt; if (Math.random() < dt * 30) Fx.glowBurst(p.pos.x + rand(-1, 1), p.pos.y + rand(0, 2), p.pos.z + rand(-1, 1), '#3cf2ff', 0.6, 0.4, 2); if (G.recallT <= 0 && !p.dead && !World.domeTrap) G.travelTo(World.spawn.x, World.spawn.z, undefined, 'Home Base'); }
   if (Input.hit('Enter')) Dialog.skip();
   updateRegion(dt);

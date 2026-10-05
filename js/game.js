@@ -416,16 +416,18 @@ const G = {
     World.openDome(A);
     this.progress.beaten[L] = true;
     Story.event('boss', L);
+    Wardens.refreshLift();
+    if (L !== 4 && Wardens.liftReady()) setTimeout(() => UI.banner('THE SKY LIFT WAKES', 'All five Wardens are free — ride the lift at home base to the citadel', '#ffe14d', 5), 7500);
     Sound.setIntensity(0);
     this.safeSpot = { x: A.x, y: A.y, z: A.z, yaw: this.player.yaw };
     saveGame();
     setTimeout(() => {
       Sound.play('portal');
       const left = WARDENS.filter((i) => !this.progress.beaten[i]).length;
-      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Islands\' beacons are unsealed' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
+      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Lift at home base has woken' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
       this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
-      if (L === 4) setTimeout(() => { if (this.state !== 'playing') return; this.state = 'victory'; Input.unlock(); Object.keys(this.stats).forEach((k) => (this.total[k] = (this.total[k] || 0) + this.stats[k])); this.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; UI.showVictory(); }, 4000);
+      if (L === 4) setTimeout(() => Story.ending(), 2500);
     }, 1800);
   },
 };
@@ -487,7 +489,7 @@ function newRun() {
 
 // Saves are versioned. Version 1 saves (separate biomes behind portals) keep the player's items,
 // upgrades, bots and Botbucks; the world itself is new.
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
   const p = G.player;
@@ -507,6 +509,14 @@ function applyState(json) {
     s.progress.legacy = beaten.filter(Boolean).length;
     s.pos = null;
     G.migrated = true;
+  } else if (s.v < 3) {
+    // version 2 → 3: the world's landmarks moved (villages, the sea, the Warden routes), so the things
+    // tied to exact places start over; gear, bots, story, quests and freed Wardens are all kept
+    const W = s.progress.world;
+    s.progress.world = { seed: W.seed, beacons: [], caches: [], sprites: [], secrets: [], caves: [], fog: '', pins: [] };
+    if (s.progress.villages) delete s.progress.villages.camp;
+    s.pos = null;
+    G.reshaped = true;
   }
   G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = Object.assign({ hull: 0, prop: 0, lamp: 0 }, s.gear); G.base = s.base;
   G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
@@ -550,6 +560,11 @@ function continueGame() {
   G.player = new Player();
   applyState(json);
   enterWorld(false);
+  if (G.reshaped) {
+    G.reshaped = false;
+    setTimeout(() => UI.banner('THE OUTLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
+    saveGame();
+  }
   if (G.migrated) {
     G.migrated = false;
     setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the Outlands are now one connected world', '#3cf2ff', 5), 600);
@@ -615,7 +630,7 @@ function applyWorldProgress() {
   }
   for (const A of World.arenas) {
     const beaten = G.progress.beaten[A.i];
-    const open = beaten || A.beacons.every((b) => b.state === 'done');   // the trench dome has no beacons: it's open, if you can reach it
+    const open = beaten || Wardens.unlocked(A);
     A.sealed = !open; A.opening = false; A.fade = open ? 0 : 1;
     A.dome.visible = A.domeWire.visible = !open;
     A.dome.material.opacity = 0.12; A.domeWire.material.opacity = 0.25; A.domeWire.scale.setScalar(1);
@@ -629,6 +644,7 @@ function applyWorldProgress() {
   World.questCamp = VS.camp !== undefined ? World.campSites.find((c) => c.id === VS.camp) : null;
   Villages.here = null;
   Villages.apply();
+  Wardens.apply();
 }
 function remember(list, v) {
   const W = G.progress.world;
@@ -757,6 +773,7 @@ function nextInteractable() {
   const cell = (x, z, R) => Math.abs(x - p.pos.x) < R && Math.abs(z - p.pos.z) < R;
   for (const c of World.caches) if (!c.opened && cell(c.x, c.z, 4)) near(c.x, c.z, 3.2, 'cache', c);
   for (const t of World.terminals) if (!t.locked) near(t.x, t.z, 2.6, t.kind, t);
+  Wardens.nearest(p, near);
   if (World.wren) near(World.wren.x, World.wren.z, 2.8, 'talk', World.wren);
   if (World.rack && !Story.F.armed) near(World.rack.x, World.rack.z, 2.4, 'rack', World.rack);
   for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 2.2, 'shop', S);
@@ -784,6 +801,7 @@ function interact(it) {
     case 'mechanic': case 'storage': case 'charging': case 'garage': case 'lab': case 'command': UI.openStation(it.kind); break;
     case 'talk': Story.talk(); break;
     case 'npc': Villages.talk(it.obj); break;
+    case 'mirror': case 'frostkey': case 'lift': Wardens.interact(it); break;
     case 'rack': Story.takeBlaster(); break;
   }
 }
@@ -1057,6 +1075,7 @@ function update(dt) {
   }
 
   Story.update(dt);
+  Wardens.update(dt, G.time);
   if (G.recallT > 0) { G.recallT -= dt; if (Math.random() < dt * 30) Fx.glowBurst(p.pos.x + rand(-1, 1), p.pos.y + rand(0, 2), p.pos.z + rand(-1, 1), '#3cf2ff', 0.6, 0.4, 2); if (G.recallT <= 0 && !p.dead && !World.domeTrap) G.travelTo(World.spawn.x, World.spawn.z, undefined, 'Home Base'); }
   if (Input.hit('Enter')) Dialog.skip();
   updateRegion(dt);

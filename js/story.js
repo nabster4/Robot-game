@@ -221,7 +221,7 @@ const Story = {
     else if (name === 'boss') {
       if (!this.F.order.includes(data)) this.F.order.push(data);
       const Z = ZONES[data];
-      setTimeout(() => Dialog.say([{ who: Z.boss.name, color: Z.boss.color, text: STORY.freed[data] }]), 2600);
+      if (data !== 4) setTimeout(() => Dialog.say([{ who: Z.boss.name, color: Z.boss.color, text: STORY.freed[data] }]), 2600);
     } else if (name === 'room') UI.banner(`${ROOMS[data].name.toUpperCase()} ONLINE`, 'The force field drops — the room is ready', ROOMS[data].color, 3);
   },
   update(dt) {
@@ -263,6 +263,30 @@ const Story = {
     if (this.step === 'rack') { this.advance(); Dialog.say(STORY.armed); }
   },
 
+  // ── the ending: Stormwing falls, the Conductor speaks, and Aurel's heart answers ──
+  ending() {
+    if (G.state !== 'playing') return;
+    const C = { name: 'THE CONDUCTOR', color: '#ff3b5c' }, A = { name: 'AUREL', color: '#ffe14d' };
+    const say = (who, text) => ({ who: who.name, color: who.color, text });
+    Dialog.clear();
+    Dialog.say([
+      say(C, 'A heart that would not stop beating. Aurel. You came back to me.'),
+      say(C, 'Every machine in this valley sings my song. Why does yours refuse?'),
+      say(A, 'Because it was never yours to sing. I threw my heart down so you could not keep it — and a mechanic gave it legs.'),
+      say({ name: 'THE WARDENS', color: '#6bff9e' }, 'Five voices, one answer: WE REMEMBER. WE ARE FREE.'),
+      say(C, 'No— the Static— it is coming apart—'),
+      L("Rivet? Rivet! The signal's gone. Every machine in the valley just… stopped fighting."),
+      L('Come home. I left the workshop lights on.'),
+    ], () => {
+      if (G.state !== 'playing') return;
+      Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
+      G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
+      G.state = 'victory'; Input.unlock(); UI.showVictory();
+    });
+    Fx.tintFlash('#ffe14d', 1);
+    Sound.play('win');
+  },
+
   // ── quests ──
   arenaStep(A) {
     const Z = ZONES[A.i], p = G.player;
@@ -273,9 +297,22 @@ const Story = {
       return { step: `Dive into the Drowned Trench and find ${Z.boss.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
     }
     if (!A.sealed) return { step: `Enter ${Z.boss.name}'s dome in the ${Z.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
-    if (A.i === 4 && G.region !== REGIONS.sky && World.skyPeak) {
-      const k = World.skyPeak;
-      return { step: 'Reach the Sky Islands — the way up starts from the tallest peak below them', target: { x: k.x, z: k.z, label: 'WAY UP' } };
+    if (A.mode === 'key') {
+      const g = World.grotto;
+      return { step: 'Find the Frost Key: turn the mirrors in the ice grotto until the light reaches the crystal', target: g ? { x: g.x, z: g.z, label: 'GROTTO' } : null };
+    }
+    if (A.mode === 'climb') {
+      const r = World.summit;
+      return { step: 'The Colossus waits on a cliff-ringed summit — climb the marked route, resting on its ledges', target: r ? { x: r.x, z: r.z, label: 'ROUTE' } : null };
+    }
+    if (A.mode === 'bridge') {
+      const v = World.villages && World.villages.find((x) => x.i === 3);
+      const st = Villages.questState('cinder');
+      if (st !== 'done') return { step: st === 'new' ? 'Infernus sits beyond a burning moat — ask Forgemistress Ashby in Cinderwell about a cooling bridge' : `Bring Ashby the parts for the cooling bridge (${Villages.needText(VQUESTS.cinder.need)})`, target: v ? { x: v.x, z: v.z, label: 'CINDERWELL' } : null };
+    }
+    if (A.mode === 'lift') {
+      const L = World.lift;
+      return { step: 'Ride the Sky Lift at home base up to the citadel', target: L ? { x: L.x, z: L.z, label: 'SKY LIFT' } : null };
     }
     const left = A.beacons.filter((b) => b.state !== 'done');
     const done = A.beacons.length - left.length;

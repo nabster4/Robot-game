@@ -106,13 +106,13 @@ const VQUESTS = {
     reward: { bucks: 200, parts: { quantum: 1, core: 1 } },
   },
   cinder: {
-    title: 'Cooling the Forge', kind: 'deliver', village: 3, need: { core: 3, wire: 6 },
-    intro: ["The lava's rising and our forge coolers are failing. Without them we can't hold the flows back.", "Bring me three Power Cores and six Copper Coils and I'll build new coolers. Maybe one day even a bridge across the lava."],
-    remind: 'Three Power Cores, six Copper Coils. The forge is getting hot, Rivet.',
-    ready: "The coolers hum! With a few more I could freeze a path straight across the lava. Infernus won't know what hit it.",
-    after: 'The forge runs cool. I am sketching that bridge.',
+    title: 'The Cooling Bridge', kind: 'deliver', village: 3, need: { core: 3, wire: 6 },
+    intro: ["Infernus sits on an island in a moat of lava so hot it melts any boots. Nobody has crossed it since the Static came.", "Bring me three Power Cores and six Copper Coils. I'll build coolers strong enough to freeze a bridge right across that moat."],
+    remind: 'Three Power Cores, six Copper Coils. Then we freeze ourselves a bridge.',
+    ready: "The coolers hum — and the bridge is freezing across the moat as we speak! Go free that poor old furnace, Rivet.",
+    after: "My bridge holds. Best thing I've ever built.",
     step: 'Bring Ashby 3 Power Cores and 6 Copper Coils', turnIn: 'Give Ashby the parts',
-    reward: { bucks: 180, gear: 'fireboots', parts: { core: 1 } },
+    reward: { bucks: 180, gear: 'fireboots', parts: { core: 1 }, bridge: true },
   },
   salt: {
     title: 'Message in a Bottle', kind: 'find', village: 4, find: 'bottle',
@@ -437,6 +437,12 @@ const Villages = {
     if (R.bucks) { G.bucks += R.bucks; UI.bump('bucks'); got.push(`${R.bucks} Botbucks`); }
     if (R.parts) for (const [k, v] of Object.entries(R.parts)) { G.store({ t: 'part', id: k }, v); got.push(`${v} ${PARTS[k].name}`); }
     if (R.gear) { if (!G.gear[R.gear]) { G.gear[R.gear] = true; got.push(R.gear === 'fireboots' ? 'Fire Boots' : R.gear); } else { G.bucks += 150; got.push('150 more Botbucks'); } }
+    if (R.bridge) {
+      Wardens.setBridge(true);
+      const A = World.arenas.find((a) => a.i === 3);
+      if (A && A.sealed && !G.progress.beaten[3]) World.openDome(A);
+      got.push('a cooling bridge to Infernus');
+    }
     if (R.beacons) { for (const b of World.beacons) WorldMap.reveal(b.x, b.z, 40); got.push('every beacon on your map'); }
     if (R.log) {
       const S = G.progress.story;

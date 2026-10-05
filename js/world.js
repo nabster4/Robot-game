@@ -43,6 +43,7 @@ const World = {
     for (const A of this.arenaPlans) this.buildArena(A);
     Villages.build(this);
     this.buildSkyRegion();
+    Wardens.build(this);
     this.buildCaves();
     this.buildWaterfalls();
     this.buildCraters();
@@ -108,6 +109,7 @@ const World = {
     }
     Villages.plan(this, flats, free);
     Sea.plan(this, flats);
+    Wardens.plan(this, flats);
     this.flats = flats;
   },
 
@@ -116,7 +118,14 @@ const World = {
     for (const f of this.flats) {
       const dx = x - f.x, dz = z - f.z, R = f.r * 1.8;
       if (dx > R || dx < -R || dz > R || dz < -R) continue;
-      const k = 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
+      if (f.ring) {
+        // a moat: a ring lowered to the given height
+        const d = Math.hypot(dx, dz), k = smoothstep(f.ring[0] - 6, f.ring[0], d) * (1 - smoothstep(f.ring[1], f.ring[1] + 6, d));
+        if (k > 0) h = lerp(h, f.h, k);
+        continue;
+      }
+      // a cliff-edged summit falls away sharply; everything else blends in gently
+      const k = f.cliff ? 1 - smoothstep(f.r, f.r * 1.3, Math.hypot(dx, dz)) : 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
       if (k > 0) h = lerp(h, f.h, k);
     }
     return Math.max(h, WORLD.water - 100);
@@ -1249,8 +1258,8 @@ const World = {
     const arena = isl(R.x, R.z, 40, base + 40, 'arena');
     const beaconI = [];
     const a0 = rand(0, TAU);
-    for (let i = 0; i < ZONES[4].beacons; i++) {
-      const a = a0 + (i / ZONES[4].beacons) * TAU, d = rand(118, 140);
+    for (let i = 0; i < 4; i++) {
+      const a = a0 + (i / 4) * TAU, d = rand(118, 140);
       const b = isl(R.x + Math.cos(a) * d, R.z + Math.sin(a) * d, 15, base + rand(5, 30), 'beacon');
       if (b) beaconI.push(b);
     }
@@ -1297,7 +1306,6 @@ const World = {
     // arena, beacons and the shop on the islands
     this.arenaPlans.push({ i: 4, x: arena.x, z: arena.z, r: 30, y: arena.top, island: true });
     const AP = this.arenaPlans[this.arenaPlans.length - 1];
-    for (const b of beaconI) this.beaconPlans.push({ x: b.x, z: b.z, y: b.top, biome: 4, arena: AP, island: b });
     this.buildArena(AP);
     // decorate islands
     const F = ZONES[4].flora, trees = [], ground = [];

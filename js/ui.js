@@ -153,6 +153,7 @@ const UI = {
   },
 
   showVictory() {
+    Dialog.clear();
     $('v-stats').innerHTML = this.statsHTML(G.total) + `<div class="stat"><b>${G.total.crafted || 0}</b><span>Items crafted</span></div>`;
     Sound.setIntensity(0);
     this.show('victory');
@@ -419,6 +420,7 @@ const UI = {
   travel(key) {
     let x, z, y, label;
     if (key === 'home') { x = World.spawn.x; z = World.spawn.z; label = 'Home Base'; }
+    else if (key.startsWith('v:')) { const v = World.villages.find((q) => q.id === key.slice(2)); if (!v) return; x = v.x + 4; z = v.z + 6; label = v.name; }
     else { const b = World.beacons.find((q) => q.id === +key); if (!b) return; const a = rand(0, TAU); x = b.x + Math.cos(a) * 4; z = b.z + Math.sin(a) * 4; y = b.island ? b.y : undefined; label = ZONES[b.biome].name + ' beacon'; }
     this.closeOverlay();
     G.travelTo(x, z, y, label);
@@ -500,9 +502,11 @@ const UI = {
       mid = `<div class="span-all">${mid}</div>`;
     } else if (this.tab === 'travel') {
       const online = World.beacons.filter((b) => b.state === 'done');
+      const vils = (World.villages || []).filter((v) => Villages.visited(v));
       mid = `<div class="travel-list"><div class="travel" style="--c:#3cf2ff"><span><b>Home Base</b> — the landing pad</span><button class="btn tiny" data-travel="home">Travel</button></div>` +
+        vils.map((v) => `<div class="travel" style="--c:${v.V.color}"><span><b>${v.name}</b> · village · ${Math.round(Math.hypot(v.x, v.z))} m from home</span><button class="btn tiny" data-travel="v:${v.id}">Travel</button></div>`).join('') +
         online.map((b) => `<div class="travel" style="--c:${ZONES[b.biome].accent}"><span><b>${ZONES[b.biome].name}</b> beacon · ${Math.round(Math.hypot(b.x, b.z))} m from home</span><button class="btn tiny" data-travel="${b.id}">Travel</button></div>`).join('') + '</div>';
-      mid = `<div class="span-all">${mid}<div class="ws-note">${online.length ? 'Travel to any beacon you have powered.' : 'Power a beacon and it appears here.'} You can also recall home from the pause menu.</div></div>`;
+      mid = `<div class="span-all">${mid}<div class="ws-note">Travel to any village you have visited or beacon you have powered. You can also recall home from the pause menu.</div></div>`;
     } else if (m === 'charging') {
       mid = `<div class="charge-list">${G.companions.length ? G.companions.map((c) => `
         <div class="squad-item" style="--c:${c.d.color}"><img src="${compIconURL(c.kind)}" alt="">
@@ -800,6 +804,7 @@ const UI = {
         cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
         mechanic: 'Use the <b>Workbench</b>', charging: 'Open the <b>Charging Bay</b>', storage: 'Open <b>Storage</b>',
+        mirror: 'Turn the <b>mirror</b>', frostkey: 'Take the <b>Frost Key</b>', lift: it.kind === 'lift' ? (it.obj.up ? (Wardens.liftReady() ? 'Ride the <b>Sky Lift</b> to the citadel' : '<span class="locked">The Sky Lift is silent</span>') : 'Ride the lift <b>home</b>') : '',
         garage: 'Use the <b>Garage</b>', lab: 'Use the <b>Lab</b>', command: 'Use the <b>Command Room</b>', talk: 'Talk to <b>Wren</b>', rack: 'Take the <b>Pulse Blaster</b>',
         shop: it.kind === 'shop' ? `Trade at <b>${it.obj.def.name}</b>` : '',
         npc: it.kind === 'npc' ? (it.obj.find ? `Pick up <b>${it.obj.find.name}</b>` : it.obj.role === 'shop' ? `Trade with <b>${it.obj.name}</b>` : `Talk to <b>${it.obj.name}</b>${it.obj.quest && Villages.questState(it.obj.quest) !== 'done' ? ' <b class="gold">!</b>' : ''}`) : '',

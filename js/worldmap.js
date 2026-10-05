@@ -189,6 +189,12 @@ const WorldMap = {
       g.moveTo(x, y - fs(6)); g.lineTo(x, y + fs(5)); g.moveTo(x - fs(5), y + fs(1)); g.quadraticCurveTo(x, y + fs(9), x + fs(5), y + fs(1)); g.moveTo(x - fs(3), y - fs(3)); g.lineTo(x + fs(3), y - fs(3)); g.stroke();
       label(`${Math.round(w.depth)} m`, x, y + fs(15), '#7fd8e8', 10, 700);
     });
+    // the ways to the Wardens: the ice grotto, the summit route, the cooling bridge, the Sky Lift
+    const tag = (o, text, color, always) => { if (o) icon(o.x, o.z, (x, y) => { g.fillStyle = color; g.beginPath(); g.arc(x, y, fs(4), 0, TAU); g.fill(); label(text, x, y + fs(12), color, 11, 900); }, always); };
+    tag(World.grotto, 'ICE GROTTO', '#8ae9ff');
+    tag(World.summit, 'SUMMIT ROUTE', '#ffcf6a');
+    if (World.bridge && World.bridge.group.visible) tag(World.bridge, 'COOLING BRIDGE', '#3cf2ff');
+    if (World.lift) tag(World.lift, Wardens.liftReady() ? 'SKY LIFT · READY' : 'SKY LIFT', '#ffe14d', true);
     // village quest goals
     for (const q of Villages.sides()) if (!q.done && q.target) icon(q.target.x, q.target.z, (x, y) => { this.star(g, x, y, fs(6), '#ffe9a0'); label(q.target.label, x, y + fs(13), '#ffe9a0', 11, 700); }, true);
     // beacons

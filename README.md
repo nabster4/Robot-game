@@ -33,8 +33,19 @@ The regions blend into each other along their borders: the sky, fog, light, weat
 - discovered caves (a **?** means a secret is still inside) and secrets you've found
 - your squad, and up to 12 markers of your own (click or tap to place one, click it again to remove it)
 
-**The Wardens:** five Warden domes, plus Stormwing's in the sky. Power a dome's **signal beacons** (activate one, then defend its ring for 22 seconds) and the dome opens. Deepsong's dome has no beacons — it's open, if your hull can take the depth. The five Wardens (Plains, Snow, Mountains, Volcano and the ocean's Deepsong) can be freed **in any order**. The Sky Islands' beacons stay sealed until all five have fallen. Step inside an open dome and it seals behind you for a one-on-one fight. Beating **Stormwing** in the Sky Islands finishes the game (you can keep exploring afterwards).
-**Brambleback** (Plains), **Glacieros** (Snow), **Colossus** (Mountains), **Infernus** (Volcano), **Deepsong** (the Drowned Trench), then **Stormwing** (Sky Islands). Each has an enraged Overdrive phase.
+**The Wardens.** Each Warden is reached in its own way, and the five can be freed **in any order**:
+
+| Warden | Where | How you get in |
+| --- | --- | --- |
+| **Brambleback** | Green Plains | Power its 3 **signal beacons** (activate one, then defend its ring for 22 seconds) and the dome drops. |
+| **Glacieros** | Snowy Plains | Find the **Ice Grotto** nearby and turn its three mirrors until the light beam reaches the crystal. The ice melts, and the **Frost Key** opens the dome. |
+| **Colossus** | The Mountains | It waits on a **summit ringed by sheer cliffs**. Climb the marked **Summit Route**: hang still at its glowing ledges to get your stamina back, or try your jetpack. Reaching the top opens the dome. |
+| **Infernus** | Fiery Volcano | Its island sits in a **lava moat that burns through any boots**. Bring Forgemistress Ashby in Cinderwell the parts for **The Cooling Bridge**, and the bridge freezes across the moat. |
+| **Deepsong** | The Drowned Trench | About 90 m under the sea. Upgrade to a **Mk III Pressure Hull** and dive to the open dome at the bottom. |
+
+When all five are free, the **Sky Lift** at home base wakes up. It reads Rivet's core, recognises the heart of **Aurel**, the Wardens' lost leader, and lifts you to the **Vane Citadel** above the Sky Islands. There, **Stormwing** guards the Conductor. Win, and the story ends: the Conductor speaks, Aurel answers, and the Static falls. You can keep exploring afterwards. A lift pad on the citadel takes you back home.
+
+Step inside an open dome and it seals behind you for a one-on-one fight. Each Warden has an enraged Overdrive phase.
 
 **Story.** A new game opens with Rivet waking on the assembly table of **Wren Halloway**, the mechanic who built it. A short tutorial follows:
 1. look around
@@ -49,7 +60,7 @@ The regions blend into each other along their borders: the sky, fog, light, weat
 - Each **Warden** speaks as the Static leaves it. Wren has more to say each time you come home after freeing one. **Memory fragments** found in caves fill in the rest of the story, piece by piece.
 
 **Quests.** The quest tracker (top left) shows the current main quest step, with a gold marker on the compass. The quest log (`J`, the pause menu, or tap the tracker on touch) lists:
-- the main quest chain: *Rise and Shine → The First Warden → The Wardens Remember → Above the Static*
+- the main quest chain: *Rise and Shine → The First Warden → The Wardens Remember → Above the Static*, with a step for each Warden's route
 - side quests: memory fragments, building the base rooms, lost bot parts, Scrap Sprites
 - every Warden's status
 
@@ -69,7 +80,7 @@ The Garage, Lab and Command Room are sealed by force fields until you build them
 
 **Saving:** the game saves when you get home, when a beacon comes online, when a Warden falls, when you find a cave secret, and every 90 seconds or so while things are calm. **Continue** puts you back where you last saved.
 If you're destroyed, you're rebuilt at home base with the gear you had at your last save. Beacons, Wardens, opened caches and found secrets stay done.
-Saves have a version number. A save from the older portal version keeps your hotbar, storage, Botbucks, gear, upgrades and bots, but starts you in the new world with the story from the beginning.
+Saves have a version number. A save from the older portal version keeps your hotbar, storage, Botbucks, gear, upgrades and bots, but starts you in the new world with the story from the beginning. A save from before the Warden routes (version 2) keeps everything except place-specific finds (opened caches, found secrets, map fog, markers), because the world's landmarks moved.
 
 **Robot camps** sit all over the world around scrap braziers. They come to life as you approach and pack up when you're far away; a camp you wipe out comes back after a few minutes. An alarm meter ("?") fills over a robot's head while it notices you. When it's full, the whole camp attacks. Robots get tougher in the farther regions (Plains < Snow and Coast < Mountains < Volcano < Sky).
 
@@ -103,7 +114,7 @@ Saves have a version number. A save from the older portal version keeps your hot
   - **Trouble Next Door** (Mayor Tinsel): clear the robot camp raiding Brassbrook.
   - **Light for the Relay** (Lumen): bring 3 Focus Lenses. The reward marks every Warden beacon on your map.
   - **The Lost Scout** (Old Piston): find Wisp on a ledge above Highbolt.
-  - **Cooling the Forge** (Forgemistress Ashby): bring Power Cores and Copper Coils.
+  - **The Cooling Bridge** (Forgemistress Ashby): bring Power Cores and Copper Coils, and Ashby freezes a bridge across Infernus's lava moat.
   - **Message in a Bottle** (Captain Brine): find a bottle on the beach. It holds a memory fragment.
   - Active village quests show in the quest log, as markers on the compass, and as stars on the map.
 - **Quill**, a wandering archivist, shows up in a different village each time you free a Warden. Quill fills in what the archives say about the Wardens' lost leader.
@@ -170,6 +181,7 @@ js/world.js     builds the world: ground chunks, water & lava, waterfalls, caves
                          sky islands, props, flora, camp sites, and the sky/fog/light blend between regions
 js/villages.js  robot villages: layout, shops, villagers, charging posts, village quests, Quill
 js/underwater.js the Sunken Reach: swimming, pressure, sea floor, wrecks, sea camps, the trench
+js/wardens.js   how each Warden is reached: ice grotto mirror puzzle, summit route, lava moat and bridge, Sky Lift
 js/worldmap.js  full-screen world map with fog of war and player markers
 js/models.js    low-poly robot, boss, companion, weapon, pickup and secret models
 js/entities.js  Player controller (cliff climbing, caves), Enemy AI, Boss patterns, Companions
