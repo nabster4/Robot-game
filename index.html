@@ -44,6 +44,8 @@
   <div id="burn-overlay"></div>
   <div id="dmgdir"></div>
   <div id="prompt"></div>
+  <div id="depth"><span class="lbl">DEPTH</span><b id="depth-val">0 m</b><div class="track"><i id="depth-bar"></i></div><span id="depth-hull"></span></div>
+  <div id="pressure"></div>
   <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
   <div id="dialog"><div class="d-who"></div><div class="d-text"></div><div class="d-hint desk-only">Enter ▸</div><div class="d-hint touch-only">tap ▸</div></div>
   <div id="hint"></div>
@@ -236,7 +238,7 @@
     <canvas id="map-canvas"></canvas>
     <div class="map-legend">
       <span><i class="lg home"></i>Home</span><span><i class="lg skull"></i>Warden dome</span><span><i class="lg beacon"></i>Beacon</span>
-      <span><i class="lg village"></i>Village</span><span><i class="lg cave"></i>Cave</span><span><i class="lg star"></i>Secret found</span><span><i class="lg pin"></i>Your marker</span>
+      <span><i class="lg village"></i>Village</span><span><i class="lg cave"></i>Cave</span><span><i class="lg wreck"></i>Wreck</span><span><i class="lg star"></i>Secret found</span><span><i class="lg pin"></i>Your marker</span>
       <em class="desk-only">Click to place a marker · click it again to remove · M / Esc to close</em>
       <em class="touch-only">Tap to place a marker · tap it again to remove</em>
     </div>
@@ -281,6 +283,7 @@
 <script src="js/world.js"></script>
 <script src="js/worldmap.js"></script>
 <script src="js/villages.js"></script>
+<script src="js/underwater.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/touch.js"></script>
 <script src="js/ui.js"></script>

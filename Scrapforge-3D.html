@@ -730,6 +730,22 @@ body.touch #objective { cursor: pointer; }
 .quest-grid .quest { margin: 0; }
 .lg.village { background: #6bff9e; border-radius: 50%; }
 
+/* ═════════════════════════ UNDERWATER ═════════════════════════ */
+#depth { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); width: 132px; padding: 10px 12px; border-radius: 10px; background: rgba(4,20,32,0.7);
+  border: 1px solid rgba(74,224,208,0.5); display: none; font-family: Orbitron, sans-serif; color: #bff6ff; text-align: center; }
+#depth.show { display: block; }
+#depth .lbl { display: block; font-size: 10px; letter-spacing: 2px; color: #7fd8e8; }
+#depth b { display: block; font-size: 22px; margin: 2px 0 6px; }
+#depth .track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#depth .track i { display: block; height: 100%; width: 0; background: #4ae0d0; }
+#depth.over { border-color: #ff3b5c; animation: blink .4s infinite alternate; }
+#depth.over .track i { background: #ff3b5c; }
+#depth #depth-hull { display: block; font: 600 12px Rajdhani, sans-serif; color: #9fc8d8; margin-top: 6px; }
+body.touch #depth { top: 38%; right: calc(10px + env(safe-area-inset-right)); width: 110px; }
+#pressure { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255,40,60,0.45) 100%); }
+.lg.wreck { border: 2px solid #7fd8e8; border-radius: 0 0 6px 6px; border-top: none; width: 8px; height: 7px; }
+
 </style>
 </head>
 <body>
@@ -761,6 +777,8 @@ body.touch #objective { cursor: pointer; }
   <div id="burn-overlay"></div>
   <div id="dmgdir"></div>
   <div id="prompt"></div>
+  <div id="depth"><span class="lbl">DEPTH</span><b id="depth-val">0 m</b><div class="track"><i id="depth-bar"></i></div><span id="depth-hull"></span></div>
+  <div id="pressure"></div>
   <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
   <div id="dialog"><div class="d-who"></div><div class="d-text"></div><div class="d-hint desk-only">Enter ▸</div><div class="d-hint touch-only">tap ▸</div></div>
   <div id="hint"></div>
@@ -953,7 +971,7 @@ body.touch #objective { cursor: pointer; }
     <canvas id="map-canvas"></canvas>
     <div class="map-legend">
       <span><i class="lg home"></i>Home</span><span><i class="lg skull"></i>Warden dome</span><span><i class="lg beacon"></i>Beacon</span>
-      <span><i class="lg village"></i>Village</span><span><i class="lg cave"></i>Cave</span><span><i class="lg star"></i>Secret found</span><span><i class="lg pin"></i>Your marker</span>
+      <span><i class="lg village"></i>Village</span><span><i class="lg cave"></i>Cave</span><span><i class="lg wreck"></i>Wreck</span><span><i class="lg star"></i>Secret found</span><span><i class="lg pin"></i>Your marker</span>
       <em class="desk-only">Click to place a marker · click it again to remove · M / Esc to close</em>
       <em class="touch-only">Tap to place a marker · tap it again to remove</em>
     </div>
@@ -1200,6 +1218,11 @@ const ENEMY_TYPES = {
     magmagrunt:  V('grunt',   { name: 'Magma Brute',   color: '#ff4a1a', body: '#4a1c12', shot: 'fire', hp: 62 }),
     embermite:   V('swarmer', { name: 'Ember Mite',    color: '#ffb347', body: '#4a2410', shot: 'fire' }),
     hawk:        V('drone',   { name: 'Sky Hawk',      color: '#ffe14d', body: '#e8e0c8', speed: 12, hover: 3.6, hp: 30 }),
+    // the Sunken Reach: robots that live under the sea (under: they never leave the water)
+    reefdrone:   V('drone',   { name: 'Reef Drone',    color: '#4ae0d0', body: '#1a5a6a', shot: 'frost', under: true, speed: 7, hp: 34 }),
+    jellymine:   V('swarmer', { name: 'Jelly Mine',    color: '#ff7ad8', body: '#5a2a6a', under: true, speed: 8, hover: 3, hp: 16 }),
+    anglerbot:   V('sniper',  { name: 'Angler',        color: '#ffe14d', body: '#20303a', under: true, hp: 48 }),
+    crabtank:    V('tank',    { name: 'Crab Crusher',  color: '#ff6a4a', body: '#6a2a1a', under: true, hp: 260 }),
   });
 })();
 
@@ -1288,6 +1311,17 @@ const ZONES = [
     boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
 ];
+
+// The sixth region: the drowned trench under the Saltglass Coast, home of the ocean Warden.
+// (Wardens are ZONES 0-3 and 5; ZONES[4], the Sky Islands, holds the final fight.)
+ZONES.push({
+  id: 'deep', name: 'Drowned Trench', short: 'DEEP',
+  intro: 'The sea floor drops away into darkness. Something down there is singing.',
+  accent: '#4ae0d0', beacons: 0,
+  pool: [['reefdrone', 5], ['jellymine', 3], ['anglerbot', 2], ['crabtank', 1]],
+  boss: { kind: 'deep', name: 'DEEPSONG', title: 'The Singer in the Trench', color: '#4ae0d0', hp: 4400, patterns: ['sonar', 'radial', 'spiral', 'aimed', 'charge'] },
+});
+const WARDENS = [0, 1, 2, 3, 5];   // the five Wardens; Stormwing (4) guards the citadel above them all
 
 // Home base: a peaceful meadow in the middle of the world
 const HUB = {
@@ -1388,6 +1422,10 @@ const SHOP_ITEMS = {
   up_magnet:    { kind: 'upgrade', up: 'magnet',    price: 90 },
   up_firmware:  { kind: 'upgrade', up: 'firmware',  price: 300 },
   up_slot:      { kind: 'upgrade', up: 'slot',      price: 380 },
+  // diving gear (each piece upgrades in tiers)
+  dive_hull: { kind: 'dive', key: 'hull', name: 'Pressure Hull', prices: [220, 480, 900], desc: 'Lets you dive deeper without being crushed.' },
+  dive_prop: { kind: 'dive', key: 'prop', name: 'Hydro-Jets', prices: [260, 560], desc: 'Swim faster, and climb toward the surface faster.' },
+  dive_lamp: { kind: 'dive', key: 'lamp', name: 'Abyss Lamp', prices: [160], desc: 'A bright chest lamp that lights up the deep.' },
   service:      { kind: 'service', name: 'Full Service', price: 30, desc: 'Hull repaired to full, and every bot with you topped up to a full battery.' },
   buy_scrap:    { kind: 'part', part: 'scrap',   price: 6 },
   buy_wire:     { kind: 'part', part: 'wire',    price: 9 },
@@ -1416,6 +1454,7 @@ const COAST = {
 const REGIONS = {
   hub: { id: 'hub', name: 'Home Base', short: 'HOME', zone: 5, tier: 0, accent: '#3cf2ff', ambient: 'pollen', ambientColor: '#fff4a8' },
   sky: { id: 'sky', name: 'Sky Islands', short: 'SKY', zone: 4, tier: 4, accent: '#ffe14d', ambient: 'pollen', ambientColor: '#ffffff' },
+  deep: { id: 'deep', name: 'The Sunken Reach', short: 'DEEP', zone: 6, tier: 2, accent: '#4ae0d0', ambient: 'bubbles', ambientColor: '#dff6ff' },
   terra: [
     { id: 'plains', name: 'Green Plains', short: 'PLAINS', zone: 0, tier: 0, accent: '#6bff9e', ambient: 'pollen', ambientColor: '#fff4a8' },
     { id: 'snow', name: 'Snowy Plains', short: 'SNOW', zone: 1, tier: 1, accent: '#8ae9ff', ambient: 'snow' },
@@ -1474,6 +1513,11 @@ const RESEARCH = {
   firmware: { circuit: 4, core: 1 },
   slot: { core: 2, quantum: 1 },
 };
+
+// ───────────────────────── Diving ─────────────────────────
+// Rivet doesn't breathe — the sea's only danger is pressure. Each Pressure Hull tier is rated deeper.
+const HULL_DEPTH = [12, 30, 55, 100];
+const HULL_NAMES = ['Stock chassis', 'Pressure Hull Mk I', 'Pressure Hull Mk II', 'Pressure Hull Mk III'];
 
 </script>
 <script>
@@ -1697,12 +1741,21 @@ const Sound = (() => {
           'A4 - C5 - F5 ~ E5 -', 'D5 - B4 - G4 ~ ~ -', 'G4 - B4 - E5 ~ D5 B4', 'C5 ~ ~ - A4 - C5 -',
           'F5 - E5 - D5 - C5 -', 'D5 ~ E5 - F5 - G5 -', 'E5 ~ D5 - C5 ~ ~ -', 'C5 - G4 - E4 - G4 -']),
       }, ['a', 'b', 'a', 'b']) },
+    { // The Sunken Reach — slow, dreamy underwater bells
+      bpm: 84, lead: 'bell', groove: 'soft', bars: song({
+        a: sec('a', 'Em C G D Em C Am B', [
+          'B4 ~ E5 - G5 ~ ~ -', 'C5 ~ E5 - G5 ~ E5 -', 'D5 ~ G5 - B5 ~ ~ -', 'A4 ~ D5 - F#5 ~ ~ -',
+          'B4 ~ E5 - G5 ~ B5 -', 'C6 ~ ~ - G5 ~ E5 -', 'A5 ~ E5 - C5 ~ E5 -', 'D#5 ~ ~ ~ F#5 ~ ~ ~']),
+        b: sec('b', 'C D Bm Em C D B B', [
+          'E5 ~ G5 - C6 ~ ~ -', 'F#5 ~ A5 - D6 ~ ~ -', 'D6 ~ B5 - F#5 ~ ~ -', 'G5 ~ ~ - E5 ~ B4 -',
+          'C6 ~ B5 - A5 ~ G5 -', 'A5 ~ ~ - F#5 ~ D5 -', 'D#5 ~ F#5 - B5 ~ ~ -', 'B4 ~ ~ ~ ~ ~ ~ ~']),
+      }, ['a', 'b']) },
   ];
   let place = PLACE_SONGS[5];
 
   const THEMES = { explore: EXPLORE, combat: COMBAT, boss: BOSS };
   // each zone gets its own key and tempo so the soundtrack doesn't wear thin
-  const ZONE_MUSIC = [{ t: 0, bpm: 116 }, { t: -2, bpm: 122 }, { t: 3, bpm: 112 }, { t: -4, bpm: 108 }, { t: 2, bpm: 124 }, { t: -1, bpm: 128 }];
+  const ZONE_MUSIC = [{ t: 0, bpm: 116 }, { t: -2, bpm: 122 }, { t: 3, bpm: 112 }, { t: -4, bpm: 108 }, { t: 2, bpm: 124 }, { t: -1, bpm: 128 }, { t: -5, bpm: 96 }];
   let zoneMusic = ZONE_MUSIC[0];
 
   let step = 0, nextTime = 0, intensity = 0, timer = null;
@@ -2721,9 +2774,9 @@ const Weather = {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
     const color = type === 'snow' ? '#ffffff' : type === 'embers' ? '#ff7a2a' : hex;
-    const size = type === 'snow' ? 0.18 : type === 'data' ? 0.16 : type === 'embers' ? 0.14 : 0.08;
+    const size = type === 'snow' ? 0.18 : type === 'data' ? 0.16 : type === 'embers' ? 0.14 : type === 'bubbles' ? 0.13 : 0.08;
     const m = new THREE.PointsMaterial({
-      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : type === 'pollen' ? 1.1 : 3),
+      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : type === 'pollen' ? 1.1 : type === 'bubbles' ? 1.2 : 3),
       size: type === 'pollen' ? 0.07 : size, transparent: true, opacity: type === 'dust' || type === 'pollen' ? 0.55 : 0.85, depthWrite: false,
       blending: type === 'snow' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
@@ -2740,6 +2793,7 @@ const Weather = {
       switch (this.type) {
         case 'snow': p[i3 + 1] -= this.vel[i] * 2.2 * dt; p[i3] += Math.sin(time + this.ph[i]) * 0.8 * dt; break;
         case 'embers': p[i3 + 1] += this.vel[i] * 1.6 * dt; p[i3] += Math.sin(time * 1.3 + this.ph[i]) * 1.2 * dt; break;
+        case 'bubbles': p[i3 + 1] += this.vel[i] * 1.3 * dt; p[i3] += Math.sin(time * 2 + this.ph[i]) * 0.4 * dt; p[i3 + 2] += Math.cos(time * 1.7 + this.ph[i]) * 0.3 * dt; break;
         case 'data': p[i3 + 1] -= this.vel[i] * 6 * dt; break;
         default: p[i3] += Math.sin(time * 0.3 + this.ph[i]) * 0.4 * dt + 0.3 * dt; p[i3 + 1] += Math.cos(time * 0.4 + this.ph[i]) * 0.2 * dt;
       }
@@ -3116,6 +3170,33 @@ function buildBossModel(kind, hex) {
       const tail = node(g, 0, 0.1, -3.4); parts.tail = tail;
       for (let k = -2; k <= 2; k++) { const f = mesh(Geo.box(0.5, 0.1, 2.6), k % 2 ? gold : body, k * 0.45, 0, -1.2, tail); f.rotation.y = k * 0.18; }
       for (const s of [-1, 1]) { const t = mesh(Geo.cyl(0.12, 0.2, 1.4, 5), gold, s * 0.6, -1.4, 0.6, g); t.rotation.x = 0.3; }
+      break;
+    }
+    case 'deep': {
+      // DEEPSONG — a great mechanical whale wrapped in singing rings
+      body.color.set('#1e3a4a');
+      const pale = Mat.std('#c8d8e0', { metal: 0.6, rough: 0.35 });
+      const b = mesh(Geo.oct(2.2), body, 0, 0, 0, g); b.scale.set(1.3, 1, 2.6);
+      mesh(Geo.box(2.4, 0.5, 4.4), pale, 0, -1.4, 0.4, g);                        // belly plates
+      for (const s of [-1, 1]) {
+        mesh(Geo.sphere(0.4, 1), Mat.glow(hex, 5), s * 1.6, 0.5, 4.6, g);           // eyes
+        mesh(Geo.box(0.12, 0.12, 3), glowM, s * 2.4, 0, 0.5, g);                    // side light lines
+      }
+      mesh(Geo.box(2.2, 0.2, 0.6), dark, 0, -0.6, 5.6, g);                          // mouth
+      parts.fins = [];
+      for (const s of [-1, 1]) { const f = node(g, s * 2.6, -0.6, 1.5); mesh(Geo.box(3.2, 0.2, 1.8), pale, s * 1.6, 0, 0, f); parts.fins.push(f); }
+      parts.tail = [];
+      let prev = g, z = -5;
+      for (let k = 0; k < 3; k++) {
+        const seg = node(prev, 0, 0, prev === g ? z : -2.2); parts.tail.push(seg);
+        const sz = 1.6 - k * 0.4;
+        mesh(Geo.box(sz * 1.6, sz * 1.2, 2.4), body, 0, 0, -1.1, seg);
+        mesh(Geo.box(0.1, 0.1, 2.2), glowM, 0, sz * 0.6, -1.1, seg);
+        prev = seg;
+      }
+      mesh(Geo.box(5, 0.25, 1.6), pale, 0, 0, -2.4, prev);                          // tail flukes
+      parts.rings = [];
+      for (const zz of [2.2, -1.2]) { const r = new THREE.Mesh(Geo.torus(3.6, 0.12, 40), glowM); r.position.z = zz; g.add(r); parts.rings.push(r); }
       break;
     }
     default: {
@@ -3746,6 +3827,7 @@ const World = {
     this.placeCaches();
     this.placeSprites(45);
     this.planCamps();
+    Sea.build(this);
     Batch.finish();
     // instanced trees & grass are grouped by area, so they can be culled like everything else
     this.group.traverse((o) => { if (o.isInstancedMesh) { o.computeBoundingSphere(); o.frustumCulled = true; } });
@@ -3800,6 +3882,7 @@ const World = {
       }
     }
     Villages.plan(this, flats, free);
+    Sea.plan(this, flats);
     this.flats = flats;
   },
 
@@ -3811,7 +3894,7 @@ const World = {
       const k = 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
       if (k > 0) h = lerp(h, f.h, k);
     }
-    return Math.max(h, WORLD.water - 70);
+    return Math.max(h, WORLD.water - 100);
   },
 
   computeHeights() {
@@ -3857,6 +3940,7 @@ const World = {
   regionAt(x, z, y = 0) {
     if (Math.hypot(x, z) < 110) return REGIONS.hub;
     if (Math.hypot(x - SKY_REGION.x, z - SKY_REGION.z) < SKY_REGION.r + 30 && y > this.skyFloor - 25) return REGIONS.sky;
+    if (y < WORLD.water - 2 && this.heightAt(x, z) < WORLD.water - 4 && Terra.weights(x, z)[4] > 0.3) return REGIONS.deep;
     return REGIONS.terra[Terra.dominant(x, z)];
   },
 
@@ -4279,7 +4363,7 @@ const World = {
   buildWater() {
     const geo = new THREE.PlaneGeometry(this.size + 600, this.size + 600, 8, 8);
     geo.rotateX(-Math.PI / 2);
-    this.waterMat = new THREE.MeshStandardMaterial({ color: '#2f86c4', emissive: '#0e3a5a', emissiveIntensity: 0.35, roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.86 });
+    this.waterMat = new THREE.MeshStandardMaterial({ color: '#2f86c4', emissive: '#0e3a5a', emissiveIntensity: 0.35, roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.86, side: THREE.DoubleSide });
     const w = new THREE.Mesh(geo, this.waterMat);
     w.position.y = WORLD.water;
     w.receiveShadow = true;
@@ -4371,6 +4455,15 @@ const World = {
       tgt.sd.addScaledVector(E.sd, w[i]);
       fd += E.fd * w[i]; hi += E.hi * w[i]; si += E.si * w[i]; st += E.stars * w[i];
     });
+    // under the sea: blue-green fog that darkens with depth, dimmer light
+    const uw = this.underK || 0;
+    if (uw > 0) {
+      const dk = clamp(this.underDepth / 70, 0, 1);
+      const sea = this._sea || (this._sea = new THREE.Color());
+      sea.copy(SEA.shallow).lerp(SEA.deep, Math.min(1, dk * 2)).lerp(SEA.abyss, Math.max(0, dk * 2 - 1));
+      tgt.fog.lerp(sea, uw); tgt.h0.lerp(SEA.hemiTop, uw).multiplyScalar(1 - 0.7 * dk * uw); tgt.h1.lerp(SEA.hemiBot, uw);
+      fd = lerp(fd, 0.03 + dk * 0.02, uw); si *= 1 - uw * (0.4 + 0.55 * dk); hi *= 1 - uw * 0.3 * dk;
+    }
     const cd = this.caveDim;
     if (cd > 0) {
       const dark = this._dark || (this._dark = new THREE.Color('#1a1510'));
@@ -5030,7 +5123,7 @@ const World = {
   buildRuins() {
     const stone = Mat.std('#4a4a58', { rough: 0.8, metal: 0.2 });
     for (const A of this.arenas) {
-      if (A.island) continue;
+      if (A.island || !this.pal[A.i]) continue;
       const P = this.pal[A.i];
       const topM = Mat.std(new THREE.Color(P.ground.mid).lerp(new THREE.Color('#ffffff'), 0.12).getStyle(), { rough: 0.9, metal: 0.05 });
       const rockM = Mat.std(P.ground.rock, { rough: 0.95, metal: 0.05 });
@@ -5436,7 +5529,11 @@ const World = {
   // ═════════════════════ Per-frame ═════════════════════
   update(dt, time, cam) {
     if (this.skyMesh) this.skyMesh.position.copy(cam.position);
-    // environment follows the camera's biome
+    // environment follows the camera's biome (and dives with it)
+    const ud = camUnderwater(cam);
+    this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
+    this.skyMesh.visible = ud <= 0;
+    Sea.update(dt, time, cam);
     this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
     this.lavaMat.emissiveIntensity = 1.3 + Math.sin(time * 2) * 0.25;
     if (this.fallTex) this.fallTex.offset.y -= dt * 1.6;
@@ -5725,6 +5822,12 @@ const WorldMap = {
       g.fillStyle = '#05060a'; g.beginPath(); g.moveTo(x, y - fs(4.5)); g.lineTo(x + fs(4.5), y); g.lineTo(x + fs(3), y); g.lineTo(x + fs(3), y + fs(4)); g.lineTo(x - fs(3), y + fs(4)); g.lineTo(x - fs(3), y); g.lineTo(x - fs(4.5), y); g.closePath(); g.fill();
       label(v.name, x, y - fs(14), v.V.color, 12, 900);
     });
+    // sunken wrecks you've seen (an anchor), with the depth you'll need to reach them
+    for (const w of World.wrecks || []) icon(w.x, w.z, (x, y) => {
+      g.strokeStyle = '#7fd8e8'; g.lineWidth = 2 * dpr; g.beginPath();
+      g.moveTo(x, y - fs(6)); g.lineTo(x, y + fs(5)); g.moveTo(x - fs(5), y + fs(1)); g.quadraticCurveTo(x, y + fs(9), x + fs(5), y + fs(1)); g.moveTo(x - fs(3), y - fs(3)); g.lineTo(x + fs(3), y - fs(3)); g.stroke();
+      label(`${Math.round(w.depth)} m`, x, y + fs(15), '#7fd8e8', 10, 700);
+    });
     // village quest goals
     for (const q of Villages.sides()) if (!q.done && q.target) icon(q.target.x, q.target.z, (x, y) => { this.star(g, x, y, fs(6), '#ffe9a0'); label(q.target.label, x, y + fs(13), '#ffe9a0', 11, 700); }, true);
     // beacons
@@ -5766,7 +5869,7 @@ const WorldMap = {
     }, true);
     // compass rose
     label('N', F.x0 + F.s / 2, F.y0 + fs(12), '#ff6b6b', 14, 900);
-    document.getElementById('map-info').textContent = `${Math.round(this.explored() * 100)}% explored · Wardens freed ${G.progress.beaten.filter(Boolean).length}/5 · Secrets ${World.secrets.filter((s) => s.found).length}/${World.secrets.length} · Caves ${World.caves.filter((c) => c.found).length}/${World.caves.length}`;
+    document.getElementById('map-info').textContent = `${Math.round(this.explored() * 100)}% explored · Wardens freed ${WARDENS.filter((i) => G.progress.beaten[i]).length}/5 · Secrets ${World.secrets.filter((s) => s.found).length}/${World.secrets.length} · Caves ${World.caves.filter((c) => c.found).length}/${World.caves.length}`;
   },
 
   star(g, x, y, r, color) {
@@ -5793,7 +5896,7 @@ const SHOP_TYPES = {
   upgrades: { label: 'Upgrades',       color: '#3cf2ff', items: ['up_overclock', 'up_split', 'up_thruster', 'up_magnet', 'up_firmware', 'up_slot'] },
   gear:     { label: 'Gear',           color: '#ff9f43', items: ['jetpack', 'fireboots', 'backpack'] },
   bots:     { label: 'Botwright',      color: '#c6ff4d', items: ['bot_shield', 'bot_bubble', 'bot_tesla', 'bot_rocket', 'bot_bomber', 'bot_laser'] },
-  dive:     { label: 'Diving Supply',  color: '#4ae0d0', items: ['backpack', 'repair'], note: 'Captain Brine is still pressure-testing the diving gear. Come back soon.' },
+  dive:     { label: 'Diving Supply',  color: '#4ae0d0', items: ['dive_hull', 'dive_prop', 'dive_lamp', 'repair'] },
 };
 
 // ───────────────────────── The villages ─────────────────────────
@@ -5846,7 +5949,7 @@ const VILLAGES = [
     id: 'saltpin', name: 'Saltpin Harbor', region: 4, color: '#4ae0d0', hut: '#f0e6cc', roof: '#2f86c4',
     blurb: 'Stilt huts and fishing bots on the coast',
     shops: [
-      { type: 'dive', name: 'Tidewright Diving', keeper: 'Marlin', body: '#4ae0d0', greet: 'The deep is calling. Mostly it says "not yet".' },
+      { type: 'dive', name: 'Tidewright Diving', keeper: 'Marlin', body: '#4ae0d0', greet: 'Pressure hulls, hydro-jets, abyss lamps. Tested all the way to the trench. Well — most of the way.' },
       { type: 'food', name: "Pebble's Galley", keeper: 'Pebble', body: '#ffd8a8', greet: 'Salted oil! Nobody else in the valley has it.' },
       { type: 'parts', name: "Barnacle Bea's", keeper: 'Barnacle Bea', body: '#c87a4a', greet: 'Everything washes up eventually. I sell it back.' },
       { type: 'bots', name: 'Driftwood Bots', keeper: 'Koi', body: '#ff9f43', greet: 'Sea-tested, salt-proof, mostly waterproof.' },
@@ -6294,6 +6397,227 @@ function buildVillagerModel(color, small = false, cloak = false) {
 </script>
 <script>
 'use strict';
+// The Sunken Reach: the sea under the Saltglass Coast. Rivet doesn't breathe, so the danger down here is
+// pressure: each Pressure Hull tier is rated deeper. Kelp forests, coral, glowing vents, sunken wrecks with
+// treasure and memories, robot camps of the deep, and at the very bottom the Drowned Trench where the
+// ocean Warden, Deepsong, sings.
+
+const SEA = {
+  deep: new THREE.Color('#0a3550'), abyss: new THREE.Color('#020a14'), shallow: new THREE.Color('#1f7a96'),
+  hemiTop: new THREE.Color('#7fd8e8'), hemiBot: new THREE.Color('#04121c'),
+};
+
+const Sea = {
+  // the trench and its arena are chosen with the other landmarks, before the heights
+  plan(W, flats) {
+    const T = TERRA[4];
+    for (let t = 0; t < 600; t++) {
+      const a = rand(0, TAU), d = rand(40, 230), x = T.cx + Math.cos(a) * d, z = T.cz + Math.sin(a) * d;
+      if (Math.max(Math.abs(x), Math.abs(z)) > W.half * 0.78 || Math.hypot(x, z) < 520) continue;
+      if (Terra.raw(x, z) > WORLD.water - 40 || flats.some((f) => Math.hypot(f.x - x, f.z - z) < f.r + 90)) continue;
+      flats.push({ x, z, r: 34, h: -92 });
+      W.arenaPlans.push({ i: 5, x, z, r: 30, y: -92, beacons: [] });
+      return;
+    }
+  },
+
+  build(W) {
+    W.wrecks = []; W.vents = [];
+    const low = W.lowSpec;
+    const spots = [];   // points on the sea floor: [x, z, h, depth]
+    for (let i = 0, n = low ? 2600 : 4200; i < n; i++) {
+      const x = rand(-W.half * 0.9, W.half * 0.9), z = rand(-W.half * 0.9, W.half * 0.9);
+      const h = W.heightAt(x, z), depth = WORLD.water - h;
+      if (depth < 3 || W.isHole(x, z)) continue;
+      if (W.arenas.some((A) => Math.hypot(A.x - x, A.z - z) < A.r + 6)) continue;
+      spots.push([x, z, h, depth]);
+    }
+    // kelp forests (instanced, grouped by area so they can be culled)
+    const kelpGeo = new THREE.BoxGeometry(0.16, 1, 0.05); kelpGeo.translate(0, 0.5, 0);
+    const kelpMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, metalness: 0, flatShading: true });
+    const groups = new Map(), col = new THREE.Color(), d = new THREE.Object3D();
+    for (let i = 0; i < spots.length; i++) {
+      const [x, z, h, depth] = spots[i];
+      if (depth < 4 || _rng() > 0.55) continue;
+      const key = Math.floor((x + 1e4) / 300) + ',' + Math.floor((z + 1e4) / 300);
+      let g = groups.get(key); if (!g) { g = []; groups.set(key, g); }
+      for (let k = randi(3, 7); k > 0; k--) g.push([x + rand(-2.5, 2.5), z + rand(-2.5, 2.5), h, Math.min(depth - 1, rand(3, 10))]);
+    }
+    for (const list of groups.values()) {
+      const m = new THREE.InstancedMesh(kelpGeo, kelpMat, list.length);
+      list.forEach(([x, z, h, len], k) => {
+        d.position.set(x, W.heightAt(x, z) - 0.2, z); d.rotation.set(rand(-0.15, 0.15), rand(0, TAU), rand(-0.15, 0.15)); d.scale.set(rand(0.8, 1.4), len, 1); d.updateMatrix();
+        m.setMatrixAt(k, d.matrix);
+        col.set(pick(['#2f7a3a', '#3e8a2e', '#5a7a2a', '#2a6a4a'])); col.offsetHSL(0, 0, rand(-0.05, 0.05)); m.setColorAt(k, col);
+      });
+      W.group.add(m);
+    }
+    // coral, anemones and rocks (batched)
+    const coralCols = ['#ff7a9a', '#ff9f43', '#b98cff', '#ffd23f', '#ff5a7a', '#4ae0d0'];
+    const coralMats = coralCols.map((c) => Mat.std(c, { rough: 0.6, metal: 0.1, emissive: c, ei: 0.25 }));
+    const rockM = Mat.std('#3a4a52', { rough: 0.95, metal: 0.05 });
+    for (let i = 0; i < spots.length; i += 3) {
+      const [x, z, h] = spots[i];
+      const r = _rng();
+      if (r < 0.45) {
+        const m = pick(coralMats);
+        for (let k = randi(2, 5); k > 0; k--) {
+          const s = rand(0.4, 1.2), cx = x + rand(-1.5, 1.5), cz = z + rand(-1.5, 1.5), cy = W.heightAt(cx, cz);
+          if (_rng() < 0.5) Batch.add(Geo.cyl(0, 0.5, 2, 6), m, cx, cy + s, cz, s, s * rand(0.8, 1.6), s, rand(-0.3, 0.3), 0, rand(-0.3, 0.3), false);
+          else Batch.add(Geo.sphere(0.6, 1), m, cx, cy + s * 0.3, cz, s * 1.3, s * 0.7, s * 1.3, 0, rand(0, 3), 0, false);
+        }
+      } else if (r < 0.6) {
+        const c = pick(['#7fffd4', '#ff9fd8', '#ffe14d']);
+        for (let k = randi(3, 6); k > 0; k--) Batch.add(Geo.sphere(0.18, 0), Mat.glow(c, 2.2), x + rand(-1, 1), h + rand(0.2, 0.7), z + rand(-1, 1), 1, 1, 1, 0, 0, 0, false);
+      } else if (r < 0.78) {
+        const s = rand(1, 3.5);
+        Batch.add(Geo.sphere(1, 0), rockM, x, h + s * 0.2, z, s, s * rand(0.5, 1), s, rand(0, 3), rand(0, 3), 0);
+        W.addCollider(x, z, s * 0.8, h + s * 0.8, 'rock');
+      }
+    }
+    // glowing vents that stream bubbles
+    for (let i = 0, made = 0; i < spots.length && made < (low ? 8 : 14); i += 37) {
+      const [x, z, h, depth] = spots[i];
+      if (depth < 8) continue;
+      Batch.add(Geo.cyl(0.6, 1.4, 1.6, 7), rockM, x, h + 0.6, z);
+      Batch.add(Geo.cyl(0.45, 0.45, 0.1, 10), Mat.glow('#4ae0d0', 2.6), x, h + 1.42, z, 1, 1, 1, 0, 0, 0, false);
+      W.vents.push({ x, z, y: h + 1.5 });
+      made++;
+    }
+    this.buildWrecks(W);
+    this.planCamps(W);
+  },
+
+  // sunken wrecks, deeper and richer the further out they lie (deep ones need a better hull)
+  buildWrecks(W) {
+    const want = [9, 20, 33, 46, 64];
+    const kinds = ['log', 'botpart', 'plating', 'log', 'treasure'];
+    const wood = Mat.std('#4a3424', { rough: 0.9, metal: 0.05 }), rust = Mat.std('#6a3a24', { rough: 0.8, metal: 0.5 });
+    want.forEach((depth, i) => {
+      let at = null;
+      for (let t = 0; t < 900 && !at; t++) {
+        const x = rand(-W.half * 0.85, W.half * 0.85), z = rand(-W.half * 0.85, W.half * 0.85);
+        const h = W.heightAt(x, z), dd = WORLD.water - h;
+        if (Math.abs(dd - depth) > 5 || W.slopeAt(x, z) > 0.5 || Terra.weights(x, z)[4] < 0.4) continue;
+        if (W.wrecks.some((w) => Math.hypot(w.x - x, w.z - z) < 90) || W.arenas.some((A) => Math.hypot(A.x - x, A.z - z) < A.r + 20)) continue;
+        at = { x, z, h };
+      }
+      if (!at) return;
+      const g = new THREE.Group(); g.position.set(at.x, at.h, at.z); g.rotation.set(0, rand(0, TAU), rand(-0.25, 0.25)); W.group.add(g);
+      // a broken hull: keel, ribs, planks and a snapped mast
+      mesh(Geo.box(2.2, 0.6, 12), wood, 0, 0.3, 0, g);
+      for (let k = -5; k <= 5; k += 1.25) for (const s of [-1, 1]) { const rib = mesh(Geo.box(0.25, 2.6, 0.25), wood, s * 1.6, 1.3, k, g); rib.rotation.z = s * -0.35; }
+      for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const pl = mesh(Geo.box(0.12, 0.6, rand(5, 9)), wood, s * (1.25 + k * 0.35), 0.6 + k * 0.7, rand(-2, 2), g); pl.rotation.z = s * -0.35; }
+      const mast = mesh(Geo.cyl(0.2, 0.25, 7, 6), rust, 0, 2.5, -1, g); mast.rotation.set(0.9, 0, 0.3);
+      mesh(Geo.box(1.6, 1.2, 1.4), rust, 0, 1.1, 4, g);
+      g.updateMatrixWorld(true);
+      W.bake(g);
+      W.addCollider(at.x, at.z, 2.2, at.h + 1.2, 'rock');
+      const cx = at.x + 2.8, cz = at.z + 1.5;
+      W.buildCache(cx, cz, true, W.heightAt(cx, cz), true);
+      W.addSecret(kinds[i], at.x - 2.6, at.h + 1.2, at.z - 1, 'wreck' + i);
+      W.wrecks.push({ x: at.x, z: at.z, y: at.h, depth });
+    });
+  },
+
+  // robot camps of the deep (they spawn when you swim near, like camps on land)
+  planCamps(W) {
+    const pool = ZONES[5].pool;
+    for (let t = 0, n = 0; t < 2000 && n < (W.lowSpec ? 7 : 10); t++) {
+      const x = rand(-W.half * 0.85, W.half * 0.85), z = rand(-W.half * 0.85, W.half * 0.85);
+      const h = W.heightAt(x, z), depth = WORLD.water - h;
+      if (depth < 7 || depth > 50 || Terra.weights(x, z)[4] < 0.4 || W.slopeAt(x, z) > 0.6) continue;
+      if (W.campSites.some((c) => Math.hypot(c.x - x, c.z - z) < 90) || W.arenas.some((A) => Math.hypot(A.x - x, A.z - z) < A.r + 40)) continue;
+      // a glowing coral totem marks the camp
+      Batch.add(Geo.cyl(0.3, 0.6, 3, 6), Mat.std('#2a4a5a', { rough: 0.7 }), x, h + 1.5, z);
+      Batch.add(Geo.oct(0.6), Mat.glow('#ff7ad8', 2.6), x, h + 3.4, z, 1, 1.6, 1, 0, 0, 0, false);
+      W.campSites.push({ x, z, y: h, r: 7, flames: [], alerted: false, under: true, tier: depth > 30 ? 3 : 2, pool, size: randi(3, 5), id: W.campSites.length });
+      n++;
+    }
+  },
+
+  // ═════════════════════════ The player in the water ═════════════════════════
+  // deep enough to swim here? (shallow water is just wading)
+  swimmable(x, z, y) {
+    if (y > WORLD.water - 0.4) return false;
+    const h = World.heightAt(x, z);
+    if (h > WORLD.water - 1.1) return false;
+    return World.hazardAt(x, z) === LIQUIDS.water || h < WORLD.water - 2;
+  },
+  get limit() { return HULL_DEPTH[(G.gear && G.gear.hull) || 0]; },
+  depthOf(y) { return Math.max(0, WORLD.water - (y + 1)); },
+
+  // swimming: you move where you look; JUMP rises, Shift / C sinks; idle, the heavy chassis sinks slowly
+  swim(p, dt, I, mf, mr) {
+    const lvl = (G.gear && G.gear.prop) || 0;
+    const spd = 4.4 * (1 + 0.4 * lvl) * (p.slowT > 0 ? 0.6 : 1);
+    const cp = Math.cos(p.pitch), fx = -Math.sin(p.yaw) * cp, fy = Math.sin(p.pitch), fz = -Math.cos(p.yaw) * cp;
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+    const up = (I.key('Space') ? 1 : 0) - (I.key('ShiftLeft') || I.key('ShiftRight') || I.key('KeyC') ? 1 : 0);
+    let tx = fx * mf + rx * mr, ty = fy * mf + up * (0.9 + 0.3 * lvl), tz = fz * mf + rz * mr;
+    const L = Math.hypot(tx, ty, tz);
+    if (L > 1) { tx /= L; ty /= L; tz /= L; }
+    const k = 1 - Math.exp(-3 * dt);
+    p.vel.x += (tx * spd - p.vel.x) * k;
+    p.vel.z += (tz * spd - p.vel.z) * k;
+    p.vel.y += ((L > 0.05 ? ty * spd : -0.9) - p.vel.y) * k;
+    if (p.dashT > 0) { p.dashT -= dt; p.vel.x = p.dashDir.x * 16; p.vel.z = p.dashDir.z * 16; }
+    const ox = p.pos.x, oz = p.pos.z;
+    p.pos.x += p.vel.x * dt; p.pos.y += p.vel.y * dt; p.pos.z += p.vel.z * dt;
+    // the sea floor is solid: no walking up underwater cliffs by accident
+    if (World.heightAt(p.pos.x, p.pos.z) > p.pos.y + 0.6) { p.pos.x = ox; p.pos.z = oz; p.vel.x *= 0.3; p.vel.z *= 0.3; }
+    World.collide(p.pos, p.r, p.pos.y + 0.4);
+    // the surface: float with your head out, or hop out onto a shore
+    const top = WORLD.water - 1.15;
+    if (p.pos.y > top) {
+      if (up > 0 && World.heightAt(p.pos.x + fx * 2, p.pos.z + fz * 2) > WORLD.water - 1.4) { p.vel.y = 7; p.pos.y = top + 0.3; p.swim = false; }
+      else { p.pos.y = top; p.vel.y = Math.min(p.vel.y, 0); }
+    }
+    p.gliding = false; p.jetting = false; p.climbing = null;
+    if (Math.random() < dt * (2 + Math.hypot(p.vel.x, p.vel.y, p.vel.z))) Fx.glow.emit(p.pos.x + rand(-0.4, 0.4), p.pos.y + 1.4, p.pos.z + rand(-0.4, 0.4), rand(-0.2, 0.2), rand(1, 2), rand(-0.2, 0.2), rand(1, 2), 0.08, new THREE.Color('#dff6ff'), 1.2, 0, 0, 1);
+    if (G.hint) G.hint(Touch.enabled ? 'Swimming — you move where you look · hold JUMP to rise' : 'Swimming — you move where you look · Space rises, Shift or C sinks');
+  },
+
+  // pressure: diving below your hull's rating crushes you slowly
+  pressure(p, dt) {
+    const depth = this.depthOf(p.pos.y), lim = this.limit;
+    p.depth = depth;
+    if (depth <= lim) { p.crush = Math.max(0, (p.crush || 0) - dt * 2); return; }
+    p.crush = Math.min(1, (p.crush || 0) + dt);
+    p.crushT = (p.crushT || 0) - dt;
+    if (p.crushT <= 0) {
+      p.crushT = 0.5;
+      p.hurt(2 + (depth - lim) * 0.3, null, true);
+      Sound.play('block', null, 0.6);
+      Fx.addShake(0.15);
+      if (G.hint) G.hint(`Hull pressure! Your ${HULL_NAMES[(G.gear && G.gear.hull) || 0]} is rated to ${lim} m — buy a stronger Pressure Hull in Saltpin Harbor`);
+    }
+  },
+
+  // ═════════════════════════ Per-frame world effects ═════════════════════════
+  update(dt, time, cam) {
+    if (!World.vents) return;
+    const near = (x, z, R) => Math.abs(x - cam.position.x) < R && Math.abs(z - cam.position.z) < R;
+    for (const v of World.vents) {
+      if (!near(v.x, v.z, 90) || Math.random() > dt * 14) continue;
+      Fx.glow.emit(v.x + rand(-0.4, 0.4), v.y, v.z + rand(-0.4, 0.4), rand(-0.3, 0.3), rand(2, 4), rand(-0.3, 0.3), rand(2, 4), 0.14, new THREE.Color('#dff6ff'), 1.3, 0, 0, 1);
+    }
+    // the water surface glimmers from below
+    if (World.waterMat) World.waterMat.opacity = cam.position.y < WORLD.water ? 0.7 : 0.86;
+  },
+};
+
+// how far below the surface the camera is (0 above water) — the environment blend uses it
+function camUnderwater(cam) {
+  const y = cam.position.y;
+  if (y >= WORLD.water - 0.05) return 0;
+  if (World.heightAt(cam.position.x, cam.position.z) > WORLD.water - 0.2) return 0;
+  return WORLD.water - y;
+}
+
+</script>
+<script>
+'use strict';
 // ═════════════════════════ Beam helper ═════════════════════════
 const _beamGeo = (() => { const g = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.5); return g; })();
 function makeBeam(hex, k = 4, radius = 0.05, opacity = 0.9) {
@@ -6385,6 +6709,7 @@ class Player {
     if (I.touchMode) touchAimAssist(this, dt);
     G.focus = false;
     this.inCave = !!World.caveAt(this.pos.x, this.pos.z, this.pos.y);
+    this.swim = !this.inCave && Sea.swimmable(this.pos.x, this.pos.z, this.pos.y);
     this.effects(dt);
     const frozen = this.frozenT > 0;
 
@@ -6416,6 +6741,8 @@ class Player {
       G.fov.kick = 12;
     }
 
+    if (this.swim) Sea.swim(this, dt, I, mf, mr);
+    else {
     // jump · glide · wall leap · jetpack (hold)
     if (I.hit('Space') && !frozen) {
       if (this.climbing) {
@@ -6540,10 +6867,13 @@ class Player {
       }
     }
 
+    }
+
     World.keepInside(this.pos, this.r);
+    if (this.swim) Sea.pressure(this, dt); else { this.depth = 0; this.crush = Math.max(0, (this.crush || 0) - dt * 2); }
     const gy = World.groundAt(this.pos.x, this.pos.z, this.pos.y);
     // fall damage: measured from the highest point of a free fall (gliding / jetpack reset it)
-    if (this.gliding || this.jetting || this.climbing || this.grounded || this.launchT > 0.8) this.fallTop = this.pos.y;
+    if (this.gliding || this.jetting || this.climbing || this.grounded || this.swim || this.launchT > 0.8) this.fallTop = this.pos.y;
     else this.fallTop = Math.max(this.fallTop, this.pos.y);
     if (!this.climbing) {
       if (this.pos.y <= gy) {
@@ -7042,7 +7372,10 @@ class Enemy {
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
     // walkers stay out of deep water & lava and can't scale cliffs
-    if (this.d.hover <= 1 && !this.island) {
+    if (this.d.under) {
+      // sea robots never leave the water
+      if (World.heightAt(this.pos.x, this.pos.z) > WORLD.water - 3) { this.pos.x = ox; this.pos.z = oz; this.vel.x *= -0.3; this.vel.z *= -0.3; this.strafe *= -1; this.wander.t = 0; }
+    } else if (this.d.hover <= 1 && !this.island) {
       const h1 = World.heightAt(this.pos.x, this.pos.z);
       if (h1 < WORLD.water + 0.2 || (h1 > World.heightAt(ox, oz) + 0.05 && World.slopeAt(this.pos.x, this.pos.z) > CLIFF_SLOPE)) {
         this.pos.x = ox; this.pos.z = oz; this.vel.x *= -0.3; this.vel.z *= -0.3; this.strafe *= -1; this.wander.t = 0;
@@ -7067,7 +7400,9 @@ class Enemy {
       if (ad < R) { this.pos.x = A.x + (ax / ad) * R; this.pos.z = A.z + (az / ad) * R; }
     }
     const gNow = this.island ? this.island.top : World.floorAt(this.pos.x, this.pos.z);
-    const flyBase = this.high ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, WORLD.water);
+    const flyBase = this.high ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY)
+      : this.d.under ? Math.max(gNow, this.aggro ? Math.min(p.pos.y - 0.5, WORLD.water - 2 - this.d.hover) : gNow)
+      : Math.max(gNow, WORLD.water);
     if (this.d.hover > 1) this.pos.y = lerp(this.pos.y, flyBase + this.d.hover + Math.sin(this.t * 2) * 0.35, 1 - Math.exp(-3 * dt));
     else this.pos.y = gNow + this.d.hover;
 
@@ -7130,6 +7465,7 @@ const BOSS_KIND = {
   titan: { r: 3.6, hover: 0,   ground: true, cyOff: 14.6, capLo: 0.5, capHi: 19.5, speed: 3.2 },
   fire:  { r: 3.2, hover: 6,   cyOff: 0,    speed: 5.5 },
   bird:  { r: 3.4, hover: 10,  cyOff: 0,    speed: 9 },
+  deep:  { r: 4.0, hover: 7,   cyOff: 0,    speed: 6 },
 };
 
 class Boss {
@@ -7203,12 +7539,13 @@ class Boss {
   }
 
   startWave(effect, speed = 17) {
-    this.wave = { r: 1, y: this.ground + 0.4, hit: false, effect, speed, x: this.pos.x, z: this.pos.z };
+    const sonar = effect === 'sonar', y = sonar ? this.cy : this.ground + 0.4;
+    this.wave = { r: 1, y, hit: false, effect, speed, x: this.pos.x, z: this.pos.z };
     this.shock.visible = true;
     this.shock.material.color.set(effect === 'freeze' ? '#bff0ff' : this.color).multiplyScalar(4);
-    Fx.explosion(this.pos.x, this.ground + 0.5, this.pos.z, effect === 'freeze' ? '#bff0ff' : this.color, 2.2);
-    Fx.addShake(1); Sound.play('slam');
-    G.hint(effect === 'freeze' ? 'Jump over the frost wave or you will freeze!' : 'Jump over the shockwave!');
+    Fx.explosion(this.pos.x, y + 0.1, this.pos.z, effect === 'freeze' ? '#bff0ff' : this.color, 2.2);
+    Fx.addShake(sonar ? 0.5 : 1); Sound.play('slam');
+    G.hint(sonar ? 'Swim above or below the sonar ring!' : effect === 'freeze' ? 'Jump over the frost wave or you will freeze!' : 'Jump over the shockwave!');
   }
 
   nextPattern() {
@@ -7238,6 +7575,7 @@ class Boss {
       case 'dive': this.dState = 'aim'; this.subT = P2 ? 0.6 : 0.85; this.sub = P2 ? 2 : 1; break;
       case 'feathers': this.sub = P2 ? 5 : 3; break;
       case 'gust': this.stateT = P2 ? 2.6 : 2; Sound.play('glide'); G.hint('Hold your ground against the gust!'); break;
+      case 'sonar': this.subT = 1.1; this.sub = P2 ? 3 : 2; this.sonarState = 'charge'; Sound.play('laser'); G.hint('A sonar ring! Swim above or below it'); break;
     }
   }
 
@@ -7600,6 +7938,17 @@ class Boss {
         }
         break;
       }
+      case 'sonar': {
+        // the Warden's song: a ring of sound sweeps out at its own depth
+        this.subT -= dt;
+        this.anim = this.sonarState === 'charge' ? 1 : 0;
+        if (this.subT <= 0) {
+          this.startWave('sonar', P2 ? 19 : 15);
+          this.sub--; this.subT = P2 ? 1.1 : 1.5;
+          if (this.sub <= 0) { this.state = 'idle'; this.stateT = 1.6; }
+        }
+        break;
+      }
       case 'gust': {
         this.hoverTarget = 7;
         const ux = dx / dd, uz = dz / dd;
@@ -7643,9 +7992,11 @@ class Boss {
       this.shock.scale.set(w.r, w.r, 1);
       this.shock.material.opacity = Math.max(0, 1 - w.r / 42);
       const pd = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
-      if (!w.hit && Math.abs(pd - w.r) < 1.1 && p.pos.y < World.arenaFloor(p.pos.x, p.pos.z) + 0.7) {
+      const inRing = w.effect === 'sonar' ? Math.abs(pd - w.r) < 1.4 && Math.abs(p.pos.y + 1 - w.y) < 1.8 : Math.abs(pd - w.r) < 1.1 && p.pos.y < World.arenaFloor(p.pos.x, p.pos.z) + 0.7;
+      if (!w.hit && inRing) {
         w.hit = true;
         if (w.effect === 'freeze') { p.hurt(this.dmg * 0.8, this.pos); p.freeze(1.8); }
+        else if (w.effect === 'sonar') { p.hurt(this.dmg * 1.3, this.pos); p.slowT = Math.max(p.slowT, 2.5); Fx.tintFlash('#4ae0d0', 0.4); }
         else { p.hurt(this.dmg * 1.6, this.pos); p.vel.y = 7; }
       }
       if (w.r > 42) { this.wave = null; this.shock.visible = false; }
@@ -7716,6 +8067,15 @@ class Boss {
         P.arms.forEach((a, i) => { a.position.y = 0.8 + Math.sin(this.t * 3 + i * 2) * 0.3; a.rotation.x = this.state === 'flame' || this.state === 'meteor' ? -1.3 : Math.sin(this.t * 2 + i) * 0.2; });
         P.tail.scale.set(1 + Math.sin(this.t * 12) * 0.08, 1 + Math.sin(this.t * 9) * 0.12, 1 + Math.sin(this.t * 12) * 0.08);
         if (Math.random() < dt * 20) Fx.trail(this.pos.x + rand(-2, 2), this.pos.y + rand(-3, 3), this.pos.z + rand(-2, 2), pick(['#ff6a1a', '#ffb347']), rand(0.8, 1.6), 0.6, 3);
+        break;
+      }
+      case 'deep': {
+        // the tail undulates; fins scull; the song rings glow brighter while it sings
+        P.tail.forEach((seg, i) => { seg.rotation.y = Math.sin(this.t * 2.2 - i * 0.8) * (0.25 + i * 0.08); });
+        P.fins.forEach((f, i) => { f.rotation.z = (i ? -1 : 1) * (0.3 + Math.sin(this.t * 2.5) * 0.25); });
+        P.rings.forEach((r, i) => { r.rotation.z += dt * (i % 2 ? 1 : -1) * (this.state === 'sonar' ? 3 : 0.6); r.scale.setScalar(1 + (this.state === 'sonar' ? 0.15 * Math.sin(this.t * 12 + i) : 0)); });
+        m.rotation.x = clamp((this.vel.y || 0) * -0.05, -0.3, 0.3);
+        if (Math.random() < dt * 6) Fx.glow.emit(this.pos.x + rand(-2, 2), this.pos.y + rand(-1, 2), this.pos.z + rand(-2, 2), 0, rand(1, 3), 0, rand(1.5, 3), 0.15, new THREE.Color('#dff6ff'), 1.2, 0, 0, 1);
         break;
       }
       case 'bird': {
@@ -8465,7 +8825,7 @@ const UI = {
     this.mode = mode;
     if (shopSpot) this.shopDef = shopSpot.def;
     // a shop's tabs follow what it stocks
-    const SHOP_TAB = { weapon: 'gear', gear: 'gear', bot: 'bots', upgrade: 'upgrades', supply: 'supplies', service: 'supplies', part: 'parts' };
+    const SHOP_TAB = { weapon: 'gear', gear: 'gear', bot: 'bots', upgrade: 'upgrades', supply: 'supplies', service: 'supplies', part: 'parts', dive: 'dive' };
     const shopTabs = this.shopDef ? ['sell', ...new Set(this.shopDef.items.map((id) => SHOP_TAB[SHOP_ITEMS[id].kind]))] : ['sell'];
     if (mode === 'shop' && shopSpot) this.tab = shopTabs[1] || 'sell';
     const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: shopTabs,
@@ -8583,6 +8943,7 @@ const UI = {
     if (S.kind === 'upgrade' && G.up[S.up] >= UPGRADES[S.up].max) return { ok: false, why: 'MAXED' };
     if ((S.kind === 'supply' || S.kind === 'weapon') && !G.canAdd({ t: S.kind, id })) return { ok: false, why: 'HOTBAR FULL' };
     if (S.kind === 'part' && !G.canAdd({ t: 'part', id: S.part })) return { ok: false, why: 'HOTBAR FULL' };
+    if (S.kind === 'dive' && (G.gear[S.key] || 0) >= S.prices.length) return { ok: false, why: 'MAXED' };
     if (S.kind === 'service' && G.player.hp >= G.player.maxHp && G.companions.every((c) => !c.active || c.battery >= 99)) return { ok: false, why: 'ALL GOOD' };
     if (G.bucks < this.price(id)) return { ok: false, why: 'NEED BOTBUCKS' };
     return { ok: true };
@@ -8590,6 +8951,7 @@ const UI = {
   price(id) {
     const S = SHOP_ITEMS[id];
     if (S.kind === 'upgrade') return Math.round(S.price * (1 + 0.5 * G.up[S.up]));
+    if (S.kind === 'dive') return S.prices[Math.min(G.gear[S.key] || 0, S.prices.length - 1)];
     if (id === 'backpack') return S.price * (1 + G.gear.backpack);
     return S.price;
   },
@@ -8600,6 +8962,10 @@ const UI = {
     let msg = '';
     if (S.kind === 'supply') { G.addItem({ t: 'supply', id }); msg = `${S.name} added to your hotbar`; }
     else if (S.kind === 'part') { G.addItem({ t: 'part', id: S.part }); msg = `+1 ${PARTS[S.part].name}`; }
+    else if (S.kind === 'dive') {
+      G.gear[S.key] = (G.gear[S.key] || 0) + 1;
+      msg = S.key === 'hull' ? `${HULL_NAMES[G.gear.hull]} fitted — safe down to ${HULL_DEPTH[G.gear.hull]} m` : S.key === 'prop' ? `Hydro-Jets ${['I', 'II'][G.gear.prop - 1]} fitted — you swim faster` : 'Abyss Lamp fitted — the deep is brighter now';
+    }
     else if (S.kind === 'service') { G.player.hp = G.player.maxHp; for (const c of G.companions) if (c.active) { c.battery = 100; c.hp = c.maxHp; } msg = 'Hull repaired and batteries topped up'; Fx.tintFlash('#6bff9e', 0.35); }
     else if (S.kind === 'weapon') { G.addItem({ t: 'weapon', id }); msg = `${WEAPONS[id].name} added to your hotbar — select its slot to use it`; }
     else if (S.kind === 'gear') {
@@ -8740,7 +9106,7 @@ const UI = {
 
     // middle: tabs + content
     const tabNames = { bots: 'Bots', base: 'Base & Rooms', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies',
-      garage: 'Gear', parts: 'Buy Parts', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
+      garage: 'Gear', parts: 'Buy Parts', dive: 'Diving Gear', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
     $('ws-tabs').innerHTML = this.tabs.map((t) => `<button class="tab ${t === this.tab ? 'active' : ''}" data-tab="${t}">${tabNames[t]}</button>`).join('');
     $('ws-tabs').querySelectorAll('.tab').forEach((t) => (t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); }));
     $('ws-tabs').style.display = this.tabs.length > 1 ? '' : 'none';
@@ -8818,13 +9184,20 @@ const UI = {
           <div class="price-list">${PART_ORDER.map((k) => `<div class="price-row" style="--c:${PARTS[k].color}"><img src="${partIconURL(k)}" alt=""><span>${PARTS[k].name}</span><b>${PARTS[k].value} BB</b></div>`).join('')}</div>
           <div class="ws-note">To sell part of a stack, drag the slider in your hotbar list to pick how many, then press <b>Sell</b>. Weapons and supplies sell for 40% of their price.</div>`;
       } else {
-        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply', 'service'], parts: ['part'] }[this.tab];
+        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply', 'service'], parts: ['part'], dive: ['dive'] }[this.tab];
         const ids = (shop ? shop.items : []).filter((id) => want.includes(SHOP_ITEMS[id].kind));
         mid = ids.map((id) => {
           const S = SHOP_ITEMS[id], st = this.shopState(id), price = this.price(id);
           let name, desc, icon, color, meta = '';
           if (S.kind === 'weapon') { const W = WEAPONS[id]; name = W.name; desc = W.desc; icon = weapIconURL(id); color = W.color; meta = `<div class="meta">DMG ${W.dmg}${W.pellets > 1 ? '×' + W.pellets : ''} · ${W.rate}/S${W.rocket ? ' · SPLASH' : ''}</div>`; }
           else if (S.kind === 'bot') { const d = COMP_DEFS[S.bot]; name = d.name; desc = COMP_DESC[S.bot]; icon = compIconURL(S.bot); color = d.color; meta = `<div class="meta">PREMIUM BOT · HULL ${Math.round(d.hp * (1 + 0.3 * G.up.firmware))}${d.range ? ' · RANGE ' + d.range + 'M' : ''}</div>`; }
+          else if (S.kind === 'dive') {
+            const lvl = G.gear[S.key] || 0, max = S.prices.length;
+            name = S.key === 'hull' ? (lvl < max ? HULL_NAMES[lvl + 1] : HULL_NAMES[max]) : S.name + (max > 1 ? ` ${['I', 'II', 'III'][Math.min(lvl, max - 1)]}` : '');
+            desc = S.key === 'hull' ? `${S.desc} Rated to ${HULL_DEPTH[Math.min(lvl + 1, max)]} m (yours: ${HULL_DEPTH[lvl]} m).` : S.desc;
+            color = '#4ae0d0'; icon = upgIconURL(S.key === 'hull' ? 'armor' : S.key === 'prop' ? 'thruster' : 'overclock', color);
+            meta = `<div class="pips">${Array.from({ length: max }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div>`;
+          }
           else if (S.kind === 'part') { const P = PARTS[S.part]; name = P.name; desc = P.desc + ' Goes into your hotbar.'; icon = partIconURL(S.part); color = P.color; meta = `<div class="meta">YOU HAVE ${G.partCount(S.part, true)}</div>`; }
           else if (S.kind === 'upgrade') { const U = UPGRADES[S.up]; name = U.name; desc = U.desc; icon = upgIconURL(S.up, '#3cf2ff'); color = '#3cf2ff'; meta = `<div class="pips">${Array.from({ length: U.max }, (_, i) => `<i class="${i < G.up[S.up] ? 'on' : ''}"></i>`).join('')}</div>`; }
           else { name = S.name; desc = S.desc; color = id === 'repair' || id === 'service' ? '#6bff9e' : id === 'cell' ? '#b98cff' : id === 'fireboots' ? '#ff6a1a' : '#ffb347'; icon = upgIconURL(id === 'service' ? 'repair' : id, color); if (id === 'backpack') meta = `<div class="pips">${Array.from({ length: S.max }, (_, i) => `<i class="${i < G.gear.backpack ? 'on' : ''}"></i>`).join('')}</div>`; }
@@ -8996,6 +9369,17 @@ const UI = {
     $('hud-bucks').textContent = G.bucks;
     document.body.classList.toggle('frozen', p.frozenT > 0 && !p.dead);
     document.body.classList.toggle('burning', p.burnT > 0 && !p.dead);
+    // depth gauge while swimming
+    const dEl = $('depth');
+    dEl.classList.toggle('show', !!p.swim && !p.dead);
+    if (p.swim) {
+      const lim = Sea.limit, dep = p.depth || 0;
+      $('depth-val').textContent = `${Math.round(dep)} m`;
+      $('depth-bar').style.width = Math.min(100, (dep / lim) * 100) + '%';
+      $('depth-hull').textContent = `${HULL_NAMES[G.gear.hull || 0]} · ${lim} m`;
+      dEl.classList.toggle('over', dep > lim);
+    }
+    $('pressure').style.opacity = (p.crush || 0) * 0.9;
     // stamina wheel (hidden while full)
     const stEl = $('stamina');
     const base = Math.min(p.stamina, 100), extra = Math.max(0, p.stamina - 100), extraMax = p.maxStamina - 100;
@@ -9049,7 +9433,7 @@ const UI = {
     $('obj-prog-fill').style.width = (prog * 100).toFixed(1) + '%';
     if (!this.objT || G.time - this.objT > 1) {
       this.objT = G.time;
-      $('obj-kills').textContent = `${R.name.toUpperCase()}  ·  WARDENS ${G.progress.beaten.filter(Boolean).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%`;
+      $('obj-kills').textContent = `${R.name.toUpperCase()}  ·  WARDENS ${WARDENS.filter((i) => G.progress.beaten[i]).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%`;
     }
 
     // boss bar
@@ -9277,6 +9661,7 @@ const STORY = {
     [L("The Colossus kept saying 'the little light that fell'. I found your core in a crater up north, you know. Still warm."), L("I never told anyone that.")],
     [L("Infernus thanked you. By name. I never told it your name, Rivet."), L('Whatever that core is, the Wardens know it. We need to find out why.')],
     [L("The skies are clear. Whatever the Conductor is, it's lost its Wardens."), L("Come home safe, Rivet. We have a lot to talk about.")],
+    [L("You went all the way down? Into the trench? Rivet, nothing I built was meant for that."), L("Brine says the sea went calm the moment you surfaced. Like someone finally started singing again.")],
   ],
   // what each Warden says as the Static leaves it
   freed: [
@@ -9285,6 +9670,7 @@ const STORY = {
     'The peaks are quiet again. Climb, little light. Climb higher than the Static can reach.',
     'The fire answers to me again. Find the citadel. Bring our leader home.',
     'You flew where the Static lives. The Conductor will not forgive this.',
+    'My song… returns. Five of us free. Go up, little light — the citadel will know your heart.',
   ],
   chatter: [
     L("Bring me Logic Boards and Power Cores and I can open up more of this place. The Lab's been sealed since the Static came."),
@@ -9505,6 +9891,12 @@ const Story = {
   // ── quests ──
   arenaStep(A) {
     const Z = ZONES[A.i], p = G.player;
+    // the ocean Warden: no beacons, just the long way down
+    if (A.i === 5) {
+      const v = World.villages && World.villages.find((x) => x.i === 4);
+      if ((G.gear.hull || 0) < 3) return { step: `Upgrade your Pressure Hull to Mk III at Tidewright Diving (yours: ${HULL_NAMES[G.gear.hull || 0]}), then dive into the trench`, target: v ? { x: v.x, z: v.z, label: 'SALTPIN' } : null };
+      return { step: `Dive into the Drowned Trench and find ${Z.boss.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
+    }
     if (!A.sealed) return { step: `Enter ${Z.boss.name}'s dome in the ${Z.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
     if (A.i === 4 && G.region !== REGIONS.sky && World.skyPeak) {
       const k = World.skyPeak;
@@ -9524,14 +9916,14 @@ const Story = {
       const target = s === 'talk' ? World.wren : s === 'rack' ? World.rack : s === 'bot' ? World.terminals[0] : s === 'targets' ? { x: 0, z: 30 } : null;
       return { id: 'wake', title: 'Rise and Shine', step: TUT_TEXT[s] + (s === 'targets' ? ` (${Math.min(3, F.targets)}/3)` : ''), target: target && { x: target.x, z: target.z, label: s === 'talk' ? 'WREN' : '' }, prog: [F.tutorial, TUTORIAL.length] };
     }
-    const ground = [0, 1, 2, 3].filter((i) => B[i]).length;
-    const title = ground === 0 ? 'The First Warden' : ground < 4 ? 'The Wardens Remember' : !B[4] ? 'Above the Static' : 'Free Skies';
+    const ground = WARDENS.filter((i) => B[i]).length;
+    const title = ground === 0 ? 'The First Warden' : ground < WARDENS.length ? 'The Wardens Remember' : !B[4] ? 'Above the Static' : 'Free Skies';
     if (F.reported < F.order.length) return { id: 'report', title, step: 'Return home and tell Wren what happened', target: { x: World.wren.x, z: World.wren.z, label: 'WREN' } };
     if (ground === 0) return Object.assign({ id: 'first', title }, this.arenaStep(World.arenas[0]));
-    if (ground < 4) {
-      const A = UI.goal().A || World.arenas.find((a) => !B[a.i]);
+    if (ground < WARDENS.length) {
+      const A = UI.goal().A || World.arenas.find((a) => !B[a.i] && a.i !== 4);
       const q = Object.assign({ id: 'wardens', title }, this.arenaStep(A));
-      q.step = `${ground}/4 freed · ` + q.step;
+      q.step = `${ground}/${WARDENS.length} freed · ` + q.step;
       return q;
     }
     if (!B[4]) return Object.assign({ id: 'sky', title }, this.arenaStep(World.arenas.find((a) => a.i === 4)));
@@ -9975,8 +10367,8 @@ const G = {
     saveGame();
     setTimeout(() => {
       Sound.play('portal');
-      const left = this.progress.beaten.filter((x) => !x).length;
-      const sub = L === 4 ? 'The skies are free!' : left === 1 ? 'Only the Sky Islands remain — their beacons are unsealed' : `${left} Wardens remain — check your map`;
+      const left = WARDENS.filter((i) => !this.progress.beaten[i]).length;
+      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Islands\' beacons are unsealed' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
       this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
       if (L === 4) setTimeout(() => { if (this.state !== 'playing') return; this.state = 'victory'; Input.unlock(); Object.keys(this.stats).forEach((k) => (this.total[k] = (this.total[k] || 0) + this.stats[k])); this.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; UI.showVictory(); }, 4000);
@@ -9999,7 +10391,7 @@ function clearEntities() {
 
 const NEW_UP = () => ({ armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 });
 const NEW_PROGRESS = (seed) => ({
-  beaten: [false, false, false, false, false],
+  beaten: ZONES.map(() => false),
   world: { seed, beacons: [], caches: [], sprites: [], secrets: [], caves: [], fog: '', pins: [] },
   story: { logs: 0, plating: 0, botparts: 0 },
 });
@@ -10025,7 +10417,7 @@ function newRun() {
   G.storage = { 'part:scrap': 4, 'part:wire': 2 };
   G.reserve = [];
   G.bucks = 40;
-  G.gear = { jetpack: false, fireboots: false, backpack: 0 };
+  G.gear = { jetpack: false, fireboots: false, backpack: 0, hull: 0, prop: 0, lamp: 0 };
   G.base = { shield: false, charger: 0, rooms: {} };
   G.progress = NEW_PROGRESS(seed);
   G.progress.story.flags = Story.fresh();
@@ -10062,10 +10454,11 @@ function applyState(json) {
     s.pos = null;
     G.migrated = true;
   }
-  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base;
+  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = Object.assign({ hull: 0, prop: 0, lamp: 0 }, s.gear); G.base = s.base;
   G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
   G.progress.world = Object.assign(NEW_PROGRESS(0).world, s.progress.world);
   G.progress.story = Object.assign(NEW_PROGRESS(0).story, s.progress.story);
+  while (G.progress.beaten.length < ZONES.length) G.progress.beaten.push(false);   // saves from before the ocean Warden
   Story.migrate(G.progress.story, G.progress.beaten);
   G.base.rooms = G.base.rooms || {};
   G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
@@ -10168,7 +10561,7 @@ function applyWorldProgress() {
   }
   for (const A of World.arenas) {
     const beaten = G.progress.beaten[A.i];
-    const open = beaten || (A.beacons.length && A.beacons.every((b) => b.state === 'done'));
+    const open = beaten || A.beacons.every((b) => b.state === 'done');   // the trench dome has no beacons: it's open, if you can reach it
     A.sealed = !open; A.opening = false; A.fade = open ? 0 : 1;
     A.dome.visible = A.domeWire.visible = !open;
     A.dome.material.opacity = 0.12; A.domeWire.material.opacity = 0.25; A.domeWire.scale.setScalar(1);
@@ -10208,6 +10601,7 @@ function updateRegion(dt, force) {
 }
 function regionIntro(R) {
   if (R === REGIONS.sky) return ZONES[4].intro;
+  if (R === REGIONS.deep) return `Kelp, coral and wrecks. Your hull is rated to ${Sea.limit} m.`;
   return R.id === 'coast' ? COAST.intro : (ZONES.find((z) => z.id === R.id) || {}).intro || '';
 }
 
@@ -10257,7 +10651,8 @@ function spawnCampRobots(camp, n, aggro, pool, tier) {
     for (let j = 0; j < k; j++) {
       const a = rand(0, TAU), r = rand(2.8, camp.island ? 4.5 : 6);
       const ex = camp.x + Math.cos(a) * r, ez = camp.z + Math.sin(a) * r;
-      if (!camp.island && World.heightAt(ex, ez) < WORLD.water + 0.3) continue;
+      if (!camp.island && !camp.under && World.heightAt(ex, ez) < WORLD.water + 0.3) continue;
+      if (camp.under && World.heightAt(ex, ez) > WORLD.water - 3) continue;
       const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp, null, tier);
       e.facing = Math.atan2(camp.x - ex, camp.z - ez);
       G.enemies.push(e);
@@ -10294,7 +10689,7 @@ function streamCamps(dt) {
 
 // ─────────── Beacons, boss domes & the Wardens ───────────
 function skyLocked() {
-  const left = [0, 1, 2, 3].filter((i) => !G.progress.beaten[i]);
+  const left = WARDENS.filter((i) => !G.progress.beaten[i]);
   return left.length ? `Sealed by the Static — defeat ${left.map((i) => ZONES[i].boss.name).join(', ')} first` : null;
 }
 
@@ -10548,7 +10943,9 @@ function explore(dt) {
   const cv = p.inCave ? World.caveAt(p.pos.x, p.pos.z, p.pos.y) : null;
   const deep = cv ? clamp((World.heightAt(p.pos.x, p.pos.z) - p.pos.y - 2) / 6, 0, 1) : 0;
   World.caveDim = lerp(World.caveDim, deep, 1 - Math.exp(-3 * dt));
-  World.headlamp.intensity = World.caveDim * 2.2;
+  const sea = p.swim ? clamp((p.depth || 0) / 25, 0, 1) * (G.gear.lamp ? 3.2 : 1.4) : 0;
+  World.headlamp.intensity = Math.max(World.caveDim * 2.2, sea);
+  World.headlamp.distance = G.gear.lamp && p.swim ? 40 : 26;
   World.headlamp.position.set(p.pos.x, p.pos.y + 1.6, p.pos.z);
   if (cv && !cv.cave.found && deep > 0.3) {
     cv.cave.found = true;

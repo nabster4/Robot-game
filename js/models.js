@@ -361,6 +361,33 @@ function buildBossModel(kind, hex) {
       for (const s of [-1, 1]) { const t = mesh(Geo.cyl(0.12, 0.2, 1.4, 5), gold, s * 0.6, -1.4, 0.6, g); t.rotation.x = 0.3; }
       break;
     }
+    case 'deep': {
+      // DEEPSONG — a great mechanical whale wrapped in singing rings
+      body.color.set('#1e3a4a');
+      const pale = Mat.std('#c8d8e0', { metal: 0.6, rough: 0.35 });
+      const b = mesh(Geo.oct(2.2), body, 0, 0, 0, g); b.scale.set(1.3, 1, 2.6);
+      mesh(Geo.box(2.4, 0.5, 4.4), pale, 0, -1.4, 0.4, g);                        // belly plates
+      for (const s of [-1, 1]) {
+        mesh(Geo.sphere(0.4, 1), Mat.glow(hex, 5), s * 1.6, 0.5, 4.6, g);           // eyes
+        mesh(Geo.box(0.12, 0.12, 3), glowM, s * 2.4, 0, 0.5, g);                    // side light lines
+      }
+      mesh(Geo.box(2.2, 0.2, 0.6), dark, 0, -0.6, 5.6, g);                          // mouth
+      parts.fins = [];
+      for (const s of [-1, 1]) { const f = node(g, s * 2.6, -0.6, 1.5); mesh(Geo.box(3.2, 0.2, 1.8), pale, s * 1.6, 0, 0, f); parts.fins.push(f); }
+      parts.tail = [];
+      let prev = g, z = -5;
+      for (let k = 0; k < 3; k++) {
+        const seg = node(prev, 0, 0, prev === g ? z : -2.2); parts.tail.push(seg);
+        const sz = 1.6 - k * 0.4;
+        mesh(Geo.box(sz * 1.6, sz * 1.2, 2.4), body, 0, 0, -1.1, seg);
+        mesh(Geo.box(0.1, 0.1, 2.2), glowM, 0, sz * 0.6, -1.1, seg);
+        prev = seg;
+      }
+      mesh(Geo.box(5, 0.25, 1.6), pale, 0, 0, -2.4, prev);                          // tail flukes
+      parts.rings = [];
+      for (const zz of [2.2, -1.2]) { const r = new THREE.Mesh(Geo.torus(3.6, 0.12, 40), glowM); r.position.z = zz; g.add(r); parts.rings.push(r); }
+      break;
+    }
     default: {
       // the original orb overseer
       mesh(Geo.sphere(2.3, 1), body, 0, 0, 0, g);

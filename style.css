@@ -712,3 +712,19 @@ body.touch #objective { cursor: pointer; }
 .quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
 .quest-grid .quest { margin: 0; }
 .lg.village { background: #6bff9e; border-radius: 50%; }
+
+/* ═════════════════════════ UNDERWATER ═════════════════════════ */
+#depth { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); width: 132px; padding: 10px 12px; border-radius: 10px; background: rgba(4,20,32,0.7);
+  border: 1px solid rgba(74,224,208,0.5); display: none; font-family: Orbitron, sans-serif; color: #bff6ff; text-align: center; }
+#depth.show { display: block; }
+#depth .lbl { display: block; font-size: 10px; letter-spacing: 2px; color: #7fd8e8; }
+#depth b { display: block; font-size: 22px; margin: 2px 0 6px; }
+#depth .track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#depth .track i { display: block; height: 100%; width: 0; background: #4ae0d0; }
+#depth.over { border-color: #ff3b5c; animation: blink .4s infinite alternate; }
+#depth.over .track i { background: #ff3b5c; }
+#depth #depth-hull { display: block; font: 600 12px Rajdhani, sans-serif; color: #9fc8d8; margin-top: 6px; }
+body.touch #depth { top: 38%; right: calc(10px + env(safe-area-inset-right)); width: 110px; }
+#pressure { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255,40,60,0.45) 100%); }
+.lg.wreck { border: 2px solid #7fd8e8; border-radius: 0 0 6px 6px; border-top: none; width: 8px; height: 7px; }

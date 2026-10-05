@@ -218,12 +218,21 @@ const Sound = (() => {
           'A4 - C5 - F5 ~ E5 -', 'D5 - B4 - G4 ~ ~ -', 'G4 - B4 - E5 ~ D5 B4', 'C5 ~ ~ - A4 - C5 -',
           'F5 - E5 - D5 - C5 -', 'D5 ~ E5 - F5 - G5 -', 'E5 ~ D5 - C5 ~ ~ -', 'C5 - G4 - E4 - G4 -']),
       }, ['a', 'b', 'a', 'b']) },
+    { // The Sunken Reach — slow, dreamy underwater bells
+      bpm: 84, lead: 'bell', groove: 'soft', bars: song({
+        a: sec('a', 'Em C G D Em C Am B', [
+          'B4 ~ E5 - G5 ~ ~ -', 'C5 ~ E5 - G5 ~ E5 -', 'D5 ~ G5 - B5 ~ ~ -', 'A4 ~ D5 - F#5 ~ ~ -',
+          'B4 ~ E5 - G5 ~ B5 -', 'C6 ~ ~ - G5 ~ E5 -', 'A5 ~ E5 - C5 ~ E5 -', 'D#5 ~ ~ ~ F#5 ~ ~ ~']),
+        b: sec('b', 'C D Bm Em C D B B', [
+          'E5 ~ G5 - C6 ~ ~ -', 'F#5 ~ A5 - D6 ~ ~ -', 'D6 ~ B5 - F#5 ~ ~ -', 'G5 ~ ~ - E5 ~ B4 -',
+          'C6 ~ B5 - A5 ~ G5 -', 'A5 ~ ~ - F#5 ~ D5 -', 'D#5 ~ F#5 - B5 ~ ~ -', 'B4 ~ ~ ~ ~ ~ ~ ~']),
+      }, ['a', 'b']) },
   ];
   let place = PLACE_SONGS[5];
 
   const THEMES = { explore: EXPLORE, combat: COMBAT, boss: BOSS };
   // each zone gets its own key and tempo so the soundtrack doesn't wear thin
-  const ZONE_MUSIC = [{ t: 0, bpm: 116 }, { t: -2, bpm: 122 }, { t: 3, bpm: 112 }, { t: -4, bpm: 108 }, { t: 2, bpm: 124 }, { t: -1, bpm: 128 }];
+  const ZONE_MUSIC = [{ t: 0, bpm: 116 }, { t: -2, bpm: 122 }, { t: 3, bpm: 112 }, { t: -4, bpm: 108 }, { t: 2, bpm: 124 }, { t: -1, bpm: 128 }, { t: -5, bpm: 96 }];
   let zoneMusic = ZONE_MUSIC[0];
 
   let step = 0, nextTime = 0, intensity = 0, timer = null;

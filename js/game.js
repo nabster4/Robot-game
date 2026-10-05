@@ -421,8 +421,8 @@ const G = {
     saveGame();
     setTimeout(() => {
       Sound.play('portal');
-      const left = this.progress.beaten.filter((x) => !x).length;
-      const sub = L === 4 ? 'The skies are free!' : left === 1 ? 'Only the Sky Islands remain — their beacons are unsealed' : `${left} Wardens remain — check your map`;
+      const left = WARDENS.filter((i) => !this.progress.beaten[i]).length;
+      const sub = L === 4 ? 'The skies are free!' : left === 0 ? 'Every Warden is free — the Sky Islands\' beacons are unsealed' : `${left} Warden${left > 1 ? 's' : ''} remain — check your map`;
       this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
       if (L === 4) setTimeout(() => { if (this.state !== 'playing') return; this.state = 'victory'; Input.unlock(); Object.keys(this.stats).forEach((k) => (this.total[k] = (this.total[k] || 0) + this.stats[k])); this.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; UI.showVictory(); }, 4000);
@@ -445,7 +445,7 @@ function clearEntities() {
 
 const NEW_UP = () => ({ armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 });
 const NEW_PROGRESS = (seed) => ({
-  beaten: [false, false, false, false, false],
+  beaten: ZONES.map(() => false),
   world: { seed, beacons: [], caches: [], sprites: [], secrets: [], caves: [], fog: '', pins: [] },
   story: { logs: 0, plating: 0, botparts: 0 },
 });
@@ -471,7 +471,7 @@ function newRun() {
   G.storage = { 'part:scrap': 4, 'part:wire': 2 };
   G.reserve = [];
   G.bucks = 40;
-  G.gear = { jetpack: false, fireboots: false, backpack: 0 };
+  G.gear = { jetpack: false, fireboots: false, backpack: 0, hull: 0, prop: 0, lamp: 0 };
   G.base = { shield: false, charger: 0, rooms: {} };
   G.progress = NEW_PROGRESS(seed);
   G.progress.story.flags = Story.fresh();
@@ -508,10 +508,11 @@ function applyState(json) {
     s.pos = null;
     G.migrated = true;
   }
-  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base;
+  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = Object.assign({ hull: 0, prop: 0, lamp: 0 }, s.gear); G.base = s.base;
   G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
   G.progress.world = Object.assign(NEW_PROGRESS(0).world, s.progress.world);
   G.progress.story = Object.assign(NEW_PROGRESS(0).story, s.progress.story);
+  while (G.progress.beaten.length < ZONES.length) G.progress.beaten.push(false);   // saves from before the ocean Warden
   Story.migrate(G.progress.story, G.progress.beaten);
   G.base.rooms = G.base.rooms || {};
   G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
@@ -614,7 +615,7 @@ function applyWorldProgress() {
   }
   for (const A of World.arenas) {
     const beaten = G.progress.beaten[A.i];
-    const open = beaten || (A.beacons.length && A.beacons.every((b) => b.state === 'done'));
+    const open = beaten || A.beacons.every((b) => b.state === 'done');   // the trench dome has no beacons: it's open, if you can reach it
     A.sealed = !open; A.opening = false; A.fade = open ? 0 : 1;
     A.dome.visible = A.domeWire.visible = !open;
     A.dome.material.opacity = 0.12; A.domeWire.material.opacity = 0.25; A.domeWire.scale.setScalar(1);
@@ -654,6 +655,7 @@ function updateRegion(dt, force) {
 }
 function regionIntro(R) {
   if (R === REGIONS.sky) return ZONES[4].intro;
+  if (R === REGIONS.deep) return `Kelp, coral and wrecks. Your hull is rated to ${Sea.limit} m.`;
   return R.id === 'coast' ? COAST.intro : (ZONES.find((z) => z.id === R.id) || {}).intro || '';
 }
 
@@ -703,7 +705,8 @@ function spawnCampRobots(camp, n, aggro, pool, tier) {
     for (let j = 0; j < k; j++) {
       const a = rand(0, TAU), r = rand(2.8, camp.island ? 4.5 : 6);
       const ex = camp.x + Math.cos(a) * r, ez = camp.z + Math.sin(a) * r;
-      if (!camp.island && World.heightAt(ex, ez) < WORLD.water + 0.3) continue;
+      if (!camp.island && !camp.under && World.heightAt(ex, ez) < WORLD.water + 0.3) continue;
+      if (camp.under && World.heightAt(ex, ez) > WORLD.water - 3) continue;
       const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp, null, tier);
       e.facing = Math.atan2(camp.x - ex, camp.z - ez);
       G.enemies.push(e);
@@ -740,7 +743,7 @@ function streamCamps(dt) {
 
 // ─────────── Beacons, boss domes & the Wardens ───────────
 function skyLocked() {
-  const left = [0, 1, 2, 3].filter((i) => !G.progress.beaten[i]);
+  const left = WARDENS.filter((i) => !G.progress.beaten[i]);
   return left.length ? `Sealed by the Static — defeat ${left.map((i) => ZONES[i].boss.name).join(', ')} first` : null;
 }
 
@@ -994,7 +997,9 @@ function explore(dt) {
   const cv = p.inCave ? World.caveAt(p.pos.x, p.pos.z, p.pos.y) : null;
   const deep = cv ? clamp((World.heightAt(p.pos.x, p.pos.z) - p.pos.y - 2) / 6, 0, 1) : 0;
   World.caveDim = lerp(World.caveDim, deep, 1 - Math.exp(-3 * dt));
-  World.headlamp.intensity = World.caveDim * 2.2;
+  const sea = p.swim ? clamp((p.depth || 0) / 25, 0, 1) * (G.gear.lamp ? 3.2 : 1.4) : 0;
+  World.headlamp.intensity = Math.max(World.caveDim * 2.2, sea);
+  World.headlamp.distance = G.gear.lamp && p.swim ? 40 : 26;
   World.headlamp.position.set(p.pos.x, p.pos.y + 1.6, p.pos.z);
   if (cv && !cv.cave.found && deep > 0.3) {
     cv.cave.found = true;

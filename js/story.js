@@ -36,6 +36,7 @@ const STORY = {
     [L("The Colossus kept saying 'the little light that fell'. I found your core in a crater up north, you know. Still warm."), L("I never told anyone that.")],
     [L("Infernus thanked you. By name. I never told it your name, Rivet."), L('Whatever that core is, the Wardens know it. We need to find out why.')],
     [L("The skies are clear. Whatever the Conductor is, it's lost its Wardens."), L("Come home safe, Rivet. We have a lot to talk about.")],
+    [L("You went all the way down? Into the trench? Rivet, nothing I built was meant for that."), L("Brine says the sea went calm the moment you surfaced. Like someone finally started singing again.")],
   ],
   // what each Warden says as the Static leaves it
   freed: [
@@ -44,6 +45,7 @@ const STORY = {
     'The peaks are quiet again. Climb, little light. Climb higher than the Static can reach.',
     'The fire answers to me again. Find the citadel. Bring our leader home.',
     'You flew where the Static lives. The Conductor will not forgive this.',
+    'My song… returns. Five of us free. Go up, little light — the citadel will know your heart.',
   ],
   chatter: [
     L("Bring me Logic Boards and Power Cores and I can open up more of this place. The Lab's been sealed since the Static came."),
@@ -264,6 +266,12 @@ const Story = {
   // ── quests ──
   arenaStep(A) {
     const Z = ZONES[A.i], p = G.player;
+    // the ocean Warden: no beacons, just the long way down
+    if (A.i === 5) {
+      const v = World.villages && World.villages.find((x) => x.i === 4);
+      if ((G.gear.hull || 0) < 3) return { step: `Upgrade your Pressure Hull to Mk III at Tidewright Diving (yours: ${HULL_NAMES[G.gear.hull || 0]}), then dive into the trench`, target: v ? { x: v.x, z: v.z, label: 'SALTPIN' } : null };
+      return { step: `Dive into the Drowned Trench and find ${Z.boss.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
+    }
     if (!A.sealed) return { step: `Enter ${Z.boss.name}'s dome in the ${Z.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
     if (A.i === 4 && G.region !== REGIONS.sky && World.skyPeak) {
       const k = World.skyPeak;
@@ -283,14 +291,14 @@ const Story = {
       const target = s === 'talk' ? World.wren : s === 'rack' ? World.rack : s === 'bot' ? World.terminals[0] : s === 'targets' ? { x: 0, z: 30 } : null;
       return { id: 'wake', title: 'Rise and Shine', step: TUT_TEXT[s] + (s === 'targets' ? ` (${Math.min(3, F.targets)}/3)` : ''), target: target && { x: target.x, z: target.z, label: s === 'talk' ? 'WREN' : '' }, prog: [F.tutorial, TUTORIAL.length] };
     }
-    const ground = [0, 1, 2, 3].filter((i) => B[i]).length;
-    const title = ground === 0 ? 'The First Warden' : ground < 4 ? 'The Wardens Remember' : !B[4] ? 'Above the Static' : 'Free Skies';
+    const ground = WARDENS.filter((i) => B[i]).length;
+    const title = ground === 0 ? 'The First Warden' : ground < WARDENS.length ? 'The Wardens Remember' : !B[4] ? 'Above the Static' : 'Free Skies';
     if (F.reported < F.order.length) return { id: 'report', title, step: 'Return home and tell Wren what happened', target: { x: World.wren.x, z: World.wren.z, label: 'WREN' } };
     if (ground === 0) return Object.assign({ id: 'first', title }, this.arenaStep(World.arenas[0]));
-    if (ground < 4) {
-      const A = UI.goal().A || World.arenas.find((a) => !B[a.i]);
+    if (ground < WARDENS.length) {
+      const A = UI.goal().A || World.arenas.find((a) => !B[a.i] && a.i !== 4);
       const q = Object.assign({ id: 'wardens', title }, this.arenaStep(A));
-      q.step = `${ground}/4 freed · ` + q.step;
+      q.step = `${ground}/${WARDENS.length} freed · ` + q.step;
       return q;
     }
     if (!B[4]) return Object.assign({ id: 'sky', title }, this.arenaStep(World.arenas.find((a) => a.i === 4)));

@@ -90,6 +90,7 @@ class Player {
     if (I.touchMode) touchAimAssist(this, dt);
     G.focus = false;
     this.inCave = !!World.caveAt(this.pos.x, this.pos.z, this.pos.y);
+    this.swim = !this.inCave && Sea.swimmable(this.pos.x, this.pos.z, this.pos.y);
     this.effects(dt);
     const frozen = this.frozenT > 0;
 
@@ -121,6 +122,8 @@ class Player {
       G.fov.kick = 12;
     }
 
+    if (this.swim) Sea.swim(this, dt, I, mf, mr);
+    else {
     // jump · glide · wall leap · jetpack (hold)
     if (I.hit('Space') && !frozen) {
       if (this.climbing) {
@@ -245,10 +248,13 @@ class Player {
       }
     }
 
+    }
+
     World.keepInside(this.pos, this.r);
+    if (this.swim) Sea.pressure(this, dt); else { this.depth = 0; this.crush = Math.max(0, (this.crush || 0) - dt * 2); }
     const gy = World.groundAt(this.pos.x, this.pos.z, this.pos.y);
     // fall damage: measured from the highest point of a free fall (gliding / jetpack reset it)
-    if (this.gliding || this.jetting || this.climbing || this.grounded || this.launchT > 0.8) this.fallTop = this.pos.y;
+    if (this.gliding || this.jetting || this.climbing || this.grounded || this.swim || this.launchT > 0.8) this.fallTop = this.pos.y;
     else this.fallTop = Math.max(this.fallTop, this.pos.y);
     if (!this.climbing) {
       if (this.pos.y <= gy) {
@@ -747,7 +753,10 @@ class Enemy {
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
     // walkers stay out of deep water & lava and can't scale cliffs
-    if (this.d.hover <= 1 && !this.island) {
+    if (this.d.under) {
+      // sea robots never leave the water
+      if (World.heightAt(this.pos.x, this.pos.z) > WORLD.water - 3) { this.pos.x = ox; this.pos.z = oz; this.vel.x *= -0.3; this.vel.z *= -0.3; this.strafe *= -1; this.wander.t = 0; }
+    } else if (this.d.hover <= 1 && !this.island) {
       const h1 = World.heightAt(this.pos.x, this.pos.z);
       if (h1 < WORLD.water + 0.2 || (h1 > World.heightAt(ox, oz) + 0.05 && World.slopeAt(this.pos.x, this.pos.z) > CLIFF_SLOPE)) {
         this.pos.x = ox; this.pos.z = oz; this.vel.x *= -0.3; this.vel.z *= -0.3; this.strafe *= -1; this.wander.t = 0;
@@ -772,7 +781,9 @@ class Enemy {
       if (ad < R) { this.pos.x = A.x + (ax / ad) * R; this.pos.z = A.z + (az / ad) * R; }
     }
     const gNow = this.island ? this.island.top : World.floorAt(this.pos.x, this.pos.z);
-    const flyBase = this.high ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, WORLD.water);
+    const flyBase = this.high ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY)
+      : this.d.under ? Math.max(gNow, this.aggro ? Math.min(p.pos.y - 0.5, WORLD.water - 2 - this.d.hover) : gNow)
+      : Math.max(gNow, WORLD.water);
     if (this.d.hover > 1) this.pos.y = lerp(this.pos.y, flyBase + this.d.hover + Math.sin(this.t * 2) * 0.35, 1 - Math.exp(-3 * dt));
     else this.pos.y = gNow + this.d.hover;
 
@@ -835,6 +846,7 @@ const BOSS_KIND = {
   titan: { r: 3.6, hover: 0,   ground: true, cyOff: 14.6, capLo: 0.5, capHi: 19.5, speed: 3.2 },
   fire:  { r: 3.2, hover: 6,   cyOff: 0,    speed: 5.5 },
   bird:  { r: 3.4, hover: 10,  cyOff: 0,    speed: 9 },
+  deep:  { r: 4.0, hover: 7,   cyOff: 0,    speed: 6 },
 };
 
 class Boss {
@@ -908,12 +920,13 @@ class Boss {
   }
 
   startWave(effect, speed = 17) {
-    this.wave = { r: 1, y: this.ground + 0.4, hit: false, effect, speed, x: this.pos.x, z: this.pos.z };
+    const sonar = effect === 'sonar', y = sonar ? this.cy : this.ground + 0.4;
+    this.wave = { r: 1, y, hit: false, effect, speed, x: this.pos.x, z: this.pos.z };
     this.shock.visible = true;
     this.shock.material.color.set(effect === 'freeze' ? '#bff0ff' : this.color).multiplyScalar(4);
-    Fx.explosion(this.pos.x, this.ground + 0.5, this.pos.z, effect === 'freeze' ? '#bff0ff' : this.color, 2.2);
-    Fx.addShake(1); Sound.play('slam');
-    G.hint(effect === 'freeze' ? 'Jump over the frost wave or you will freeze!' : 'Jump over the shockwave!');
+    Fx.explosion(this.pos.x, y + 0.1, this.pos.z, effect === 'freeze' ? '#bff0ff' : this.color, 2.2);
+    Fx.addShake(sonar ? 0.5 : 1); Sound.play('slam');
+    G.hint(sonar ? 'Swim above or below the sonar ring!' : effect === 'freeze' ? 'Jump over the frost wave or you will freeze!' : 'Jump over the shockwave!');
   }
 
   nextPattern() {
@@ -943,6 +956,7 @@ class Boss {
       case 'dive': this.dState = 'aim'; this.subT = P2 ? 0.6 : 0.85; this.sub = P2 ? 2 : 1; break;
       case 'feathers': this.sub = P2 ? 5 : 3; break;
       case 'gust': this.stateT = P2 ? 2.6 : 2; Sound.play('glide'); G.hint('Hold your ground against the gust!'); break;
+      case 'sonar': this.subT = 1.1; this.sub = P2 ? 3 : 2; this.sonarState = 'charge'; Sound.play('laser'); G.hint('A sonar ring! Swim above or below it'); break;
     }
   }
 
@@ -1305,6 +1319,17 @@ class Boss {
         }
         break;
       }
+      case 'sonar': {
+        // the Warden's song: a ring of sound sweeps out at its own depth
+        this.subT -= dt;
+        this.anim = this.sonarState === 'charge' ? 1 : 0;
+        if (this.subT <= 0) {
+          this.startWave('sonar', P2 ? 19 : 15);
+          this.sub--; this.subT = P2 ? 1.1 : 1.5;
+          if (this.sub <= 0) { this.state = 'idle'; this.stateT = 1.6; }
+        }
+        break;
+      }
       case 'gust': {
         this.hoverTarget = 7;
         const ux = dx / dd, uz = dz / dd;
@@ -1348,9 +1373,11 @@ class Boss {
       this.shock.scale.set(w.r, w.r, 1);
       this.shock.material.opacity = Math.max(0, 1 - w.r / 42);
       const pd = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
-      if (!w.hit && Math.abs(pd - w.r) < 1.1 && p.pos.y < World.arenaFloor(p.pos.x, p.pos.z) + 0.7) {
+      const inRing = w.effect === 'sonar' ? Math.abs(pd - w.r) < 1.4 && Math.abs(p.pos.y + 1 - w.y) < 1.8 : Math.abs(pd - w.r) < 1.1 && p.pos.y < World.arenaFloor(p.pos.x, p.pos.z) + 0.7;
+      if (!w.hit && inRing) {
         w.hit = true;
         if (w.effect === 'freeze') { p.hurt(this.dmg * 0.8, this.pos); p.freeze(1.8); }
+        else if (w.effect === 'sonar') { p.hurt(this.dmg * 1.3, this.pos); p.slowT = Math.max(p.slowT, 2.5); Fx.tintFlash('#4ae0d0', 0.4); }
         else { p.hurt(this.dmg * 1.6, this.pos); p.vel.y = 7; }
       }
       if (w.r > 42) { this.wave = null; this.shock.visible = false; }
@@ -1421,6 +1448,15 @@ class Boss {
         P.arms.forEach((a, i) => { a.position.y = 0.8 + Math.sin(this.t * 3 + i * 2) * 0.3; a.rotation.x = this.state === 'flame' || this.state === 'meteor' ? -1.3 : Math.sin(this.t * 2 + i) * 0.2; });
         P.tail.scale.set(1 + Math.sin(this.t * 12) * 0.08, 1 + Math.sin(this.t * 9) * 0.12, 1 + Math.sin(this.t * 12) * 0.08);
         if (Math.random() < dt * 20) Fx.trail(this.pos.x + rand(-2, 2), this.pos.y + rand(-3, 3), this.pos.z + rand(-2, 2), pick(['#ff6a1a', '#ffb347']), rand(0.8, 1.6), 0.6, 3);
+        break;
+      }
+      case 'deep': {
+        // the tail undulates; fins scull; the song rings glow brighter while it sings
+        P.tail.forEach((seg, i) => { seg.rotation.y = Math.sin(this.t * 2.2 - i * 0.8) * (0.25 + i * 0.08); });
+        P.fins.forEach((f, i) => { f.rotation.z = (i ? -1 : 1) * (0.3 + Math.sin(this.t * 2.5) * 0.25); });
+        P.rings.forEach((r, i) => { r.rotation.z += dt * (i % 2 ? 1 : -1) * (this.state === 'sonar' ? 3 : 0.6); r.scale.setScalar(1 + (this.state === 'sonar' ? 0.15 * Math.sin(this.t * 12 + i) : 0)); });
+        m.rotation.x = clamp((this.vel.y || 0) * -0.05, -0.3, 0.3);
+        if (Math.random() < dt * 6) Fx.glow.emit(this.pos.x + rand(-2, 2), this.pos.y + rand(-1, 2), this.pos.z + rand(-2, 2), 0, rand(1, 3), 0, rand(1.5, 3), 0.15, new THREE.Color('#dff6ff'), 1.2, 0, 0, 1);
         break;
       }
       case 'bird': {

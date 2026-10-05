@@ -33,8 +33,8 @@ The regions blend into each other along their borders: the sky, fog, light, weat
 - discovered caves (a **?** means a secret is still inside) and secrets you've found
 - your squad, and up to 12 markers of your own (click or tap to place one, click it again to remove it)
 
-**The Wardens:** five boss domes, one per region. Power a dome's **signal beacons** (activate one, then defend its ring for 22 seconds) and the dome opens. The four ground Wardens can be freed **in any order**. The Sky Islands' beacons stay sealed until those four have fallen. Step inside an open dome and it seals behind you for a one-on-one fight. Beating **Stormwing** in the Sky Islands finishes the game (you can keep exploring afterwards).
-**Brambleback** (Plains), **Glacieros** (Snow), **Colossus** (Mountains), **Infernus** (Volcano), **Stormwing** (Sky Islands). Each has an enraged Overdrive phase.
+**The Wardens:** five Warden domes, plus Stormwing's in the sky. Power a dome's **signal beacons** (activate one, then defend its ring for 22 seconds) and the dome opens. Deepsong's dome has no beacons — it's open, if your hull can take the depth. The five Wardens (Plains, Snow, Mountains, Volcano and the ocean's Deepsong) can be freed **in any order**. The Sky Islands' beacons stay sealed until all five have fallen. Step inside an open dome and it seals behind you for a one-on-one fight. Beating **Stormwing** in the Sky Islands finishes the game (you can keep exploring afterwards).
+**Brambleback** (Plains), **Glacieros** (Snow), **Colossus** (Mountains), **Infernus** (Volcano), **Deepsong** (the Drowned Trench), then **Stormwing** (Sky Islands). Each has an enraged Overdrive phase.
 
 **Story.** A new game opens with Rivet waking on the assembly table of **Wren Halloway**, the mechanic who built it. A short tutorial follows:
 1. look around
@@ -73,6 +73,16 @@ Saves have a version number. A save from the older portal version keeps your hot
 
 **Robot camps** sit all over the world around scrap braziers. They come to life as you approach and pack up when you're far away; a camp you wipe out comes back after a few minutes. An alarm meter ("?") fills over a robot's head while it notices you. When it's full, the whole camp attacks. Robots get tougher in the farther regions (Plains < Snow and Coast < Mountains < Volcano < Sky).
 
+**The Sunken Reach (underwater).** The sea under the Saltglass Coast is a region of its own: kelp forests, coral reefs, glowing vents, sunken wrecks, and robot camps of the deep (Reef Drones that slow you, Jelly Mines, Anglers, Crab Crushers). Underwater the light turns blue-green and darkens with depth, bubbles drift up, the sky fades away, and the music changes to its own slow theme.
+- **Swimming:** you move where you look. `Space` (or holding **JUMP** on touch) rises, `Shift` or `C` sinks, and the heavy chassis sinks slowly when you let go. Swim up to a shore and press `Space` to climb out.
+- **No oxygen** (Rivet doesn't breathe). The danger is **pressure**: the depth gauge shows how deep you are and your hull's rating. Below that depth your hull is slowly crushed. Your stock chassis is safe to 12 m.
+- **Diving gear** is sold at **Tidewright Diving** in Saltpin Harbor:
+  - **Pressure Hull Mk I / II / III** (safe to 30 / 55 / 100 m)
+  - **Hydro-Jets I / II** (faster swimming)
+  - **Abyss Lamp** (a much brighter chest lamp in the deep)
+- **Wrecks** lie at 9 to about 65 m, so the deeper ones need better hulls. Each holds a golden cache and a secret: memory fragments, plating, lost bot parts or treasure. Wrecks you've seen appear on the map with their depth.
+- **The Drowned Trench** drops to about 90 m and needs Mk III. At the bottom, the ocean Warden **Deepsong**, a great mechanical whale wrapped in singing rings, waits in an open dome. Its **sonar rings** sweep out at its own depth, so swim above or below them.
+
 **Robot villages.** Each region has a village of friendly robots that the Static hasn't reached. Walking into one saves the game, and its **charging post** starts serving your bots.
 
 | Village | Region | Shops |
@@ -81,7 +91,7 @@ Saves have a version number. A save from the older portal version keeps your hot
 | **Glimmerdrift** | Snow | Sleet Plating (armor), Koba's Botwright (premium bots) |
 | **Highbolt** | Mountains | Vela's Tuning (upgrades), Crank Outfitters (gear), Summit Arms (weapons) |
 | **Cinderwell** | Volcano | Slag Ironworks (armor), Tempra's Kiln (upgrades), The Sooty Kettle (repairs) |
-| **Saltpin Harbor** | Coast | Tidewright Diving (diving gear, coming with the underwater update), Pebble's Galley (repairs), Barnacle Bea's (parts), Driftwood Bots (premium bots) |
+| **Saltpin Harbor** | Coast | Tidewright Diving (pressure hulls, hydro-jets, abyss lamp), Pebble's Galley (repairs), Barnacle Bea's (parts), Driftwood Bots (premium bots) |
 
 - **Shop types:**
   - **Oil & Repairs:** Full Service (full hull and full bot batteries), repair kits, plasma cells.
@@ -116,7 +126,8 @@ Saves have a version number. A save from the older portal version keeps your hot
 | --- | --- |
 | `W A S D` | Move (`Shift` sprint) |
 | Mouse | Look, left-click fire |
-| `Space` | Jump. Tap in mid-air to glide, hold for the jetpack, and leap off while climbing |
+| `Space` | Jump. Tap in mid-air to glide, hold for the jetpack, and leap off while climbing. Underwater: rise |
+| `Shift` / `C` | Underwater: sink |
 | Walk into a cliff or rock | Climb (hold `W` to go up) |
 | `Q` | Dash |
 | Right-click / `G` | Plasma bomb |
@@ -158,6 +169,7 @@ js/terrain.js   world size, blended biome height functions (plateaus, terraces, 
 js/world.js     builds the world: ground chunks, water & lava, waterfalls, caves & secrets, the Halloway Works base, Warden domes & beacons,
                          sky islands, props, flora, camp sites, and the sky/fog/light blend between regions
 js/villages.js  robot villages: layout, shops, villagers, charging posts, village quests, Quill
+js/underwater.js the Sunken Reach: swimming, pressure, sea floor, wrecks, sea camps, the trench
 js/worldmap.js  full-screen world map with fog of war and player markers
 js/models.js    low-poly robot, boss, companion, weapon, pickup and secret models
 js/entities.js  Player controller (cliff climbing, caves), Enemy AI, Boss patterns, Companions

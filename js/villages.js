@@ -12,7 +12,7 @@ const SHOP_TYPES = {
   upgrades: { label: 'Upgrades',       color: '#3cf2ff', items: ['up_overclock', 'up_split', 'up_thruster', 'up_magnet', 'up_firmware', 'up_slot'] },
   gear:     { label: 'Gear',           color: '#ff9f43', items: ['jetpack', 'fireboots', 'backpack'] },
   bots:     { label: 'Botwright',      color: '#c6ff4d', items: ['bot_shield', 'bot_bubble', 'bot_tesla', 'bot_rocket', 'bot_bomber', 'bot_laser'] },
-  dive:     { label: 'Diving Supply',  color: '#4ae0d0', items: ['backpack', 'repair'], note: 'Captain Brine is still pressure-testing the diving gear. Come back soon.' },
+  dive:     { label: 'Diving Supply',  color: '#4ae0d0', items: ['dive_hull', 'dive_prop', 'dive_lamp', 'repair'] },
 };
 
 // ───────────────────────── The villages ─────────────────────────
@@ -65,7 +65,7 @@ const VILLAGES = [
     id: 'saltpin', name: 'Saltpin Harbor', region: 4, color: '#4ae0d0', hut: '#f0e6cc', roof: '#2f86c4',
     blurb: 'Stilt huts and fishing bots on the coast',
     shops: [
-      { type: 'dive', name: 'Tidewright Diving', keeper: 'Marlin', body: '#4ae0d0', greet: 'The deep is calling. Mostly it says "not yet".' },
+      { type: 'dive', name: 'Tidewright Diving', keeper: 'Marlin', body: '#4ae0d0', greet: 'Pressure hulls, hydro-jets, abyss lamps. Tested all the way to the trench. Well — most of the way.' },
       { type: 'food', name: "Pebble's Galley", keeper: 'Pebble', body: '#ffd8a8', greet: 'Salted oil! Nobody else in the valley has it.' },
       { type: 'parts', name: "Barnacle Bea's", keeper: 'Barnacle Bea', body: '#c87a4a', greet: 'Everything washes up eventually. I sell it back.' },
       { type: 'bots', name: 'Driftwood Bots', keeper: 'Koi', body: '#ff9f43', greet: 'Sea-tested, salt-proof, mostly waterproof.' },

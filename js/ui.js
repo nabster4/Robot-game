@@ -171,7 +171,7 @@ const UI = {
     this.mode = mode;
     if (shopSpot) this.shopDef = shopSpot.def;
     // a shop's tabs follow what it stocks
-    const SHOP_TAB = { weapon: 'gear', gear: 'gear', bot: 'bots', upgrade: 'upgrades', supply: 'supplies', service: 'supplies', part: 'parts' };
+    const SHOP_TAB = { weapon: 'gear', gear: 'gear', bot: 'bots', upgrade: 'upgrades', supply: 'supplies', service: 'supplies', part: 'parts', dive: 'dive' };
     const shopTabs = this.shopDef ? ['sell', ...new Set(this.shopDef.items.map((id) => SHOP_TAB[SHOP_ITEMS[id].kind]))] : ['sell'];
     if (mode === 'shop' && shopSpot) this.tab = shopTabs[1] || 'sell';
     const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: shopTabs,
@@ -289,6 +289,7 @@ const UI = {
     if (S.kind === 'upgrade' && G.up[S.up] >= UPGRADES[S.up].max) return { ok: false, why: 'MAXED' };
     if ((S.kind === 'supply' || S.kind === 'weapon') && !G.canAdd({ t: S.kind, id })) return { ok: false, why: 'HOTBAR FULL' };
     if (S.kind === 'part' && !G.canAdd({ t: 'part', id: S.part })) return { ok: false, why: 'HOTBAR FULL' };
+    if (S.kind === 'dive' && (G.gear[S.key] || 0) >= S.prices.length) return { ok: false, why: 'MAXED' };
     if (S.kind === 'service' && G.player.hp >= G.player.maxHp && G.companions.every((c) => !c.active || c.battery >= 99)) return { ok: false, why: 'ALL GOOD' };
     if (G.bucks < this.price(id)) return { ok: false, why: 'NEED BOTBUCKS' };
     return { ok: true };
@@ -296,6 +297,7 @@ const UI = {
   price(id) {
     const S = SHOP_ITEMS[id];
     if (S.kind === 'upgrade') return Math.round(S.price * (1 + 0.5 * G.up[S.up]));
+    if (S.kind === 'dive') return S.prices[Math.min(G.gear[S.key] || 0, S.prices.length - 1)];
     if (id === 'backpack') return S.price * (1 + G.gear.backpack);
     return S.price;
   },
@@ -306,6 +308,10 @@ const UI = {
     let msg = '';
     if (S.kind === 'supply') { G.addItem({ t: 'supply', id }); msg = `${S.name} added to your hotbar`; }
     else if (S.kind === 'part') { G.addItem({ t: 'part', id: S.part }); msg = `+1 ${PARTS[S.part].name}`; }
+    else if (S.kind === 'dive') {
+      G.gear[S.key] = (G.gear[S.key] || 0) + 1;
+      msg = S.key === 'hull' ? `${HULL_NAMES[G.gear.hull]} fitted — safe down to ${HULL_DEPTH[G.gear.hull]} m` : S.key === 'prop' ? `Hydro-Jets ${['I', 'II'][G.gear.prop - 1]} fitted — you swim faster` : 'Abyss Lamp fitted — the deep is brighter now';
+    }
     else if (S.kind === 'service') { G.player.hp = G.player.maxHp; for (const c of G.companions) if (c.active) { c.battery = 100; c.hp = c.maxHp; } msg = 'Hull repaired and batteries topped up'; Fx.tintFlash('#6bff9e', 0.35); }
     else if (S.kind === 'weapon') { G.addItem({ t: 'weapon', id }); msg = `${WEAPONS[id].name} added to your hotbar — select its slot to use it`; }
     else if (S.kind === 'gear') {
@@ -446,7 +452,7 @@ const UI = {
 
     // middle: tabs + content
     const tabNames = { bots: 'Bots', base: 'Base & Rooms', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies',
-      garage: 'Gear', parts: 'Buy Parts', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
+      garage: 'Gear', parts: 'Buy Parts', dive: 'Diving Gear', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
     $('ws-tabs').innerHTML = this.tabs.map((t) => `<button class="tab ${t === this.tab ? 'active' : ''}" data-tab="${t}">${tabNames[t]}</button>`).join('');
     $('ws-tabs').querySelectorAll('.tab').forEach((t) => (t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); }));
     $('ws-tabs').style.display = this.tabs.length > 1 ? '' : 'none';
@@ -524,13 +530,20 @@ const UI = {
           <div class="price-list">${PART_ORDER.map((k) => `<div class="price-row" style="--c:${PARTS[k].color}"><img src="${partIconURL(k)}" alt=""><span>${PARTS[k].name}</span><b>${PARTS[k].value} BB</b></div>`).join('')}</div>
           <div class="ws-note">To sell part of a stack, drag the slider in your hotbar list to pick how many, then press <b>Sell</b>. Weapons and supplies sell for 40% of their price.</div>`;
       } else {
-        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply', 'service'], parts: ['part'] }[this.tab];
+        const want = { gear: ['weapon', 'gear'], bots: ['bot'], upgrades: ['upgrade'], supplies: ['supply', 'service'], parts: ['part'], dive: ['dive'] }[this.tab];
         const ids = (shop ? shop.items : []).filter((id) => want.includes(SHOP_ITEMS[id].kind));
         mid = ids.map((id) => {
           const S = SHOP_ITEMS[id], st = this.shopState(id), price = this.price(id);
           let name, desc, icon, color, meta = '';
           if (S.kind === 'weapon') { const W = WEAPONS[id]; name = W.name; desc = W.desc; icon = weapIconURL(id); color = W.color; meta = `<div class="meta">DMG ${W.dmg}${W.pellets > 1 ? '×' + W.pellets : ''} · ${W.rate}/S${W.rocket ? ' · SPLASH' : ''}</div>`; }
           else if (S.kind === 'bot') { const d = COMP_DEFS[S.bot]; name = d.name; desc = COMP_DESC[S.bot]; icon = compIconURL(S.bot); color = d.color; meta = `<div class="meta">PREMIUM BOT · HULL ${Math.round(d.hp * (1 + 0.3 * G.up.firmware))}${d.range ? ' · RANGE ' + d.range + 'M' : ''}</div>`; }
+          else if (S.kind === 'dive') {
+            const lvl = G.gear[S.key] || 0, max = S.prices.length;
+            name = S.key === 'hull' ? (lvl < max ? HULL_NAMES[lvl + 1] : HULL_NAMES[max]) : S.name + (max > 1 ? ` ${['I', 'II', 'III'][Math.min(lvl, max - 1)]}` : '');
+            desc = S.key === 'hull' ? `${S.desc} Rated to ${HULL_DEPTH[Math.min(lvl + 1, max)]} m (yours: ${HULL_DEPTH[lvl]} m).` : S.desc;
+            color = '#4ae0d0'; icon = upgIconURL(S.key === 'hull' ? 'armor' : S.key === 'prop' ? 'thruster' : 'overclock', color);
+            meta = `<div class="pips">${Array.from({ length: max }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div>`;
+          }
           else if (S.kind === 'part') { const P = PARTS[S.part]; name = P.name; desc = P.desc + ' Goes into your hotbar.'; icon = partIconURL(S.part); color = P.color; meta = `<div class="meta">YOU HAVE ${G.partCount(S.part, true)}</div>`; }
           else if (S.kind === 'upgrade') { const U = UPGRADES[S.up]; name = U.name; desc = U.desc; icon = upgIconURL(S.up, '#3cf2ff'); color = '#3cf2ff'; meta = `<div class="pips">${Array.from({ length: U.max }, (_, i) => `<i class="${i < G.up[S.up] ? 'on' : ''}"></i>`).join('')}</div>`; }
           else { name = S.name; desc = S.desc; color = id === 'repair' || id === 'service' ? '#6bff9e' : id === 'cell' ? '#b98cff' : id === 'fireboots' ? '#ff6a1a' : '#ffb347'; icon = upgIconURL(id === 'service' ? 'repair' : id, color); if (id === 'backpack') meta = `<div class="pips">${Array.from({ length: S.max }, (_, i) => `<i class="${i < G.gear.backpack ? 'on' : ''}"></i>`).join('')}</div>`; }
@@ -702,6 +715,17 @@ const UI = {
     $('hud-bucks').textContent = G.bucks;
     document.body.classList.toggle('frozen', p.frozenT > 0 && !p.dead);
     document.body.classList.toggle('burning', p.burnT > 0 && !p.dead);
+    // depth gauge while swimming
+    const dEl = $('depth');
+    dEl.classList.toggle('show', !!p.swim && !p.dead);
+    if (p.swim) {
+      const lim = Sea.limit, dep = p.depth || 0;
+      $('depth-val').textContent = `${Math.round(dep)} m`;
+      $('depth-bar').style.width = Math.min(100, (dep / lim) * 100) + '%';
+      $('depth-hull').textContent = `${HULL_NAMES[G.gear.hull || 0]} · ${lim} m`;
+      dEl.classList.toggle('over', dep > lim);
+    }
+    $('pressure').style.opacity = (p.crush || 0) * 0.9;
     // stamina wheel (hidden while full)
     const stEl = $('stamina');
     const base = Math.min(p.stamina, 100), extra = Math.max(0, p.stamina - 100), extraMax = p.maxStamina - 100;
@@ -755,7 +779,7 @@ const UI = {
     $('obj-prog-fill').style.width = (prog * 100).toFixed(1) + '%';
     if (!this.objT || G.time - this.objT > 1) {
       this.objT = G.time;
-      $('obj-kills').textContent = `${R.name.toUpperCase()}  ·  WARDENS ${G.progress.beaten.filter(Boolean).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%`;
+      $('obj-kills').textContent = `${R.name.toUpperCase()}  ·  WARDENS ${WARDENS.filter((i) => G.progress.beaten[i]).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%`;
     }
 
     // boss bar

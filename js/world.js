@@ -52,6 +52,7 @@ const World = {
     this.placeCaches();
     this.placeSprites(45);
     this.planCamps();
+    Sea.build(this);
     Batch.finish();
     // instanced trees & grass are grouped by area, so they can be culled like everything else
     this.group.traverse((o) => { if (o.isInstancedMesh) { o.computeBoundingSphere(); o.frustumCulled = true; } });
@@ -106,6 +107,7 @@ const World = {
       }
     }
     Villages.plan(this, flats, free);
+    Sea.plan(this, flats);
     this.flats = flats;
   },
 
@@ -117,7 +119,7 @@ const World = {
       const k = 1 - smoothstep(f.r * 0.8, f.r * 1.8, Math.hypot(dx, dz));
       if (k > 0) h = lerp(h, f.h, k);
     }
-    return Math.max(h, WORLD.water - 70);
+    return Math.max(h, WORLD.water - 100);
   },
 
   computeHeights() {
@@ -163,6 +165,7 @@ const World = {
   regionAt(x, z, y = 0) {
     if (Math.hypot(x, z) < 110) return REGIONS.hub;
     if (Math.hypot(x - SKY_REGION.x, z - SKY_REGION.z) < SKY_REGION.r + 30 && y > this.skyFloor - 25) return REGIONS.sky;
+    if (y < WORLD.water - 2 && this.heightAt(x, z) < WORLD.water - 4 && Terra.weights(x, z)[4] > 0.3) return REGIONS.deep;
     return REGIONS.terra[Terra.dominant(x, z)];
   },
 
@@ -585,7 +588,7 @@ const World = {
   buildWater() {
     const geo = new THREE.PlaneGeometry(this.size + 600, this.size + 600, 8, 8);
     geo.rotateX(-Math.PI / 2);
-    this.waterMat = new THREE.MeshStandardMaterial({ color: '#2f86c4', emissive: '#0e3a5a', emissiveIntensity: 0.35, roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.86 });
+    this.waterMat = new THREE.MeshStandardMaterial({ color: '#2f86c4', emissive: '#0e3a5a', emissiveIntensity: 0.35, roughness: 0.12, metalness: 0.3, transparent: true, opacity: 0.86, side: THREE.DoubleSide });
     const w = new THREE.Mesh(geo, this.waterMat);
     w.position.y = WORLD.water;
     w.receiveShadow = true;
@@ -677,6 +680,15 @@ const World = {
       tgt.sd.addScaledVector(E.sd, w[i]);
       fd += E.fd * w[i]; hi += E.hi * w[i]; si += E.si * w[i]; st += E.stars * w[i];
     });
+    // under the sea: blue-green fog that darkens with depth, dimmer light
+    const uw = this.underK || 0;
+    if (uw > 0) {
+      const dk = clamp(this.underDepth / 70, 0, 1);
+      const sea = this._sea || (this._sea = new THREE.Color());
+      sea.copy(SEA.shallow).lerp(SEA.deep, Math.min(1, dk * 2)).lerp(SEA.abyss, Math.max(0, dk * 2 - 1));
+      tgt.fog.lerp(sea, uw); tgt.h0.lerp(SEA.hemiTop, uw).multiplyScalar(1 - 0.7 * dk * uw); tgt.h1.lerp(SEA.hemiBot, uw);
+      fd = lerp(fd, 0.03 + dk * 0.02, uw); si *= 1 - uw * (0.4 + 0.55 * dk); hi *= 1 - uw * 0.3 * dk;
+    }
     const cd = this.caveDim;
     if (cd > 0) {
       const dark = this._dark || (this._dark = new THREE.Color('#1a1510'));
@@ -1336,7 +1348,7 @@ const World = {
   buildRuins() {
     const stone = Mat.std('#4a4a58', { rough: 0.8, metal: 0.2 });
     for (const A of this.arenas) {
-      if (A.island) continue;
+      if (A.island || !this.pal[A.i]) continue;
       const P = this.pal[A.i];
       const topM = Mat.std(new THREE.Color(P.ground.mid).lerp(new THREE.Color('#ffffff'), 0.12).getStyle(), { rough: 0.9, metal: 0.05 });
       const rockM = Mat.std(P.ground.rock, { rough: 0.95, metal: 0.05 });
@@ -1742,7 +1754,11 @@ const World = {
   // ═════════════════════ Per-frame ═════════════════════
   update(dt, time, cam) {
     if (this.skyMesh) this.skyMesh.position.copy(cam.position);
-    // environment follows the camera's biome
+    // environment follows the camera's biome (and dives with it)
+    const ud = camUnderwater(cam);
+    this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
+    this.skyMesh.visible = ud <= 0;
+    Sea.update(dt, time, cam);
     this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
     this.lavaMat.emissiveIntensity = 1.3 + Math.sin(time * 2) * 0.25;
     if (this.fallTex) this.fallTex.offset.y -= dt * 1.6;

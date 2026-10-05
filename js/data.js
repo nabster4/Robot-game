@@ -57,6 +57,11 @@ const ENEMY_TYPES = {
     magmagrunt:  V('grunt',   { name: 'Magma Brute',   color: '#ff4a1a', body: '#4a1c12', shot: 'fire', hp: 62 }),
     embermite:   V('swarmer', { name: 'Ember Mite',    color: '#ffb347', body: '#4a2410', shot: 'fire' }),
     hawk:        V('drone',   { name: 'Sky Hawk',      color: '#ffe14d', body: '#e8e0c8', speed: 12, hover: 3.6, hp: 30 }),
+    // the Sunken Reach: robots that live under the sea (under: they never leave the water)
+    reefdrone:   V('drone',   { name: 'Reef Drone',    color: '#4ae0d0', body: '#1a5a6a', shot: 'frost', under: true, speed: 7, hp: 34 }),
+    jellymine:   V('swarmer', { name: 'Jelly Mine',    color: '#ff7ad8', body: '#5a2a6a', under: true, speed: 8, hover: 3, hp: 16 }),
+    anglerbot:   V('sniper',  { name: 'Angler',        color: '#ffe14d', body: '#20303a', under: true, hp: 48 }),
+    crabtank:    V('tank',    { name: 'Crab Crusher',  color: '#ff6a4a', body: '#6a2a1a', under: true, hp: 260 }),
   });
 })();
 
@@ -145,6 +150,17 @@ const ZONES = [
     boss: { kind: 'bird', name: 'STORMWING', title: 'Tyrant of the Skies', color: '#ffe14d', hp: 6600, patterns: ['vanish', 'dive', 'feathers', 'gust', 'spiral'] },
   },
 ];
+
+// The sixth region: the drowned trench under the Saltglass Coast, home of the ocean Warden.
+// (Wardens are ZONES 0-3 and 5; ZONES[4], the Sky Islands, holds the final fight.)
+ZONES.push({
+  id: 'deep', name: 'Drowned Trench', short: 'DEEP',
+  intro: 'The sea floor drops away into darkness. Something down there is singing.',
+  accent: '#4ae0d0', beacons: 0,
+  pool: [['reefdrone', 5], ['jellymine', 3], ['anglerbot', 2], ['crabtank', 1]],
+  boss: { kind: 'deep', name: 'DEEPSONG', title: 'The Singer in the Trench', color: '#4ae0d0', hp: 4400, patterns: ['sonar', 'radial', 'spiral', 'aimed', 'charge'] },
+});
+const WARDENS = [0, 1, 2, 3, 5];   // the five Wardens; Stormwing (4) guards the citadel above them all
 
 // Home base: a peaceful meadow in the middle of the world
 const HUB = {
@@ -245,6 +261,10 @@ const SHOP_ITEMS = {
   up_magnet:    { kind: 'upgrade', up: 'magnet',    price: 90 },
   up_firmware:  { kind: 'upgrade', up: 'firmware',  price: 300 },
   up_slot:      { kind: 'upgrade', up: 'slot',      price: 380 },
+  // diving gear (each piece upgrades in tiers)
+  dive_hull: { kind: 'dive', key: 'hull', name: 'Pressure Hull', prices: [220, 480, 900], desc: 'Lets you dive deeper without being crushed.' },
+  dive_prop: { kind: 'dive', key: 'prop', name: 'Hydro-Jets', prices: [260, 560], desc: 'Swim faster, and climb toward the surface faster.' },
+  dive_lamp: { kind: 'dive', key: 'lamp', name: 'Abyss Lamp', prices: [160], desc: 'A bright chest lamp that lights up the deep.' },
   service:      { kind: 'service', name: 'Full Service', price: 30, desc: 'Hull repaired to full, and every bot with you topped up to a full battery.' },
   buy_scrap:    { kind: 'part', part: 'scrap',   price: 6 },
   buy_wire:     { kind: 'part', part: 'wire',    price: 9 },
@@ -273,6 +293,7 @@ const COAST = {
 const REGIONS = {
   hub: { id: 'hub', name: 'Home Base', short: 'HOME', zone: 5, tier: 0, accent: '#3cf2ff', ambient: 'pollen', ambientColor: '#fff4a8' },
   sky: { id: 'sky', name: 'Sky Islands', short: 'SKY', zone: 4, tier: 4, accent: '#ffe14d', ambient: 'pollen', ambientColor: '#ffffff' },
+  deep: { id: 'deep', name: 'The Sunken Reach', short: 'DEEP', zone: 6, tier: 2, accent: '#4ae0d0', ambient: 'bubbles', ambientColor: '#dff6ff' },
   terra: [
     { id: 'plains', name: 'Green Plains', short: 'PLAINS', zone: 0, tier: 0, accent: '#6bff9e', ambient: 'pollen', ambientColor: '#fff4a8' },
     { id: 'snow', name: 'Snowy Plains', short: 'SNOW', zone: 1, tier: 1, accent: '#8ae9ff', ambient: 'snow' },
@@ -331,3 +352,8 @@ const RESEARCH = {
   firmware: { circuit: 4, core: 1 },
   slot: { core: 2, quantum: 1 },
 };
+
+// ───────────────────────── Diving ─────────────────────────
+// Rivet doesn't breathe — the sea's only danger is pressure. Each Pressure Hull tier is rated deeper.
+const HULL_DEPTH = [12, 30, 55, 100];
+const HULL_NAMES = ['Stock chassis', 'Pressure Hull Mk I', 'Pressure Hull Mk II', 'Pressure Hull Mk III'];

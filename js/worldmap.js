@@ -183,6 +183,12 @@ const WorldMap = {
       g.fillStyle = '#05060a'; g.beginPath(); g.moveTo(x, y - fs(4.5)); g.lineTo(x + fs(4.5), y); g.lineTo(x + fs(3), y); g.lineTo(x + fs(3), y + fs(4)); g.lineTo(x - fs(3), y + fs(4)); g.lineTo(x - fs(3), y); g.lineTo(x - fs(4.5), y); g.closePath(); g.fill();
       label(v.name, x, y - fs(14), v.V.color, 12, 900);
     });
+    // sunken wrecks you've seen (an anchor), with the depth you'll need to reach them
+    for (const w of World.wrecks || []) icon(w.x, w.z, (x, y) => {
+      g.strokeStyle = '#7fd8e8'; g.lineWidth = 2 * dpr; g.beginPath();
+      g.moveTo(x, y - fs(6)); g.lineTo(x, y + fs(5)); g.moveTo(x - fs(5), y + fs(1)); g.quadraticCurveTo(x, y + fs(9), x + fs(5), y + fs(1)); g.moveTo(x - fs(3), y - fs(3)); g.lineTo(x + fs(3), y - fs(3)); g.stroke();
+      label(`${Math.round(w.depth)} m`, x, y + fs(15), '#7fd8e8', 10, 700);
+    });
     // village quest goals
     for (const q of Villages.sides()) if (!q.done && q.target) icon(q.target.x, q.target.z, (x, y) => { this.star(g, x, y, fs(6), '#ffe9a0'); label(q.target.label, x, y + fs(13), '#ffe9a0', 11, 700); }, true);
     // beacons
@@ -224,7 +230,7 @@ const WorldMap = {
     }, true);
     // compass rose
     label('N', F.x0 + F.s / 2, F.y0 + fs(12), '#ff6b6b', 14, 900);
-    document.getElementById('map-info').textContent = `${Math.round(this.explored() * 100)}% explored · Wardens freed ${G.progress.beaten.filter(Boolean).length}/5 · Secrets ${World.secrets.filter((s) => s.found).length}/${World.secrets.length} · Caves ${World.caves.filter((c) => c.found).length}/${World.caves.length}`;
+    document.getElementById('map-info').textContent = `${Math.round(this.explored() * 100)}% explored · Wardens freed ${WARDENS.filter((i) => G.progress.beaten[i]).length}/5 · Secrets ${World.secrets.filter((s) => s.found).length}/${World.secrets.length} · Caves ${World.caves.filter((c) => c.found).length}/${World.caves.length}`;
   },
 
   star(g, x, y, r, color) {

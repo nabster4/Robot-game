@@ -279,9 +279,9 @@ const Weather = {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
     const color = type === 'snow' ? '#ffffff' : type === 'embers' ? '#ff7a2a' : hex;
-    const size = type === 'snow' ? 0.18 : type === 'data' ? 0.16 : type === 'embers' ? 0.14 : 0.08;
+    const size = type === 'snow' ? 0.18 : type === 'data' ? 0.16 : type === 'embers' ? 0.14 : type === 'bubbles' ? 0.13 : 0.08;
     const m = new THREE.PointsMaterial({
-      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : type === 'pollen' ? 1.1 : 3),
+      color: new THREE.Color(color).multiplyScalar(type === 'snow' ? 1.2 : type === 'dust' ? 0.9 : type === 'data' ? 1.6 : type === 'pollen' ? 1.1 : type === 'bubbles' ? 1.2 : 3),
       size: type === 'pollen' ? 0.07 : size, transparent: true, opacity: type === 'dust' || type === 'pollen' ? 0.55 : 0.85, depthWrite: false,
       blending: type === 'snow' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
@@ -298,6 +298,7 @@ const Weather = {
       switch (this.type) {
         case 'snow': p[i3 + 1] -= this.vel[i] * 2.2 * dt; p[i3] += Math.sin(time + this.ph[i]) * 0.8 * dt; break;
         case 'embers': p[i3 + 1] += this.vel[i] * 1.6 * dt; p[i3] += Math.sin(time * 1.3 + this.ph[i]) * 1.2 * dt; break;
+        case 'bubbles': p[i3 + 1] += this.vel[i] * 1.3 * dt; p[i3] += Math.sin(time * 2 + this.ph[i]) * 0.4 * dt; p[i3 + 2] += Math.cos(time * 1.7 + this.ph[i]) * 0.3 * dt; break;
         case 'data': p[i3 + 1] -= this.vel[i] * 6 * dt; break;
         default: p[i3] += Math.sin(time * 0.3 + this.ph[i]) * 0.4 * dt + 0.3 * dt; p[i3 + 1] += Math.cos(time * 0.4 + this.ph[i]) * 0.2 * dt;
       }
