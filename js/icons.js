@@ -348,6 +348,27 @@ function drawUpgradeIcon(ctx, id, x, y, s, color) {
       else ctx.fillRect((len - 0.9) * s, -0.08 * s, (id === 'rifle' ? 0.6 : 0.4) * s, 0.16 * s);
       break;
     }
+    case 'garage':
+      poly(ctx, [[-1, -0.1], [0, -0.9], [1, -0.1], [1, 0.9], [-1, 0.9]], s); ctx.fill(); ctx.stroke();
+      for (const k of [0.15, 0.4, 0.65]) { ctx.beginPath(); ctx.moveTo(-0.6 * s, k * s); ctx.lineTo(0.6 * s, k * s); ctx.stroke(); }
+      break;
+    case 'lab':
+      poly(ctx, [[-0.3, -1], [0.3, -1], [0.3, -0.3], [0.85, 0.85], [-0.85, 0.85], [-0.3, -0.3]], s); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-0.55 * s, 0.35 * s); ctx.lineTo(0.55 * s, 0.35 * s); ctx.stroke();
+      break;
+    case 'command':
+      ctx.beginPath(); ctx.arc(0, 0, 0.85 * s, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, 0.85 * s, 0.32 * s, 0, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -0.85 * s); ctx.lineTo(0, 0.85 * s); ctx.stroke();
+      break;
+    case 'quest': case 'memory':
+      roundRect(ctx, -0.75 * s, -0.95 * s, 1.5 * s, 1.9 * s, 0.15 * s); ctx.fill(); ctx.stroke();
+      for (const k of [-0.45, -0.1, 0.25]) { ctx.beginPath(); ctx.moveTo(-0.45 * s, k * s); ctx.lineTo(0.45 * s, k * s); ctx.stroke(); }
+      break;
+    case 'travel':
+      ctx.beginPath(); ctx.arc(0, -0.25 * s, 0.55 * s, Math.PI * 0.9, Math.PI * 0.1); ctx.lineTo(0, 0.95 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -0.25 * s, 0.2 * s, 0, TAU); ctx.stroke();
+      break;
   }
   ctx.restore();
 }

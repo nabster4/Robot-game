@@ -21,7 +21,7 @@ const WorldMap = {
 
   // shaded relief of the whole world (rebuilt for each new world)
   buildRelief() {
-    if (this.reliefSeed === World.seed) return;
+    if (this.reliefSeed === World.seed) { this.attachHolo(); return; }
     this.reliefSeed = World.seed;
     const N = this.RES, cv = this.relief || (this.relief = document.createElement('canvas'));
     cv.width = cv.height = N;
@@ -42,6 +42,14 @@ const WorldMap = {
       d[k] = clamp(col.r * 255 * shade, 0, 255); d[k + 1] = clamp(col.g * 255 * shade, 0, 255); d[k + 2] = clamp(col.b * 255 * shade, 0, 255); d[k + 3] = 255;
     }
     g.putImageData(img, 0, 0);
+    this.tex = null;
+    this.attachHolo();
+  },
+  // the Command Room's holo table shows the same relief
+  attachHolo() {
+    if (!World.cmdMap || !this.relief) return;
+    if (!this.tex) this.tex = new THREE.CanvasTexture(this.relief);
+    if (World.cmdMap.material.map !== this.tex) { World.cmdMap.material.map = this.tex; World.cmdMap.material.needsUpdate = true; }
   },
 
   // ── fog of war ──
@@ -95,6 +103,7 @@ const WorldMap = {
     Sound.play('click');
     this.resize();
     this.draw();
+    Story.event('map');
   },
   close() {
     if (G.state !== 'map') return;

@@ -828,137 +828,275 @@ const World = {
   surf(x, z) { return this.heightAt(x, z); },
 
   // ═════════════════════ Home base ═════════════════════
+  // Halloway Works: a modern compound of glass, white composite panels and glowing trim.
+  //   front row  · Workshop | Atrium (entrance) | Charging Bay
+  //   back row   · Lab      | Storage           | Command Room
+  //   west annex · Garage
+  // The Garage, Lab and Command Room start sealed and are built from the Workshop.
   buildHub() {
-    this.spawn = { x: 0, z: 17 };
-    this.home = { x: 0, z: -2, y: this.heightAt(0, 0) };
-    this.buildHouse(0, -2);
+    this.spawn = { x: 0, z: 13 };
+    const y0 = this.heightAt(0, 0);
+    this.home = { x: 0, z: -6, y: y0 };
+    this.house = { x: -6, z: -11, y: y0 };
+    this.rooms = {};
+    this.buildBase(y0);
     this.buildSpawnPad();
     if (G.base && G.base.shield) this.buildHomeDome();
   },
-  // A cosy house with three rooms side by side: Mechanic · Charging · Storage.
-  buildHouse(cx, cz) {
-    const y0 = this.heightAt(cx, cz);
-    this.house = { x: cx, z: cz, y: y0, w: 24, d: 16 };
-    const g = new THREE.Group(); g.position.set(cx, y0, cz); this.group.add(g);
-    const wall = Mat.std('#efe2c4', { rough: 0.85, metal: 0 });
-    const trim = Mat.std('#7a4a2a', { rough: 0.75, metal: 0.05 });
-    const floorM = Mat.std('#b98a5a', { rough: 0.8, metal: 0.05 });
-    const roofM = Mat.std('#b8442e', { rough: 0.8, metal: 0.05 });
-    const glass = Mat.glow('#ffe7a0', 1.6);
-    const W = 12, D = 8, H = 4.6, T = 0.35;
-    mesh(Geo.box(W * 2 + 0.6, 0.4, D * 2 + 0.6), Mat.std('#8a8478', { rough: 0.9 }), 0, -0.15, 0, g).receiveShadow = true;
-    const fl = mesh(Geo.box(W * 2, 0.1, D * 2), floorM, 0, 0.06, 0, g); fl.receiveShadow = true;
-    const wallSeg = (x1, z1, x2, z2, h = H, y = 0) => {
-      const len = Math.hypot(x2 - x1, z2 - z1);
-      const m = mesh(Geo.box(len, h, T), wall, (x1 + x2) / 2, y + h / 2, (z1 + z2) / 2, g);
-      m.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-      m.receiveShadow = true;
-      if (y === 0) {
-        for (let t = 0; t <= len; t += 0.55) {
-          const k = t / len;
-          this.addCollider(cx + lerp(x1, x2, k), cz + lerp(z1, z2, k), 0.33, y0 + h, 'wall');
-        }
+
+  buildBase(y0) {
+    const S = new THREE.Group(); S.position.set(0, y0, 0); this.group.add(S);   // static structure (baked)
+    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, people (live)
+    this.baseD = D;
+    const M = {
+      panel: Mat.std('#e9eef3', { rough: 0.45, metal: 0.25 }),
+      panel2: Mat.std('#cfd7e0', { rough: 0.5, metal: 0.3 }),
+      dark: Mat.std('#1d232d', { rough: 0.4, metal: 0.7 }),
+      floor: Mat.std('#2b3340', { rough: 0.32, metal: 0.55 }),
+      floor2: Mat.std('#343e4e', { rough: 0.35, metal: 0.5 }),
+      roof: Mat.std('#3a4352', { rough: 0.6, metal: 0.5 }),
+      solar: Mat.std('#1b3a6a', { rough: 0.2, metal: 0.8 }),
+      wood: Mat.std('#8a6440', { rough: 0.7, metal: 0.05 }),
+      plant: Mat.std('#3d9c45', { rough: 0.8, metal: 0 }),
+    };
+    const glass = new THREE.MeshStandardMaterial({ color: '#bfe8ff', emissive: '#1a4a66', emissiveIntensity: 0.35, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+    const cyan = Mat.glow('#3cf2ff', 2.4), cyanDim = Mat.glow('#3cf2ff', 1.2), warm = Mat.glow('#ffe2a8', 2.2);
+    const H = 5.2, HA = 8, T = 0.4;
+    const box = (w, h, d, mat, x, y, z, parent = S) => mesh(Geo.box(w, h, d), mat, x, y, z, parent);
+
+    // one straight wall, with optional doorway gaps (positions along the wall) and a glass band
+    const wall = (x1, z1, x2, z2, o = {}) => {
+      const h = o.h || H, len = Math.hypot(x2 - x1, z2 - z1), ang = -Math.atan2(z2 - z1, x2 - x1);
+      const ux = (x2 - x1) / len, uz = (z2 - z1) / len;
+      const doors = (o.doors || []).map((d) => [d - (o.dw || 1.5), d + (o.dw || 1.5)]).sort((a, b) => a[0] - b[0]);
+      const spans = []; let t = 0;
+      for (const [a, b] of doors) { if (a > t) spans.push([t, a]); t = b; }
+      if (t < len) spans.push([t, len]);
+      const piece = (a, b, y, hh, mat, parent = S) => {
+        const L = b - a; if (L <= 0.01) return;
+        const m = mesh(Geo.box(L, hh, T), mat, x1 + ux * (a + L / 2), y + hh / 2, z1 + uz * (a + L / 2), parent);
+        m.rotation.y = ang; m.receiveShadow = true;
+        return m;
+      };
+      for (const [a, b] of spans) {
+        if (o.glass && b - a > 2.2) {
+          piece(a, b, 0, 1.0, M.panel2);
+          piece(a, b, 3.6, h - 3.6, M.panel);
+          const g = piece(a + 0.3, b - 0.3, 1.0, 2.6, glass, D); g.renderOrder = 3;
+          piece(a, a + 0.3, 1.0, 2.6, M.dark); piece(b - 0.3, b, 1.0, 2.6, M.dark);
+        } else piece(a, b, 0, h, M.panel);
+        // glowing trim lines on the outside face of the wall
+        const tl = mesh(Geo.box(b - a, 0.06, T + 0.04), cyanDim, x1 + ux * (a + b) / 2, h - 0.35, z1 + uz * (a + b) / 2, S); tl.rotation.y = ang;
+        for (let s = a; s <= b + 0.01; s += 0.55) this.addCollider(x1 + ux * Math.min(s, b), z1 + uz * Math.min(s, b), 0.33, y0 + h, 'wall');
       }
-      return m;
+      // lintels over doorways
+      for (const [a, b] of doors) {
+        piece(a, b, 3.4, h - 3.4, M.panel);
+        const fr = mesh(Geo.box(b - a + 0.2, 0.12, T + 0.08), cyan, x1 + ux * (a + b) / 2, 3.42, z1 + uz * (a + b) / 2, S); fr.rotation.y = ang;
+        for (const e of [a, b]) mesh(Geo.box(0.12, 3.4, T + 0.08), cyan, x1 + ux * e, 1.7, z1 + uz * e, S).rotation.y = ang;
+      }
     };
-    // outer shell (back, sides) and the front with three doors
-    wallSeg(-W, -D, W, -D); wallSeg(-W, -D, -W, D); wallSeg(W, -D, W, D);
-    const doors = [-8, 0, 8], dw = 1.4;
-    let x = -W;
-    for (const dx of doors) { wallSeg(x, D, dx - dw, D); wallSeg(dx - dw, D, dx + dw, D, H - 3.2, 3.2); x = dx + dw; }
-    wallSeg(x, D, W, D);
-    // inner walls with a doorway between rooms
-    for (const ix of [-4, 4]) { wallSeg(ix, -D, ix, -1.2); wallSeg(ix, 1.2, ix, D); wallSeg(ix, -1.2, ix, 1.2, H - 3.2, 3.2); }
-    // trims, door frames, windows
-    for (const dx of doors) {
-      for (const s of [-1, 1]) mesh(Geo.box(0.25, 3.3, 0.5), trim, dx + s * dw, 1.65, D, g);
-      mesh(Geo.box(dw * 2 + 0.5, 0.3, 0.5), trim, dx, 3.3, D, g);
-    }
-    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, D, g);
-    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, -D, g);
-    for (const s of [-1, 1]) {
-      for (const wz of [-4, 3]) mesh(Geo.box(0.1, 1.2, 1.6), glass, s * (W + 0.14), 2.4, wz, g);
-      for (const wx of [-8, 0, 8]) mesh(Geo.box(1.6, 1.2, 0.1), glass, wx + s * 0, 2.4, -D - 0.14, g);
-    }
-    for (const wx of [-10.5, -5.5, 5.5, 10.5]) mesh(Geo.box(1.2, 1.1, 0.1), glass, wx, 2.5, D + 0.14, g);
-    // pitched roof (no shadow, so the rooms stay bright inside)
-    const pitch = Math.atan2(2.6, D + 0.8);
-    for (const s of [-1, 1]) {
-      const r = mesh(Geo.box(W * 2 + 1.4, 0.35, Math.hypot(2.6, D + 0.8) + 0.3), roofM, 0, H + 1.3, s * (D + 0.8) / 2, g);
-      r.rotation.x = s * pitch; r.castShadow = false;
-    }
-    for (const s of [-1, 1]) {
-      const gable = new THREE.Shape([new THREE.Vector2(-D, 0), new THREE.Vector2(D, 0), new THREE.Vector2(0, 2.6)]);
-      const gm = mesh(new THREE.ShapeGeometry(gable), wall, s * W, H, 0, g); gm.rotation.y = s * Math.PI / 2; gm.castShadow = false;
-      gm.material = Mat.std('#efe2c4', { rough: 0.85, metal: 0, flat: true });
-    }
-    mesh(Geo.box(1.2, 2.4, 1.2), Mat.std('#9a5a3a', { rough: 0.9 }), 7, H + 2.4, -3, g).castShadow = false;   // chimney
-    // porch path
-    for (const dx of doors) mesh(Geo.box(2.6, 0.08, 5), Mat.std('#c9b08a', { rough: 0.9 }), dx, 0.02, D + 2.8, g).receiveShadow = true;
+    const floor = (x0, x1, z0, z1, mat = M.floor) => {
+      const f = box(x1 - x0, 0.2, z1 - z0, mat, (x0 + x1) / 2, 0.02, (z0 + z1) / 2); f.receiveShadow = true;
+      for (let x = x0 + 2; x < x1 - 0.5; x += 2) box(0.04, 0.02, z1 - z0 - 0.4, cyanDim, x, 0.13, (z0 + z1) / 2);
+    };
+    const roof = (x0, x1, z0, z1, h = H) => {
+      const r = box(x1 - x0 + 0.8, 0.35, z1 - z0 + 0.8, M.roof, (x0 + x1) / 2, h + 0.17, (z0 + z1) / 2); r.castShadow = false;
+      // solar panels and the glowing roof edge
+      for (let x = x0 + 2; x < x1 - 1.5; x += 3) { const p = box(2.4, 0.08, (z1 - z0) * 0.6, M.solar, x + 0.7, h + 0.55, (z0 + z1) / 2); p.rotation.x = 0.18; p.castShadow = false; }
+      for (const z of [z0 - 0.4, z1 + 0.4]) box(x1 - x0 + 0.8, 0.08, 0.08, cyan, (x0 + x1) / 2, h + 0.38, z);
+      for (const x of [x0 - 0.4, x1 + 0.4]) box(0.08, 0.08, z1 - z0 + 0.8, cyan, x, h + 0.38, (z0 + z1) / 2);
+    };
+    // ceiling light panels (warm) — they just glow, the bloom does the rest
+    const lamps = (x0, x1, z0, z1, h = H, parent = S) => { for (let x = x0 + 3; x < x1 - 1; x += 4.5) for (let z = z0 + 2.5; z < z1 - 1; z += 4.5) box(1.6, 0.06, 1.6, warm, x, h - 0.06, z, parent); };
 
-    // room signs over the doors
-    const rooms = [['MECHANIC', '#ffb347', -8], ['CHARGING', '#6bff9e', 0], ['STORAGE', '#3cf2ff', 8]];
-    for (const [name, c, dx] of rooms) { const l = this.makeLabel(name, c, 512, 110); l.position.set(dx, H + 0.9, D + 0.7); l.scale.set(4.2, 0.9, 1); g.add(l); }
+    // ── floors, walls, roofs ──
+    floor(-20, -7, -12, -2); floor(-7, 7, -14, -2, M.floor2); floor(7, 20, -12, -2);
+    floor(-20, -7, -24, -12); floor(-7, 7, -24, -14); floor(7, 20, -24, -12);
+    floor(-34, -23, -12, 0);
+    // front (z = -2): glass with doors into the workshop, atrium and charging bay
+    wall(-20, -2, -7, -2, { glass: true, doors: [6.5] });
+    wall(-7, -2, 7, -2, { glass: true, h: HA, doors: [7], dw: 2.6 });
+    wall(7, -2, 20, -2, { glass: true, doors: [6.5] });
+    // sides and back
+    wall(-20, -2, -20, -24, { glass: true }); wall(20, -2, 20, -24, { glass: true });
+    wall(-20, -24, 20, -24);
+    // inner walls
+    wall(-7, -2, -7, -14, { h: HA, doors: [5] }); wall(7, -2, 7, -14, { h: HA, doors: [5] });
+    wall(-20, -12, -7, -12, { doors: [6.5] }); wall(7, -12, 20, -12, { doors: [6.5] });
+    wall(-7, -14, 7, -14, { h: HA, doors: [7] });
+    wall(-7, -14, -7, -24); wall(7, -14, 7, -24);
+    // garage annex: roll door facing the yard
+    wall(-34, 0, -23, 0, { doors: [5.5], dw: 2.6 }); wall(-34, 0, -34, -12); wall(-34, -12, -23, -12); wall(-23, 0, -23, -12, { glass: true });
+    roof(-20, -7, -12, -2); roof(7, 20, -12, -2); roof(-20, -7, -24, -12); roof(-7, 7, -24, -14); roof(7, 20, -24, -12); roof(-34, -23, -12, 0);
+    lamps(-20, -7, -12, -2); lamps(7, 20, -12, -2); lamps(-7, 7, -24, -14); lamps(-34, -23, -12, 0);
+    // atrium: tall glass roof on ribs
+    for (let x = -7; x <= 7.01; x += 3.5) box(0.25, 0.35, 12.4, M.dark, x, HA + 0.15, -8);
+    for (let z = -14; z <= -2; z += 3) box(14.4, 0.25, 0.25, M.dark, 0, HA + 0.15, z);
+    const sky = box(14, 0.08, 12, glass, 0, HA + 0.05, -8, D); sky.renderOrder = 3; sky.castShadow = false;
+    for (const x of [-7, 7]) box(0.12, 0.12, 12.2, cyan, x, HA + 0.38, -8);
+    // the sign over the entrance
+    const sign = this.makeLabel('HALLOWAY WORKS', '#3cf2ff', 1024, 140); sign.position.set(0, y0 + HA + 1.4, -1.6); sign.scale.set(9, 1.25, 1); this.group.add(sign);
 
-    const console = (lx, lz, color, kind, label) => {
-      const t = new THREE.Group(); t.position.set(lx, 0, lz); g.add(t);
-      mesh(Geo.box(1.6, 1.1, 0.8), Mat.std('#2a3444', { metal: 0.6, rough: 0.4 }), 0, 0.55, 0, t);
-      const scr = mesh(Geo.box(1.4, 0.9, 0.08), Mat.glow(color, 1.1), 0, 1.6, -0.2, t); scr.rotation.x = -0.25;
-      mesh(Geo.box(1.5, 0.08, 0.5), Mat.glow(color, 2.4), 0, 1.12, 0.1, t);
+    // ── atrium: holo emblem, planters, benches, light columns ──
+    const ring1 = new THREE.Mesh(Geo.torus(2.6, 0.06, 48), cyan); ring1.rotation.x = Math.PI / 2; ring1.position.set(0, 0.18, -8); D.add(ring1);
+    const holo = new THREE.Group(); holo.position.set(0, 2.6, -8); D.add(holo);
+    for (let k = 0; k < 3; k++) { const r = new THREE.Mesh(Geo.torus(0.9 + k * 0.35, 0.03, 40), Mat.glow(['#3cf2ff', '#6bff9e', '#ffd23f'][k], 2.6)); r.rotation.x = k * 1.1; holo.add(r); }
+    mesh(Geo.oct(0.45), Mat.glow('#ffffff', 2.4), 0, 0, 0, holo);
+    this.atriumHolo = holo;
+    for (const [x, z] of [[-5, -4], [5, -4], [-5, -12.2], [5, -12.2]]) {
+      box(1.6, 0.7, 1.6, M.dark, x, 0.35, z); box(1.66, 0.06, 1.66, cyan, x, 0.72, z);
+      mesh(Geo.sphere(0.85, 1), M.plant, x, 1.4, z, S); mesh(Geo.sphere(0.6, 1), M.plant, x + 0.3, 1.95, z - 0.2, S);
+      this.addCollider(x, z, 1, y0 + 0.8, 'wall');
+    }
+    for (const x of [-3.2, 3.2]) { box(2.4, 0.45, 0.7, M.wood, x, 0.45, -11.5); box(2.4, 0.15, 0.7, M.dark, x, 0.15, -11.5); }
+    for (const x of [-3.6, 3.6]) { box(0.35, 4.2, 0.35, M.dark, x, 2.1, 0.6); box(0.18, 3.6, 0.18, cyan, x, 2.2, 0.6); this.addCollider(x, 0.6, 0.3, y0 + 4, 'wall'); }
+
+    // ── Workshop: Wren's assembly table (where you wake up), tool wall, workbench, weapon rack ──
+    const table = new THREE.Group(); table.position.set(-16, 0, -7); S.add(table);
+    mesh(Geo.box(1.4, 0.15, 2.8), M.dark, 0, 0.95, 0, table);
+    mesh(Geo.box(1.2, 0.85, 0.5), M.panel2, 0, 0.45, -0.9, table); mesh(Geo.box(1.2, 0.85, 0.5), M.panel2, 0, 0.45, 0.9, table);
+    mesh(Geo.box(1.42, 0.04, 2.82), cyanDim, 0, 1.04, 0, table);
+    this.addCollider(-16, -7.6, 0.75, y0 + 1.05, 'wall'); this.addCollider(-16, -6.4, 0.75, y0 + 1.05, 'wall');
+    const lampRing = new THREE.Mesh(Geo.torus(0.8, 0.07, 32), warm); lampRing.rotation.x = Math.PI / 2; lampRing.position.set(-16, 3.6, -7); D.add(lampRing);
+    box(0.06, 1.5, 0.06, M.dark, -16, 4.4, -7);
+    for (const s of [-1, 1]) {   // two assembly arms over the table
+      const arm = new THREE.Group(); arm.position.set(-16 + s * 1.3, 0, -7); S.add(arm);
+      mesh(Geo.cyl(0.25, 0.32, 0.4, 8), Mat.std('#ffb347', { metal: 0.6 }), 0, 0.2, 0, arm);
+      const a1 = mesh(Geo.box(0.2, 1.8, 0.2), Mat.std('#ffb347', { metal: 0.6 }), 0, 1.2, 0, arm); a1.rotation.z = s * 0.35;
+      const a2 = mesh(Geo.box(0.16, 1.1, 0.16), M.dark, -s * 0.55, 2.2, 0, arm); a2.rotation.z = -s * 1.15;
+      this.addCollider(-16 + s * 1.3, -7, 0.35, y0 + 2, 'wall');
+    }
+    this.wakeSpot = { x: -16, y: y0 + 1.1, z: -7.9, yaw: Math.PI };   // lying on the table, head toward -z
+    // tool wall and parts shelves
+    box(8, 2.6, 0.12, M.panel2, -13.5, 2.3, -11.75);
+    for (let i = 0; i < 9; i++) box(0.1, 0.6, 0.1, Mat.std(pick(['#c8c8d0', '#ff6b6b', '#ffd23f', '#3cf2ff']), { metal: 0.8 }), -17 + i * 0.85, 2.4 + (i % 2) * 0.3, -11.6);
+    for (let i = 0; i < 3; i++) box(1.1, 0.06, 0.5, M.dark, -19.4, 1 + i * 0.8, -9 + i * 0.1);
+    // weapon rack by the workshop door
+    const rack = new THREE.Group(); rack.position.set(-19.2, 0, -3.6); rack.rotation.y = Math.PI / 2; D.add(rack);
+    mesh(Geo.box(1.6, 2.2, 0.2), M.dark, 0, 1.1, -0.1, rack);
+    mesh(Geo.box(1.4, 0.05, 0.22), cyan, 0, 2.1, 0, rack);
+    const gun = buildViewModel(); setViewModelWeapon(gun, 'blaster', 1); gun.position.set(0, 1.3, 0.15); gun.rotation.set(0, Math.PI / 2, 0); gun.scale.setScalar(1.6); rack.add(gun);
+    this.addCollider(-19.2, -3.6, 0.6, y0 + 2.2, 'wall');
+    this.rack = { x: -18.2, z: -3.6, y: y0, gun };
+    // Wren
+    const wren = buildPersonModel({ skin: '#e2b48c', hair: '#b4532a', suit: '#3d5a78', trim: '#ffb347' });
+    wren.position.set(-13, 0, -8.6); wren.rotation.y = -Math.PI / 2; D.add(wren);
+    this.wren = { x: -13, z: -8.6, y: y0, model: wren, yaw: -Math.PI / 2, home: { x: -13, z: -8.6 } };
+    this.addCollider(-13, -8.6, 0.4, y0 + 1.8, 'wall');
+
+    // ── terminals ──
+    const terminal = (x, z, face, color, kind, label, room) => {
+      const t = new THREE.Group(); t.position.set(x, 0, z); t.rotation.y = face; D.add(t);
+      mesh(Geo.box(1.4, 1.05, 0.6), M.dark, 0, 0.52, 0, t);
+      const scr = mesh(Geo.box(1.3, 0.85, 0.06), Mat.glow(color, 1.1), 0, 1.55, -0.12, t); scr.rotation.x = -0.25;
+      mesh(Geo.box(1.36, 0.06, 0.5), Mat.glow(color, 2.4), 0, 1.07, 0.06, t);
       const sp = glowSprite(color, 1.3, 0.6); sp.position.y = 1.7; t.add(sp);
-      const l = this.makeLabel(label, color, 512, 96); l.position.set(0, 2.7, 0); l.scale.set(2.8, 0.55, 1); t.add(l);
-      this.addCollider(cx + lx, cz + lz, 0.8, y0 + 1.2, 'wall');
-      this.terminals.push({ kind, x: cx + lx, z: cz + lz + 1.2, y: y0, color, sprite: sp });
+      const l = this.makeLabel(label, color, 512, 96); l.position.set(0, 2.65, 0); l.scale.set(2.6, 0.5, 1); t.add(l);
+      this.addCollider(x, z, 0.8, y0 + 1.2, 'wall');
+      const T2 = { kind, x: x + Math.sin(face) * 1.3, z: z + Math.cos(face) * 1.3, y: y0, color, sprite: sp, room, group: t };
+      this.terminals.push(T2);
+      return T2;
     };
-    // ── Mechanic room: workbench, bot on the bench, robot arm, tool wall
-    console(-8, -6.6, '#ffb347', 'mechanic', 'MECHANIC');
-    mesh(Geo.box(3.4, 1, 1.4), trim, -10.2, 0.5, -1.5, g); mesh(Geo.box(3.6, 0.12, 1.6), Mat.std('#5a3a22'), -10.2, 1.05, -1.5, g);
-    this.addCollider(cx - 10.2, cz - 1.5, 1.3, y0 + 1.1, 'wall');
-    const benchBot = buildCompanionModel('gunner'); benchBot.position.set(-10.2, 1.5, -1.5); benchBot.scale.setScalar(1.2); g.add(benchBot);
-    const arm = new THREE.Group(); arm.position.set(-11.3, 0, -5.5); g.add(arm);
-    mesh(Geo.cyl(0.35, 0.45, 0.4, 8), Mat.std('#ffb347', { metal: 0.6 }), 0, 0.2, 0, arm);
-    const a1 = mesh(Geo.box(0.25, 2, 0.25), Mat.std('#ffb347', { metal: 0.6 }), 0.3, 1.2, 0, arm); a1.rotation.z = -0.3;
-    const a2 = mesh(Geo.box(0.2, 1.4, 0.2), Mat.std('#333844', { metal: 0.7 }), 1, 2.3, 0, arm); a2.rotation.z = -1.1;
-    this.addCollider(cx - 11.3, cz - 5.5, 0.6, y0 + 2, 'wall');
-    for (let i = 0; i < 5; i++) mesh(Geo.box(0.12, 0.7, 0.12), Mat.std(pick(['#c8c8d0', '#ff6b6b', '#ffd23f']), { metal: 0.8 }), -W + 0.3, 2 + (i % 2) * 0.3, -3 + i * 0.9, g);
-    this.mechanicSpot = { x: cx - 6, z: cz - 3.5, y: y0 };
-    // ── Charging room: glowing pads for docked bots
-    console(0, -6.6, '#6bff9e', 'charging', 'CHARGING');
-    for (const pz of [-3.6, -0.2]) for (const px of [-2.4, 0, 2.4]) {
-      mesh(Geo.cyl(0.8, 0.9, 0.18, 12), Mat.std('#2a3444', { metal: 0.7 }), px, 0.15, pz, g);
-      const ring = new THREE.Mesh(Geo.torus(0.62, 0.05, 24), Mat.glow('#6bff9e', 2.2)); ring.rotation.x = Math.PI / 2; ring.position.set(px, 0.26, pz); g.add(ring);
-      ring.userData.keep = true;
-      this.chargePads.push({ x: cx + px, z: cz + pz, y: y0 + 1.25, ring });
-    }
-    // ── Storage room: shelves and crates
-    console(8, -6.6, '#3cf2ff', 'storage', 'STORAGE');
-    const crate = Mat.std('#9a6a3a', { rough: 0.85 }), crateB = Mat.std('#4a6a8a', { rough: 0.6, metal: 0.4 });
-    for (const sx of [W - 0.9]) for (let i = 0; i < 4; i++) {
-      mesh(Geo.box(1.2, 3.2, 3), trim, sx, 1.6, -5.5 + i * 3.4, g);
-      for (let k = 0; k < 3; k++) mesh(Geo.box(0.8, 0.7, 0.8), pick([crate, crateB]), sx - 0.1, 0.5 + k * 1, -6 + i * 3.4 + rand(-0.4, 0.4), g);
-      this.addCollider(cx + sx, cz - 5.5 + i * 3.4, 1.3, y0 + 3.2, 'wall');
-    }
-    for (let i = 0; i < 4; i++) mesh(Geo.box(1, 1, 1), pick([crate, crateB]), 5.6 + (i % 2) * 1.1, 0.5 + Math.floor(i / 2) * 1, 3.6, g);
-    this.addCollider(cx + 6.2, cz + 3.6, 1.3, y0 + 2, 'wall');
+    terminal(-10.5, -11, 0, '#ffb347', 'mechanic', 'WORKBENCH');
+    terminal(13.5, -11, 0, '#6bff9e', 'charging', 'CHARGING');
+    terminal(0, -23, 0, '#3cf2ff', 'storage', 'STORAGE');
+    terminal(-13.5, -23, 0, '#b98cff', 'lab', 'LAB', 'lab');
+    terminal(13.5, -23, 0, '#ffd23f', 'command', 'COMMAND', 'command');
+    terminal(-28.5, -11, 0, '#ff9f43', 'garage', 'GARAGE', 'garage');
 
-    // mailbox & lanterns outside
-    for (const s of [-1, 1]) {
-      mesh(Geo.cyl(0.08, 0.1, 2.4, 6), Mat.std('#2a2a30', { metal: 0.7 }), s * 13.5, 1.2, D + 2, g);
-      mesh(Geo.sphere(0.25, 1), Mat.glow('#ffd88a', 4), s * 13.5, 2.5, D + 2, g).castShadow = false;
+    // ── Charging bay ──
+    for (const pz of [-8.6, -5]) for (const px of [10, 13.5, 17]) {
+      mesh(Geo.cyl(0.8, 0.9, 0.18, 12), M.dark, px, 0.15, pz, S);
+      const ring = new THREE.Mesh(Geo.torus(0.62, 0.05, 24), Mat.glow('#6bff9e', 2.2)); ring.rotation.x = Math.PI / 2; ring.position.set(px, 0.26, pz); D.add(ring);
+      this.chargePads.push({ x: px, z: pz, y: y0 + 1.25, ring });
     }
-    this.bake(g);
+    // ── Storage: shelving ──
+    const crate = Mat.std('#9a6a3a', { rough: 0.85 }), crateB = Mat.std('#4a6a8a', { rough: 0.6, metal: 0.4 });
+    for (const sx of [-6.2, 6.2]) for (let i = 0; i < 3; i++) {
+      box(1, 3, 2.6, M.dark, sx, 1.5, -16.5 - i * 2.8);
+      for (let k = 0; k < 3; k++) mesh(Geo.box(0.7, 0.6, 0.7), pick([crate, crateB]), sx - Math.sign(sx) * 0.05, 0.45 + k * 0.95, -16.2 - i * 2.8 + rand(-0.5, 0.5), S);
+      this.addCollider(sx, -16.5 - i * 2.8, 1.3, y0 + 3, 'wall');
+    }
+
+    // ── Lab: glowing tanks and holo screens ──
+    const lab = new THREE.Group(); D.add(lab);
+    for (const [x, z, c] of [[-18.5, -15, '#6bff9e'], [-18.5, -18.5, '#b98cff'], [-18.5, -22, '#3cf2ff']]) {
+      box(1.4, 0.4, 1.4, M.dark, x, 0.2, z); box(1.4, 0.3, 1.4, M.dark, x, 3.1, z);
+      const tank = mesh(Geo.cyl(0.55, 0.55, 2.5, 12, true), glass, x, 1.65, z, D); tank.renderOrder = 3;
+      mesh(Geo.cyl(0.48, 0.48, 2.2, 12), Mat.glow(c, 1.4), x, 1.55, z, lab);
+      this.addCollider(x, z, 0.8, y0 + 3.2, 'wall');
+    }
+    for (let i = 0; i < 3; i++) { box(2, 0.9, 0.9, M.panel2, -12 + i * 0, 0.45, -16 - i * 3); const scr = mesh(Geo.box(1.6, 0.9, 0.05), Mat.glow(['#b98cff', '#6bff9e', '#3cf2ff'][i], 1.3), -12, 1.6, -16.3 - i * 3, lab); scr.rotation.x = -0.2; this.addCollider(-12, -16 - i * 3, 1, y0 + 1, 'wall'); }
+    // ── Command Room: holo table showing the world ──
+    const cmd = new THREE.Group(); D.add(cmd);
+    mesh(Geo.cyl(2.4, 2.6, 0.9, 24), M.dark, 13.5, 0.45, -17, S);
+    mesh(Geo.torus(2.45, 0.05, 48), cyan, 13.5, 0.92, -17, S).rotation.x = Math.PI / 2;
+    this.addCollider(13.5, -17, 2.6, y0 + 1, 'wall');
+    const mapDisc = new THREE.Mesh(new THREE.CircleGeometry(2.1, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false }));
+    mapDisc.rotation.x = -Math.PI / 2; mapDisc.position.set(13.5, 1.0, -17); cmd.add(mapDisc);
+    this.cmdMap = mapDisc;
+    for (let k = 0; k < 2; k++) { const r = new THREE.Mesh(Geo.torus(2.2 + k * 0.25, 0.03, 48), Mat.glow('#ffd23f', 2)); r.rotation.x = Math.PI / 2; r.position.set(13.5, 1.15 + k * 0.7, -17); cmd.add(r); }
+    for (const x of [9, 13.5, 18]) { const s = mesh(Geo.box(3.2, 1.8, 0.06), Mat.glow('#ffd23f', 0.9), x, 2.8, -23.6, cmd); void s; }
+    // antenna mast on the command room roof
+    box(0.3, 7, 0.3, M.dark, 18, H + 3.5, -22);
+    const beaconLight = mesh(Geo.sphere(0.3, 1), Mat.glow('#ff4d6d', 4), 18, H + 7.2, -22, D);
+    this.mastLight = beaconLight;
+    // ── Garage: roll door, lift, gear racks ──
+    const gar = new THREE.Group(); D.add(gar);
+    box(5, 0.3, 3, M.dark, -28.5, 0.15, -5); box(0.3, 2.4, 0.3, Mat.std('#ffb347', { metal: 0.6 }), -30.5, 1.2, -5); box(0.3, 2.4, 0.3, Mat.std('#ffb347', { metal: 0.6 }), -26.5, 1.2, -5);
+    for (let i = 0; i < 3; i++) { box(0.8, 1.2, 0.5, M.panel2, -33.4, 1.6, -9 + i * 1.8); mesh(Geo.box(0.6, 0.08, 0.06), Mat.glow('#ff9f43', 2), -33.1, 2.1, -9 + i * 1.8, gar); }
+
+    // ── sealed rooms: a force field in the doorway until the room is built ──
+    const field = (key, x, z, w, rotY) => {
+      const f = new THREE.Mesh(Geo.box(w, 3.3, 0.08), Mat.glowT('#ff7a3d', 1.6, 0.35));
+      f.position.set(x, 1.7, z); f.rotation.y = rotY; D.add(f);
+      const lbl = this.makeLabel(ROOMS[key].name.toUpperCase() + ' — SEALED', '#ff9f43', 640, 100); lbl.position.set(x, y0 + 3.9, z); lbl.scale.set(3.8, 0.6, 1); this.group.add(lbl);
+      const cols = [];
+      for (let s = -w / 2; s <= w / 2 + 0.01; s += 0.5) cols.push(this.addCollider(x + Math.cos(rotY) * s, z - Math.sin(rotY) * s, 0.35, y0 + 3.4, 'wall'));
+      return { field: f, label: lbl, cols };
+    };
+    this.rooms.lab = Object.assign(field('lab', -13.5, -12, 3, 0), { lights: lab });
+    this.rooms.command = Object.assign(field('command', 13.5, -12, 3, 0), { lights: cmd });
+    this.rooms.garage = Object.assign(field('garage', -28.5, 0, 5.2, 0), { lights: gar });
+
+    // lanterns along the path to the pad
+    for (const s of [-1, 1]) for (const z of [3, 8]) { box(0.14, 2.2, 0.14, M.dark, s * 3.6, 1.1, z); box(0.3, 0.3, 0.3, warm, s * 3.6, 2.3, z); this.addCollider(s * 3.6, z, 0.25, y0 + 2.2, 'wall'); }
+    box(6, 0.06, 12, M.floor2, 0, 0.03, 4.5).receiveShadow = true;
+
+    this.bake(S);
+    this.refreshRooms();
+  },
+
+  // light up rooms that have been built and drop their force fields
+  refreshRooms() {
+    if (!this.rooms) return;
+    for (const [key, R] of Object.entries(this.rooms)) {
+      const open = !!(G.base && G.base.rooms && G.base.rooms[key]);
+      R.field.visible = R.label.visible = !open;
+      R.lights.visible = open;
+      for (const c of R.cols) c.top = open ? -1e9 : this.home.y + 3.4;
+      for (const t of this.terminals) if (t.room === key) t.locked = !open;
+    }
+  },
+  unlockRoom(key) {
+    const R = this.rooms && this.rooms[key];
+    if (!R) return;
+    Fx.shockRing(R.field.position.x, this.home.y + 1, R.field.position.z, '#6bff9e', 3, 30);
+    Fx.explosion(R.field.position.x, this.home.y + 1.7, R.field.position.z, '#ff9f43', 0.6);
+    this.refreshRooms();
   },
 
   buildHomeDome() {
     if (this.homeDome || !this.house) return;
-    const H = this.house, R = 21;
+    const H = this.house, R = 34;
     const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(1.1), transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 20, 0, TAU, 0, Math.PI / 2), mat);
     dome.position.set(H.x, H.y, H.z);
     const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(R + 0.05, 3), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(2), wireframe: true, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
     wire.position.copy(dome.position);
-    // generator pylon in the mechanic room corner
-    const py = new THREE.Group(); py.position.set(H.x - 5.2, H.y, H.z + 6.6); this.group.add(py);
+    // generator pylon on the workshop roof
+    const py = new THREE.Group(); py.position.set(-13.5, H.y + 5.4, -7); this.group.add(py);
     mesh(Geo.cyl(0.5, 0.7, 0.4, 8), Mat.std('#2a3444', { metal: 0.7 }), 0, 0.2, 0, py);
     mesh(Geo.cyl(0.15, 0.2, 2.6, 6), Mat.std('#8aa0b8', { metal: 0.8 }), 0, 1.5, 0, py);
     const orb = mesh(Geo.sphere(0.4, 1), Mat.glow('#5ab8ff', 4), 0, 3, 0, py); orb.castShadow = false;
@@ -1437,9 +1575,10 @@ const World = {
       let g = groups.get(key); if (!g) { g = { F, list: [], ground: [] }; groups.set(key, g); }
       g.ground.push({ x, z, y: this.heightAt(x, z), r: rand(2, 5) });
     }
-    // a ring of flowers around the house
+    // flower beds around the base
     const ring = { F: HUB.flora, list: [], ground: [] };
-    for (let i = 0; i < 26; i++) { const a = (i / 26) * TAU, r = rand(20, 30); const x = Math.sin(a) * r, z = Math.cos(a) * r - 2; ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.2 }); }
+    for (let i = 0; i < 22; i++) { const x = (i % 2 ? 1 : -1) * rand(7, 22), z = rand(2, 22); ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.2 }); }
+    for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU, r = rand(36, 46); const x = Math.sin(a) * r - 6, z = Math.cos(a) * r - 11; ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.4 }); }
     groups.set('ring', ring);
     for (const g of groups.values()) {
       if (g.list.length) this.plantTrees(g.list, g.F);
@@ -1711,6 +1850,21 @@ const World = {
     }
     for (const S of this.shops) if (near(S.x, S.z, 120)) S.head.rotation.y = Math.sin(time * 0.8 + S.x) * 0.5;
     for (const pad of this.chargePads) pad.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + pad.x));
+    // Wren turns to look at you when you're close
+    if (this.wren && near(this.wren.x, this.wren.z, 30) && G.player) {
+      const w = this.wren, p = G.player, d = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
+      const want = d < 9 ? Math.atan2(p.pos.x - w.x, p.pos.z - w.z) : w.yaw;
+      w.model.rotation.y += angDiff(w.model.rotation.y, want) * (1 - Math.exp(-4 * dt));
+      const U = w.model.userData;
+      U.head.rotation.x = d < 9 ? clamp(-Math.atan2(p.pos.y + 1.6 - (w.y + 1.7), d) * 0.6, -0.3, 0.3) : 0;
+      U.arms[0].sh.rotation.x = Math.sin(time * 1.3) * 0.05 + (Dialog.cur && Dialog.cur.who === 'WREN' && d < 9 ? Math.sin(time * 5) * 0.25 - 0.3 : 0);
+      w.model.position.y = Math.sin(time * 1.6) * 0.01;
+    }
+    if (this.atriumHolo && near(0, 0, 120)) {
+      this.atriumHolo.rotation.y += dt * 0.6; this.atriumHolo.children.forEach((r, i) => { r.rotation.x += dt * (0.4 + i * 0.2); });
+      this.mastLight.visible = Math.sin(time * 3) > 0;
+      if (this.rooms.command.lights.visible) this.rooms.command.lights.children.forEach((r, i) => { if (i && i < 3) r.rotation.z += dt * (i % 2 ? 0.5 : -0.4); });
+    }
     if (this.homeDome) {
       const D = this.homeDome;
       D.wire.rotation.y += dt * 0.04;

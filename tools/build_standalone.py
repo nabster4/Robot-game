@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / 'explorer'
+SRC = ROOT
 OUT = ROOT / 'Scrapforge-3D.html'
 
 html = (SRC / 'index.html').read_text()
@@ -21,7 +21,7 @@ body = html[html.index('<body>') + 6:html.index('</body>')]
 
 scripts = re.findall(r'<script src="([^"]+)"></script>', body)
 body = re.sub(r'<script src="[^"]+"></script>\n?', '', body)
-body = re.sub(r'\s*<a class="menu-link"[^>]*>.*?</a>', '', body)  # the 2D game isn't part of this file
+
 
 # drop links to files that won't sit next to the standalone page
 head = re.sub(r'<link rel="(manifest|stylesheet)" href="(manifest\.webmanifest|style\.css)">\n?', '', head)

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#05060a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2305060a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%233cf2ff' stroke-width='4'/><circle cx='32' cy='32' r='8' fill='%23ff8c42'/><path d='M32 6v10M32 48v10M6 32h10M48 32h10' stroke='%233cf2ff' stroke-width='4' stroke-linecap='round'/></svg>">
 <title>Scrapforge: Outlands</title>
-<meta name="description" content="First-person 3D robot salvage adventure: explore alien zones, destroy machines, salvage their parts and craft a robot squad.">
+<meta name="description" content="3D robot adventure in one connected open world: wake on a mechanic's table, free the five Wardens, explore caves, build a robot squad.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -690,6 +690,45 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
 #lore .lore-text { font: 600 17px Rajdhani, sans-serif; color: #efe6ff; line-height: 1.35; }
 #lore .lore-n { float: right; color: #8a7aa8; font: 700 11px Orbitron, sans-serif; }
 
+/* ═════════════════════════ STORY: dialogue, opening, quests ═════════════════════════ */
+#dialog { position: absolute; left: 50%; bottom: 168px; transform: translate(-50%, 10px); width: min(640px, 90vw); padding: 12px 18px 14px; border-radius: 12px;
+  background: rgba(8,12,22,0.86); border: 1px solid var(--c, #ffb347); box-shadow: 0 0 26px rgba(0,0,0,0.4); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 6; }
+#dialog.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
+#dialog .d-who { font: 900 13px Orbitron, sans-serif; letter-spacing: 2px; margin-bottom: 4px; }
+#dialog .d-text { font: 600 19px Rajdhani, sans-serif; color: #f2f6fb; line-height: 1.3; min-height: 25px; }
+#dialog .d-hint { position: absolute; right: 12px; bottom: 6px; font: 700 10px Orbitron, sans-serif; color: #8aa0b8; }
+body.touch #dialog { bottom: 120px; width: min(560px, 60vw); }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 9; }
+#skip-intro { position: fixed; right: 18px; bottom: 18px; z-index: 11; display: none; min-width: 0; font-size: 12px; padding: 8px 14px; }
+#skip-intro.show { display: block; }
+body.playing #skip-intro.show { display: block; }
+body.touch #skip-intro { top: calc(64px + env(safe-area-inset-top)); bottom: auto; right: calc(10px + env(safe-area-inset-right)); }
+body.cine #hud > *:not(#dialog):not(#banner) { opacity: 0; }
+body.cine #touch { opacity: 0; pointer-events: none; }
+#obj-zone { color: #ffd23f; }
+body.touch #objective { cursor: pointer; }
+.quest { border: 1px solid rgba(255,255,255,0.12); border-left: 3px solid #8aa0b8; border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); text-align: left; }
+.quest.main { border-left-color: #ffd23f; background: rgba(255,210,63,0.06); }
+.quest.done { opacity: 0.6; border-left-color: #6bff9e; }
+.quest .q-title { font: 900 13px Orbitron, sans-serif; letter-spacing: 1.5px; color: #ffe9a0; margin-bottom: 3px; }
+.quest .q-step { font: 600 15px Rajdhani, sans-serif; color: #dfe8f4; }
+.quest .q-step b { color: #ffd23f; }
+.warden-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.warden { border: 1px solid var(--c); border-radius: 8px; padding: 8px 10px; text-align: left; opacity: 0.75; }
+.warden.free { opacity: 1; box-shadow: 0 0 14px rgba(107,255,158,0.25); }
+.warden b { display: block; font: 900 12px Orbitron, sans-serif; color: var(--c); letter-spacing: 1px; }
+.warden span { font: 600 13px Rajdhani, sans-serif; color: #b9c7d8; }
+.lore-list { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.lore-item { border: 1px solid rgba(185,140,255,0.4); border-radius: 8px; padding: 10px 12px; background: rgba(40,20,70,0.25); }
+.lore-item .lore-from { font: 700 11px Orbitron, sans-serif; color: #b98cff; letter-spacing: 1.5px; margin-bottom: 4px; }
+.lore-item .lore-text { font: 600 16px Rajdhani, sans-serif; color: #efe6ff; }
+.travel-list { display: flex; flex-direction: column; gap: 8px; }
+.travel { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--c); border-radius: 8px; padding: 8px 12px; font: 600 15px Rajdhani, sans-serif; color: #dfe8f4; }
+.travel b { color: var(--c); }
+.span-all { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+.quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.quest-grid .quest { margin: 0; }
+
 </style>
 </head>
 <body>
@@ -722,6 +761,7 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
   <div id="dmgdir"></div>
   <div id="prompt"></div>
   <div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+  <div id="dialog"><div class="d-who"></div><div class="d-text"></div><div class="d-hint desk-only">Enter ▸</div><div class="d-hint touch-only">tap ▸</div></div>
   <div id="hint"></div>
   <div id="feed"></div>
 
@@ -741,7 +781,7 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
   </div>
 
   <canvas id="radar" width="180" height="180"></canvas>
-  <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · M map · Q dash · RMB bomb · hold SPACE jetpack</div>
+  <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · M map · J quests · Q dash · RMB bomb · hold SPACE jetpack</div>
 </div>
 
 
@@ -780,6 +820,8 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
   </div>
 </div>
 
+<div id="fade"></div>
+<button class="btn ghost" id="skip-intro">Skip tutorial ▸</button>
 <div id="rotate">
   <svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="44" rx="4"/><path d="M50 40a18 18 0 0 1-18 16M46 58l-6-2 2-6"/></svg>
   <div>Rotate your phone to landscape</div>
@@ -812,6 +854,7 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
         <div><kbd>USE</kbd><span>Rooms · shops · caches · beacon uplinks</span></div>
         <div><kbd>CRAFT</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>MAP</kbd><span>World map · tap to place markers</span></div>
+        <div><kbd>Quest panel</kbd><span>Tap it for quests &amp; memories</span></div>
       </div>
       <div class="howto-grid desk-only">
         <div><kbd>W A S D</kbd><span>Move · <b>Shift</b> sprint</span></div>
@@ -824,13 +867,15 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
         <div><kbd>Right-click / G</kbd><span>Plasma grenade</span></div>
         <div><kbd>E</kbd><span>Rooms · shops · caches · beacons</span></div>
         <div><kbd>M</kbd><span>World map · click to place markers</span></div>
+        <div><kbd>J</kbd><span>Quests &amp; memories · <b>Enter</b> skips dialogue</span></div>
         <div><kbd>R</kbd><span>Use repair kit</span></div>
         <div><kbd>Tab / I</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
         <div><kbd>N</kbd><span>Mute</span></div>
       </div>
-      <p><b>Home base</b> is a house with three rooms: the <b>Mechanic Room</b> (build bots and a shield
-        generator), the <b>Charging Room</b> (bots recharge here) and <b>Storage</b> (unlimited).
+      <p><b>Halloway Works</b>, your home base: Wren's <b>Workshop</b> (build bots, base systems and new rooms),
+        the <b>Charging Bay</b> (bots recharge here) and <b>Storage</b> (unlimited). Build the <b>Garage</b> (gear),
+        <b>Lab</b> (research, memories) and <b>Command Room</b> (quick travel, recall) to open them up.
         Around it lies one connected world: the <b>Green Plains</b> to the south, <b>Snowy Plains</b> to the north,
         <b>Mountains</b> to the east, the <b>Fiery Volcano</b> to the west, the <b>Saltglass Coast</b> to the south-east,
         and the <b>Sky Islands</b> floating high above the north-east. Power a Warden's beacons to open its dome,
@@ -858,6 +903,8 @@ body:not(.touch) .touch-only, body.touch .desk-only { display: none; }
       <label class="check"><input type="checkbox" id="opt-quality"> Performance mode (no shadows, lower resolution)</label>
     </div>
     <button class="btn" id="btn-p-map">World Map (M)</button>
+    <button class="btn" id="btn-p-journal">Quests &amp; Memories (J)</button>
+    <button class="btn" id="btn-p-recall">Recall to Home Base</button>
     <button class="btn" id="btn-mute">Sound: On</button>
     <button class="btn ghost" id="btn-quit">Quit to Menu</button>
   </div>
@@ -1249,7 +1296,7 @@ const ZONES = [
 // Home base: a peaceful meadow in the middle of the world
 const HUB = {
   id: 'hub', name: 'Home Base', short: 'HOME', hub: true,
-  intro: 'Your house, your workshop, your squad. Five portals lead out into the world.',
+  intro: 'Halloway Works: your workshop, your squad, and Wren.',
   sky: { top: '#3d8be0', horizon: '#f2e6d0', bottom: '#a8cfe8' }, sun: '#fff0c8', sunDir: [0.55, 0.5, 0.6], stars: false,
   fog: '#b8d8f2', fogDensity: 0.0034,
   hemi: ['#eaf4ff', '#6a8a4a', 1.15], sunI: 2.3,
@@ -1297,15 +1344,18 @@ const WEAPONS = {
   launcher: { name: 'Rocket Launcher', color: '#c6ff4d', rate: 1.0, dmg: 80, speed: 52,  pellets: 1, spread: 0.004, life: 3, rocket: true, splash: 5.5, desc: 'Explosive rockets. Keep your distance — the blast hurts you too.' },
 };
 
-// ───────────────────────── Crafting (Mechanic Room & field) ─────────────────────────
-// Only simple bots can be built in the field. The Mechanic Room also builds base systems.
+// ───────────────────────── Crafting (Workshop bench & field) ─────────────────────────
+// Only simple bots can be built in the field. The Workshop bench also builds base systems and rooms.
 const RECIPES = [
   { id: 'gunner', kind: 'companion', name: 'Gunner Drone', desc: COMP_DESC.gunner, cost: { scrap: 3, wire: 2 } },
   { id: 'medic',  kind: 'companion', name: 'Medic Bot',    desc: COMP_DESC.medic,  cost: { scrap: 3, circuit: 2 } },
   { id: 'scout',  kind: 'companion', name: 'Scout Bot',    desc: COMP_DESC.scout,  cost: { scrap: 2, wire: 1, servo: 1 } },
 
-  { id: 'shieldgen', kind: 'base', name: 'Shield Generator', desc: 'Raises an energy dome around the house. Enemy shots and raiders cannot get through.', cost: { scrap: 12, circuit: 4, core: 2 } },
-  { id: 'charger',   kind: 'base', name: 'Fast Chargers', desc: 'Upgrades the Charging Room: bots recharge 60% faster.', max: 2, cost: { wire: 5, circuit: 3, core: 1 } },
+  { id: 'shieldgen', kind: 'base', name: 'Shield Generator', desc: 'Raises an energy dome around the base. Enemy shots and raiders cannot get through.', cost: { scrap: 12, circuit: 4, core: 2 } },
+  { id: 'garage',  kind: 'room', name: 'Garage', desc: 'Opens the Garage annex: build gear (jetpack, fire boots, backpacks) from parts instead of buying it.', cost: { scrap: 14, wire: 6, servo: 3 } },
+  { id: 'lab',     kind: 'room', name: 'Lab', desc: 'Opens the Lab: research upgrades with rare parts, and replay the memory fragments you have found.', cost: { circuit: 6, lens: 3, core: 1 } },
+  { id: 'command', kind: 'room', name: 'Command Room', desc: 'Opens the Command Room: a live holo map, quick travel to any beacon you have powered, and recall home from anywhere.', cost: { circuit: 8, core: 3, quantum: 1 } },
+  { id: 'charger',   kind: 'base', name: 'Fast Chargers', desc: 'Upgrades the Charging Bay: bots recharge 60% faster.', max: 2, cost: { wire: 5, circuit: 3, core: 1 } },
 ];
 
 // Upgrades are only sold in shops (the price rises with each level)
@@ -1398,6 +1448,29 @@ const LORE_LOGS = [
   { from: 'WREN HALLOWAY · workshop note', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
   { from: 'UNKNOWN · memory shard', text: 'The deep one beneath the coast still sings to keep the sea calm. Its song is getting quieter.' },
 ];
+
+// ───────────────────────── Home base rooms ─────────────────────────
+const ROOMS = {
+  garage: { name: 'Garage', color: '#ff9f43' },
+  lab: { name: 'Lab', color: '#b98cff' },
+  command: { name: 'Command Room', color: '#ffd23f' },
+};
+// Garage: gear built from parts (an alternative to buying it)
+const GEAR_RECIPES = [
+  { id: 'jetpack', name: 'Jetpack', desc: 'Hold Space / JUMP in mid-air to fly. Fuel refills on the ground.', cost: { servo: 6, wire: 8, core: 2 } },
+  { id: 'fireboots', name: 'Fire Boots', desc: 'Heat-proof soles: lava barely hurts.', cost: { scrap: 12, lens: 2, core: 1 } },
+  { id: 'backpack', name: 'Backpack', desc: '+3 hotbar slots.', max: 3, cost: { scrap: 8, wire: 5, servo: 1 } },
+];
+// Lab: upgrades researched with parts; each level costs more
+const RESEARCH = {
+  armor: { scrap: 10, circuit: 2 },
+  overclock: { lens: 3, circuit: 2 },
+  split: { lens: 3, core: 1 },
+  thruster: { servo: 4, wire: 4 },
+  magnet: { wire: 4, circuit: 1 },
+  firmware: { circuit: 4, core: 1 },
+  slot: { core: 2, quantum: 1 },
+};
 
 </script>
 <script>
@@ -2185,6 +2258,27 @@ function drawUpgradeIcon(ctx, id, x, y, s, color) {
       else ctx.fillRect((len - 0.9) * s, -0.08 * s, (id === 'rifle' ? 0.6 : 0.4) * s, 0.16 * s);
       break;
     }
+    case 'garage':
+      poly(ctx, [[-1, -0.1], [0, -0.9], [1, -0.1], [1, 0.9], [-1, 0.9]], s); ctx.fill(); ctx.stroke();
+      for (const k of [0.15, 0.4, 0.65]) { ctx.beginPath(); ctx.moveTo(-0.6 * s, k * s); ctx.lineTo(0.6 * s, k * s); ctx.stroke(); }
+      break;
+    case 'lab':
+      poly(ctx, [[-0.3, -1], [0.3, -1], [0.3, -0.3], [0.85, 0.85], [-0.85, 0.85], [-0.3, -0.3]], s); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-0.55 * s, 0.35 * s); ctx.lineTo(0.55 * s, 0.35 * s); ctx.stroke();
+      break;
+    case 'command':
+      ctx.beginPath(); ctx.arc(0, 0, 0.85 * s, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, 0.85 * s, 0.32 * s, 0, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -0.85 * s); ctx.lineTo(0, 0.85 * s); ctx.stroke();
+      break;
+    case 'quest': case 'memory':
+      roundRect(ctx, -0.75 * s, -0.95 * s, 1.5 * s, 1.9 * s, 0.15 * s); ctx.fill(); ctx.stroke();
+      for (const k of [-0.45, -0.1, 0.25]) { ctx.beginPath(); ctx.moveTo(-0.45 * s, k * s); ctx.lineTo(0.45 * s, k * s); ctx.stroke(); }
+      break;
+    case 'travel':
+      ctx.beginPath(); ctx.arc(0, -0.25 * s, 0.55 * s, Math.PI * 0.9, Math.PI * 0.1); ctx.lineTo(0, 0.95 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -0.25 * s, 0.2 * s, 0, TAU); ctx.stroke();
+      break;
   }
   ctx.restore();
 }
@@ -3374,6 +3468,45 @@ function buildSecretModel(type) {
   return g;
 }
 
+// A low-poly person (Wren the mechanic). Faces +Z. userData: head, arms[2] for idle gestures.
+function buildPersonModel(o) {
+  const g = new THREE.Group();
+  const skin = Mat.std(o.skin, { rough: 0.8, metal: 0 }), suit = Mat.std(o.suit, { rough: 0.75, metal: 0.05 });
+  const dark = Mat.std('#2a2420', { rough: 0.8, metal: 0.1 }), hair = Mat.std(o.hair, { rough: 0.9, metal: 0 });
+  const trim = Mat.std(o.trim, { rough: 0.6, metal: 0.2 });
+  for (const s of [-1, 1]) {
+    mesh(Geo.box(0.16, 0.12, 0.28), dark, s * 0.11, 0.06, 0.04, g);          // boots
+    mesh(Geo.box(0.15, 0.8, 0.17), suit, s * 0.11, 0.52, 0, g);              // legs
+  }
+  mesh(Geo.box(0.42, 0.6, 0.24), suit, 0, 1.2, 0, g);                         // torso (overalls)
+  mesh(Geo.box(0.44, 0.08, 0.26), Mat.std('#5a4030', { rough: 0.8 }), 0, 0.93, 0, g);   // tool belt
+  for (const k of [-0.12, 0.05, 0.16]) mesh(Geo.box(0.05, 0.12, 0.05), trim, k, 0.86, 0.14, g);
+  mesh(Geo.box(0.3, 0.2, 0.02), trim, 0, 1.3, 0.125, g);                     // bib pocket
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(s * 0.27, 1.45, 0); g.add(sh);
+    mesh(Geo.box(0.12, 0.34, 0.13), suit, 0, -0.16, 0, sh);
+    const fore = new THREE.Group(); fore.position.y = -0.33; sh.add(fore);
+    mesh(Geo.box(0.1, 0.3, 0.11), skin, 0, -0.15, 0, fore);
+    mesh(Geo.box(0.11, 0.1, 0.12), Mat.std('#3a3a40', { rough: 0.7 }), 0, -0.33, 0, fore);   // glove
+    sh.rotation.z = s * 0.08;
+    arms.push({ sh, fore });
+  }
+  const head = new THREE.Group(); head.position.y = 1.56; g.add(head);
+  mesh(Geo.box(0.1, 0.08, 0.1), skin, 0, 0.04, 0, head);                     // neck
+  mesh(Geo.box(0.26, 0.28, 0.26), skin, 0, 0.22, 0, head);
+  mesh(Geo.box(0.28, 0.1, 0.28), hair, 0, 0.38, -0.01, head);                 // hair
+  mesh(Geo.box(0.28, 0.2, 0.08), hair, 0, 0.26, -0.13, head);
+  mesh(Geo.sphere(0.09, 1), hair, 0, 0.42, -0.16, head);                      // bun
+  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.035, 0.02), Mat.std('#1a1a1a'), s * 0.06, 0.24, 0.135, head);   // eyes
+  // goggles pushed up on the forehead
+  mesh(Geo.box(0.3, 0.05, 0.05), dark, 0, 0.33, 0.12, head);
+  for (const s of [-1, 1]) mesh(Geo.cyl(0.05, 0.05, 0.04, 10), Mat.std('#5aa8d8', { rough: 0.2, metal: 0.6, emissive: '#2a6a9a', ei: 0.5 }), s * 0.07, 0.33, 0.15, head).rotation.x = Math.PI / 2;
+  g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+  g.userData = { head, arms };
+  return g;
+}
+
 </script>
 <script>
 'use strict';
@@ -4386,137 +4519,275 @@ const World = {
   surf(x, z) { return this.heightAt(x, z); },
 
   // ═════════════════════ Home base ═════════════════════
+  // Halloway Works: a modern compound of glass, white composite panels and glowing trim.
+  //   front row  · Workshop | Atrium (entrance) | Charging Bay
+  //   back row   · Lab      | Storage           | Command Room
+  //   west annex · Garage
+  // The Garage, Lab and Command Room start sealed and are built from the Workshop.
   buildHub() {
-    this.spawn = { x: 0, z: 17 };
-    this.home = { x: 0, z: -2, y: this.heightAt(0, 0) };
-    this.buildHouse(0, -2);
+    this.spawn = { x: 0, z: 13 };
+    const y0 = this.heightAt(0, 0);
+    this.home = { x: 0, z: -6, y: y0 };
+    this.house = { x: -6, z: -11, y: y0 };
+    this.rooms = {};
+    this.buildBase(y0);
     this.buildSpawnPad();
     if (G.base && G.base.shield) this.buildHomeDome();
   },
-  // A cosy house with three rooms side by side: Mechanic · Charging · Storage.
-  buildHouse(cx, cz) {
-    const y0 = this.heightAt(cx, cz);
-    this.house = { x: cx, z: cz, y: y0, w: 24, d: 16 };
-    const g = new THREE.Group(); g.position.set(cx, y0, cz); this.group.add(g);
-    const wall = Mat.std('#efe2c4', { rough: 0.85, metal: 0 });
-    const trim = Mat.std('#7a4a2a', { rough: 0.75, metal: 0.05 });
-    const floorM = Mat.std('#b98a5a', { rough: 0.8, metal: 0.05 });
-    const roofM = Mat.std('#b8442e', { rough: 0.8, metal: 0.05 });
-    const glass = Mat.glow('#ffe7a0', 1.6);
-    const W = 12, D = 8, H = 4.6, T = 0.35;
-    mesh(Geo.box(W * 2 + 0.6, 0.4, D * 2 + 0.6), Mat.std('#8a8478', { rough: 0.9 }), 0, -0.15, 0, g).receiveShadow = true;
-    const fl = mesh(Geo.box(W * 2, 0.1, D * 2), floorM, 0, 0.06, 0, g); fl.receiveShadow = true;
-    const wallSeg = (x1, z1, x2, z2, h = H, y = 0) => {
-      const len = Math.hypot(x2 - x1, z2 - z1);
-      const m = mesh(Geo.box(len, h, T), wall, (x1 + x2) / 2, y + h / 2, (z1 + z2) / 2, g);
-      m.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-      m.receiveShadow = true;
-      if (y === 0) {
-        for (let t = 0; t <= len; t += 0.55) {
-          const k = t / len;
-          this.addCollider(cx + lerp(x1, x2, k), cz + lerp(z1, z2, k), 0.33, y0 + h, 'wall');
-        }
+
+  buildBase(y0) {
+    const S = new THREE.Group(); S.position.set(0, y0, 0); this.group.add(S);   // static structure (baked)
+    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, people (live)
+    this.baseD = D;
+    const M = {
+      panel: Mat.std('#e9eef3', { rough: 0.45, metal: 0.25 }),
+      panel2: Mat.std('#cfd7e0', { rough: 0.5, metal: 0.3 }),
+      dark: Mat.std('#1d232d', { rough: 0.4, metal: 0.7 }),
+      floor: Mat.std('#2b3340', { rough: 0.32, metal: 0.55 }),
+      floor2: Mat.std('#343e4e', { rough: 0.35, metal: 0.5 }),
+      roof: Mat.std('#3a4352', { rough: 0.6, metal: 0.5 }),
+      solar: Mat.std('#1b3a6a', { rough: 0.2, metal: 0.8 }),
+      wood: Mat.std('#8a6440', { rough: 0.7, metal: 0.05 }),
+      plant: Mat.std('#3d9c45', { rough: 0.8, metal: 0 }),
+    };
+    const glass = new THREE.MeshStandardMaterial({ color: '#bfe8ff', emissive: '#1a4a66', emissiveIntensity: 0.35, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+    const cyan = Mat.glow('#3cf2ff', 2.4), cyanDim = Mat.glow('#3cf2ff', 1.2), warm = Mat.glow('#ffe2a8', 2.2);
+    const H = 5.2, HA = 8, T = 0.4;
+    const box = (w, h, d, mat, x, y, z, parent = S) => mesh(Geo.box(w, h, d), mat, x, y, z, parent);
+
+    // one straight wall, with optional doorway gaps (positions along the wall) and a glass band
+    const wall = (x1, z1, x2, z2, o = {}) => {
+      const h = o.h || H, len = Math.hypot(x2 - x1, z2 - z1), ang = -Math.atan2(z2 - z1, x2 - x1);
+      const ux = (x2 - x1) / len, uz = (z2 - z1) / len;
+      const doors = (o.doors || []).map((d) => [d - (o.dw || 1.5), d + (o.dw || 1.5)]).sort((a, b) => a[0] - b[0]);
+      const spans = []; let t = 0;
+      for (const [a, b] of doors) { if (a > t) spans.push([t, a]); t = b; }
+      if (t < len) spans.push([t, len]);
+      const piece = (a, b, y, hh, mat, parent = S) => {
+        const L = b - a; if (L <= 0.01) return;
+        const m = mesh(Geo.box(L, hh, T), mat, x1 + ux * (a + L / 2), y + hh / 2, z1 + uz * (a + L / 2), parent);
+        m.rotation.y = ang; m.receiveShadow = true;
+        return m;
+      };
+      for (const [a, b] of spans) {
+        if (o.glass && b - a > 2.2) {
+          piece(a, b, 0, 1.0, M.panel2);
+          piece(a, b, 3.6, h - 3.6, M.panel);
+          const g = piece(a + 0.3, b - 0.3, 1.0, 2.6, glass, D); g.renderOrder = 3;
+          piece(a, a + 0.3, 1.0, 2.6, M.dark); piece(b - 0.3, b, 1.0, 2.6, M.dark);
+        } else piece(a, b, 0, h, M.panel);
+        // glowing trim lines on the outside face of the wall
+        const tl = mesh(Geo.box(b - a, 0.06, T + 0.04), cyanDim, x1 + ux * (a + b) / 2, h - 0.35, z1 + uz * (a + b) / 2, S); tl.rotation.y = ang;
+        for (let s = a; s <= b + 0.01; s += 0.55) this.addCollider(x1 + ux * Math.min(s, b), z1 + uz * Math.min(s, b), 0.33, y0 + h, 'wall');
       }
-      return m;
+      // lintels over doorways
+      for (const [a, b] of doors) {
+        piece(a, b, 3.4, h - 3.4, M.panel);
+        const fr = mesh(Geo.box(b - a + 0.2, 0.12, T + 0.08), cyan, x1 + ux * (a + b) / 2, 3.42, z1 + uz * (a + b) / 2, S); fr.rotation.y = ang;
+        for (const e of [a, b]) mesh(Geo.box(0.12, 3.4, T + 0.08), cyan, x1 + ux * e, 1.7, z1 + uz * e, S).rotation.y = ang;
+      }
     };
-    // outer shell (back, sides) and the front with three doors
-    wallSeg(-W, -D, W, -D); wallSeg(-W, -D, -W, D); wallSeg(W, -D, W, D);
-    const doors = [-8, 0, 8], dw = 1.4;
-    let x = -W;
-    for (const dx of doors) { wallSeg(x, D, dx - dw, D); wallSeg(dx - dw, D, dx + dw, D, H - 3.2, 3.2); x = dx + dw; }
-    wallSeg(x, D, W, D);
-    // inner walls with a doorway between rooms
-    for (const ix of [-4, 4]) { wallSeg(ix, -D, ix, -1.2); wallSeg(ix, 1.2, ix, D); wallSeg(ix, -1.2, ix, 1.2, H - 3.2, 3.2); }
-    // trims, door frames, windows
-    for (const dx of doors) {
-      for (const s of [-1, 1]) mesh(Geo.box(0.25, 3.3, 0.5), trim, dx + s * dw, 1.65, D, g);
-      mesh(Geo.box(dw * 2 + 0.5, 0.3, 0.5), trim, dx, 3.3, D, g);
-    }
-    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, D, g);
-    mesh(Geo.box(W * 2 + 0.4, 0.3, 0.5), trim, 0, H, -D, g);
-    for (const s of [-1, 1]) {
-      for (const wz of [-4, 3]) mesh(Geo.box(0.1, 1.2, 1.6), glass, s * (W + 0.14), 2.4, wz, g);
-      for (const wx of [-8, 0, 8]) mesh(Geo.box(1.6, 1.2, 0.1), glass, wx + s * 0, 2.4, -D - 0.14, g);
-    }
-    for (const wx of [-10.5, -5.5, 5.5, 10.5]) mesh(Geo.box(1.2, 1.1, 0.1), glass, wx, 2.5, D + 0.14, g);
-    // pitched roof (no shadow, so the rooms stay bright inside)
-    const pitch = Math.atan2(2.6, D + 0.8);
-    for (const s of [-1, 1]) {
-      const r = mesh(Geo.box(W * 2 + 1.4, 0.35, Math.hypot(2.6, D + 0.8) + 0.3), roofM, 0, H + 1.3, s * (D + 0.8) / 2, g);
-      r.rotation.x = s * pitch; r.castShadow = false;
-    }
-    for (const s of [-1, 1]) {
-      const gable = new THREE.Shape([new THREE.Vector2(-D, 0), new THREE.Vector2(D, 0), new THREE.Vector2(0, 2.6)]);
-      const gm = mesh(new THREE.ShapeGeometry(gable), wall, s * W, H, 0, g); gm.rotation.y = s * Math.PI / 2; gm.castShadow = false;
-      gm.material = Mat.std('#efe2c4', { rough: 0.85, metal: 0, flat: true });
-    }
-    mesh(Geo.box(1.2, 2.4, 1.2), Mat.std('#9a5a3a', { rough: 0.9 }), 7, H + 2.4, -3, g).castShadow = false;   // chimney
-    // porch path
-    for (const dx of doors) mesh(Geo.box(2.6, 0.08, 5), Mat.std('#c9b08a', { rough: 0.9 }), dx, 0.02, D + 2.8, g).receiveShadow = true;
+    const floor = (x0, x1, z0, z1, mat = M.floor) => {
+      const f = box(x1 - x0, 0.2, z1 - z0, mat, (x0 + x1) / 2, 0.02, (z0 + z1) / 2); f.receiveShadow = true;
+      for (let x = x0 + 2; x < x1 - 0.5; x += 2) box(0.04, 0.02, z1 - z0 - 0.4, cyanDim, x, 0.13, (z0 + z1) / 2);
+    };
+    const roof = (x0, x1, z0, z1, h = H) => {
+      const r = box(x1 - x0 + 0.8, 0.35, z1 - z0 + 0.8, M.roof, (x0 + x1) / 2, h + 0.17, (z0 + z1) / 2); r.castShadow = false;
+      // solar panels and the glowing roof edge
+      for (let x = x0 + 2; x < x1 - 1.5; x += 3) { const p = box(2.4, 0.08, (z1 - z0) * 0.6, M.solar, x + 0.7, h + 0.55, (z0 + z1) / 2); p.rotation.x = 0.18; p.castShadow = false; }
+      for (const z of [z0 - 0.4, z1 + 0.4]) box(x1 - x0 + 0.8, 0.08, 0.08, cyan, (x0 + x1) / 2, h + 0.38, z);
+      for (const x of [x0 - 0.4, x1 + 0.4]) box(0.08, 0.08, z1 - z0 + 0.8, cyan, x, h + 0.38, (z0 + z1) / 2);
+    };
+    // ceiling light panels (warm) — they just glow, the bloom does the rest
+    const lamps = (x0, x1, z0, z1, h = H, parent = S) => { for (let x = x0 + 3; x < x1 - 1; x += 4.5) for (let z = z0 + 2.5; z < z1 - 1; z += 4.5) box(1.6, 0.06, 1.6, warm, x, h - 0.06, z, parent); };
 
-    // room signs over the doors
-    const rooms = [['MECHANIC', '#ffb347', -8], ['CHARGING', '#6bff9e', 0], ['STORAGE', '#3cf2ff', 8]];
-    for (const [name, c, dx] of rooms) { const l = this.makeLabel(name, c, 512, 110); l.position.set(dx, H + 0.9, D + 0.7); l.scale.set(4.2, 0.9, 1); g.add(l); }
+    // ── floors, walls, roofs ──
+    floor(-20, -7, -12, -2); floor(-7, 7, -14, -2, M.floor2); floor(7, 20, -12, -2);
+    floor(-20, -7, -24, -12); floor(-7, 7, -24, -14); floor(7, 20, -24, -12);
+    floor(-34, -23, -12, 0);
+    // front (z = -2): glass with doors into the workshop, atrium and charging bay
+    wall(-20, -2, -7, -2, { glass: true, doors: [6.5] });
+    wall(-7, -2, 7, -2, { glass: true, h: HA, doors: [7], dw: 2.6 });
+    wall(7, -2, 20, -2, { glass: true, doors: [6.5] });
+    // sides and back
+    wall(-20, -2, -20, -24, { glass: true }); wall(20, -2, 20, -24, { glass: true });
+    wall(-20, -24, 20, -24);
+    // inner walls
+    wall(-7, -2, -7, -14, { h: HA, doors: [5] }); wall(7, -2, 7, -14, { h: HA, doors: [5] });
+    wall(-20, -12, -7, -12, { doors: [6.5] }); wall(7, -12, 20, -12, { doors: [6.5] });
+    wall(-7, -14, 7, -14, { h: HA, doors: [7] });
+    wall(-7, -14, -7, -24); wall(7, -14, 7, -24);
+    // garage annex: roll door facing the yard
+    wall(-34, 0, -23, 0, { doors: [5.5], dw: 2.6 }); wall(-34, 0, -34, -12); wall(-34, -12, -23, -12); wall(-23, 0, -23, -12, { glass: true });
+    roof(-20, -7, -12, -2); roof(7, 20, -12, -2); roof(-20, -7, -24, -12); roof(-7, 7, -24, -14); roof(7, 20, -24, -12); roof(-34, -23, -12, 0);
+    lamps(-20, -7, -12, -2); lamps(7, 20, -12, -2); lamps(-7, 7, -24, -14); lamps(-34, -23, -12, 0);
+    // atrium: tall glass roof on ribs
+    for (let x = -7; x <= 7.01; x += 3.5) box(0.25, 0.35, 12.4, M.dark, x, HA + 0.15, -8);
+    for (let z = -14; z <= -2; z += 3) box(14.4, 0.25, 0.25, M.dark, 0, HA + 0.15, z);
+    const sky = box(14, 0.08, 12, glass, 0, HA + 0.05, -8, D); sky.renderOrder = 3; sky.castShadow = false;
+    for (const x of [-7, 7]) box(0.12, 0.12, 12.2, cyan, x, HA + 0.38, -8);
+    // the sign over the entrance
+    const sign = this.makeLabel('HALLOWAY WORKS', '#3cf2ff', 1024, 140); sign.position.set(0, y0 + HA + 1.4, -1.6); sign.scale.set(9, 1.25, 1); this.group.add(sign);
 
-    const console = (lx, lz, color, kind, label) => {
-      const t = new THREE.Group(); t.position.set(lx, 0, lz); g.add(t);
-      mesh(Geo.box(1.6, 1.1, 0.8), Mat.std('#2a3444', { metal: 0.6, rough: 0.4 }), 0, 0.55, 0, t);
-      const scr = mesh(Geo.box(1.4, 0.9, 0.08), Mat.glow(color, 1.1), 0, 1.6, -0.2, t); scr.rotation.x = -0.25;
-      mesh(Geo.box(1.5, 0.08, 0.5), Mat.glow(color, 2.4), 0, 1.12, 0.1, t);
+    // ── atrium: holo emblem, planters, benches, light columns ──
+    const ring1 = new THREE.Mesh(Geo.torus(2.6, 0.06, 48), cyan); ring1.rotation.x = Math.PI / 2; ring1.position.set(0, 0.18, -8); D.add(ring1);
+    const holo = new THREE.Group(); holo.position.set(0, 2.6, -8); D.add(holo);
+    for (let k = 0; k < 3; k++) { const r = new THREE.Mesh(Geo.torus(0.9 + k * 0.35, 0.03, 40), Mat.glow(['#3cf2ff', '#6bff9e', '#ffd23f'][k], 2.6)); r.rotation.x = k * 1.1; holo.add(r); }
+    mesh(Geo.oct(0.45), Mat.glow('#ffffff', 2.4), 0, 0, 0, holo);
+    this.atriumHolo = holo;
+    for (const [x, z] of [[-5, -4], [5, -4], [-5, -12.2], [5, -12.2]]) {
+      box(1.6, 0.7, 1.6, M.dark, x, 0.35, z); box(1.66, 0.06, 1.66, cyan, x, 0.72, z);
+      mesh(Geo.sphere(0.85, 1), M.plant, x, 1.4, z, S); mesh(Geo.sphere(0.6, 1), M.plant, x + 0.3, 1.95, z - 0.2, S);
+      this.addCollider(x, z, 1, y0 + 0.8, 'wall');
+    }
+    for (const x of [-3.2, 3.2]) { box(2.4, 0.45, 0.7, M.wood, x, 0.45, -11.5); box(2.4, 0.15, 0.7, M.dark, x, 0.15, -11.5); }
+    for (const x of [-3.6, 3.6]) { box(0.35, 4.2, 0.35, M.dark, x, 2.1, 0.6); box(0.18, 3.6, 0.18, cyan, x, 2.2, 0.6); this.addCollider(x, 0.6, 0.3, y0 + 4, 'wall'); }
+
+    // ── Workshop: Wren's assembly table (where you wake up), tool wall, workbench, weapon rack ──
+    const table = new THREE.Group(); table.position.set(-16, 0, -7); S.add(table);
+    mesh(Geo.box(1.4, 0.15, 2.8), M.dark, 0, 0.95, 0, table);
+    mesh(Geo.box(1.2, 0.85, 0.5), M.panel2, 0, 0.45, -0.9, table); mesh(Geo.box(1.2, 0.85, 0.5), M.panel2, 0, 0.45, 0.9, table);
+    mesh(Geo.box(1.42, 0.04, 2.82), cyanDim, 0, 1.04, 0, table);
+    this.addCollider(-16, -7.6, 0.75, y0 + 1.05, 'wall'); this.addCollider(-16, -6.4, 0.75, y0 + 1.05, 'wall');
+    const lampRing = new THREE.Mesh(Geo.torus(0.8, 0.07, 32), warm); lampRing.rotation.x = Math.PI / 2; lampRing.position.set(-16, 3.6, -7); D.add(lampRing);
+    box(0.06, 1.5, 0.06, M.dark, -16, 4.4, -7);
+    for (const s of [-1, 1]) {   // two assembly arms over the table
+      const arm = new THREE.Group(); arm.position.set(-16 + s * 1.3, 0, -7); S.add(arm);
+      mesh(Geo.cyl(0.25, 0.32, 0.4, 8), Mat.std('#ffb347', { metal: 0.6 }), 0, 0.2, 0, arm);
+      const a1 = mesh(Geo.box(0.2, 1.8, 0.2), Mat.std('#ffb347', { metal: 0.6 }), 0, 1.2, 0, arm); a1.rotation.z = s * 0.35;
+      const a2 = mesh(Geo.box(0.16, 1.1, 0.16), M.dark, -s * 0.55, 2.2, 0, arm); a2.rotation.z = -s * 1.15;
+      this.addCollider(-16 + s * 1.3, -7, 0.35, y0 + 2, 'wall');
+    }
+    this.wakeSpot = { x: -16, y: y0 + 1.1, z: -7.9, yaw: Math.PI };   // lying on the table, head toward -z
+    // tool wall and parts shelves
+    box(8, 2.6, 0.12, M.panel2, -13.5, 2.3, -11.75);
+    for (let i = 0; i < 9; i++) box(0.1, 0.6, 0.1, Mat.std(pick(['#c8c8d0', '#ff6b6b', '#ffd23f', '#3cf2ff']), { metal: 0.8 }), -17 + i * 0.85, 2.4 + (i % 2) * 0.3, -11.6);
+    for (let i = 0; i < 3; i++) box(1.1, 0.06, 0.5, M.dark, -19.4, 1 + i * 0.8, -9 + i * 0.1);
+    // weapon rack by the workshop door
+    const rack = new THREE.Group(); rack.position.set(-19.2, 0, -3.6); rack.rotation.y = Math.PI / 2; D.add(rack);
+    mesh(Geo.box(1.6, 2.2, 0.2), M.dark, 0, 1.1, -0.1, rack);
+    mesh(Geo.box(1.4, 0.05, 0.22), cyan, 0, 2.1, 0, rack);
+    const gun = buildViewModel(); setViewModelWeapon(gun, 'blaster', 1); gun.position.set(0, 1.3, 0.15); gun.rotation.set(0, Math.PI / 2, 0); gun.scale.setScalar(1.6); rack.add(gun);
+    this.addCollider(-19.2, -3.6, 0.6, y0 + 2.2, 'wall');
+    this.rack = { x: -18.2, z: -3.6, y: y0, gun };
+    // Wren
+    const wren = buildPersonModel({ skin: '#e2b48c', hair: '#b4532a', suit: '#3d5a78', trim: '#ffb347' });
+    wren.position.set(-13, 0, -8.6); wren.rotation.y = -Math.PI / 2; D.add(wren);
+    this.wren = { x: -13, z: -8.6, y: y0, model: wren, yaw: -Math.PI / 2, home: { x: -13, z: -8.6 } };
+    this.addCollider(-13, -8.6, 0.4, y0 + 1.8, 'wall');
+
+    // ── terminals ──
+    const terminal = (x, z, face, color, kind, label, room) => {
+      const t = new THREE.Group(); t.position.set(x, 0, z); t.rotation.y = face; D.add(t);
+      mesh(Geo.box(1.4, 1.05, 0.6), M.dark, 0, 0.52, 0, t);
+      const scr = mesh(Geo.box(1.3, 0.85, 0.06), Mat.glow(color, 1.1), 0, 1.55, -0.12, t); scr.rotation.x = -0.25;
+      mesh(Geo.box(1.36, 0.06, 0.5), Mat.glow(color, 2.4), 0, 1.07, 0.06, t);
       const sp = glowSprite(color, 1.3, 0.6); sp.position.y = 1.7; t.add(sp);
-      const l = this.makeLabel(label, color, 512, 96); l.position.set(0, 2.7, 0); l.scale.set(2.8, 0.55, 1); t.add(l);
-      this.addCollider(cx + lx, cz + lz, 0.8, y0 + 1.2, 'wall');
-      this.terminals.push({ kind, x: cx + lx, z: cz + lz + 1.2, y: y0, color, sprite: sp });
+      const l = this.makeLabel(label, color, 512, 96); l.position.set(0, 2.65, 0); l.scale.set(2.6, 0.5, 1); t.add(l);
+      this.addCollider(x, z, 0.8, y0 + 1.2, 'wall');
+      const T2 = { kind, x: x + Math.sin(face) * 1.3, z: z + Math.cos(face) * 1.3, y: y0, color, sprite: sp, room, group: t };
+      this.terminals.push(T2);
+      return T2;
     };
-    // ── Mechanic room: workbench, bot on the bench, robot arm, tool wall
-    console(-8, -6.6, '#ffb347', 'mechanic', 'MECHANIC');
-    mesh(Geo.box(3.4, 1, 1.4), trim, -10.2, 0.5, -1.5, g); mesh(Geo.box(3.6, 0.12, 1.6), Mat.std('#5a3a22'), -10.2, 1.05, -1.5, g);
-    this.addCollider(cx - 10.2, cz - 1.5, 1.3, y0 + 1.1, 'wall');
-    const benchBot = buildCompanionModel('gunner'); benchBot.position.set(-10.2, 1.5, -1.5); benchBot.scale.setScalar(1.2); g.add(benchBot);
-    const arm = new THREE.Group(); arm.position.set(-11.3, 0, -5.5); g.add(arm);
-    mesh(Geo.cyl(0.35, 0.45, 0.4, 8), Mat.std('#ffb347', { metal: 0.6 }), 0, 0.2, 0, arm);
-    const a1 = mesh(Geo.box(0.25, 2, 0.25), Mat.std('#ffb347', { metal: 0.6 }), 0.3, 1.2, 0, arm); a1.rotation.z = -0.3;
-    const a2 = mesh(Geo.box(0.2, 1.4, 0.2), Mat.std('#333844', { metal: 0.7 }), 1, 2.3, 0, arm); a2.rotation.z = -1.1;
-    this.addCollider(cx - 11.3, cz - 5.5, 0.6, y0 + 2, 'wall');
-    for (let i = 0; i < 5; i++) mesh(Geo.box(0.12, 0.7, 0.12), Mat.std(pick(['#c8c8d0', '#ff6b6b', '#ffd23f']), { metal: 0.8 }), -W + 0.3, 2 + (i % 2) * 0.3, -3 + i * 0.9, g);
-    this.mechanicSpot = { x: cx - 6, z: cz - 3.5, y: y0 };
-    // ── Charging room: glowing pads for docked bots
-    console(0, -6.6, '#6bff9e', 'charging', 'CHARGING');
-    for (const pz of [-3.6, -0.2]) for (const px of [-2.4, 0, 2.4]) {
-      mesh(Geo.cyl(0.8, 0.9, 0.18, 12), Mat.std('#2a3444', { metal: 0.7 }), px, 0.15, pz, g);
-      const ring = new THREE.Mesh(Geo.torus(0.62, 0.05, 24), Mat.glow('#6bff9e', 2.2)); ring.rotation.x = Math.PI / 2; ring.position.set(px, 0.26, pz); g.add(ring);
-      ring.userData.keep = true;
-      this.chargePads.push({ x: cx + px, z: cz + pz, y: y0 + 1.25, ring });
-    }
-    // ── Storage room: shelves and crates
-    console(8, -6.6, '#3cf2ff', 'storage', 'STORAGE');
-    const crate = Mat.std('#9a6a3a', { rough: 0.85 }), crateB = Mat.std('#4a6a8a', { rough: 0.6, metal: 0.4 });
-    for (const sx of [W - 0.9]) for (let i = 0; i < 4; i++) {
-      mesh(Geo.box(1.2, 3.2, 3), trim, sx, 1.6, -5.5 + i * 3.4, g);
-      for (let k = 0; k < 3; k++) mesh(Geo.box(0.8, 0.7, 0.8), pick([crate, crateB]), sx - 0.1, 0.5 + k * 1, -6 + i * 3.4 + rand(-0.4, 0.4), g);
-      this.addCollider(cx + sx, cz - 5.5 + i * 3.4, 1.3, y0 + 3.2, 'wall');
-    }
-    for (let i = 0; i < 4; i++) mesh(Geo.box(1, 1, 1), pick([crate, crateB]), 5.6 + (i % 2) * 1.1, 0.5 + Math.floor(i / 2) * 1, 3.6, g);
-    this.addCollider(cx + 6.2, cz + 3.6, 1.3, y0 + 2, 'wall');
+    terminal(-10.5, -11, 0, '#ffb347', 'mechanic', 'WORKBENCH');
+    terminal(13.5, -11, 0, '#6bff9e', 'charging', 'CHARGING');
+    terminal(0, -23, 0, '#3cf2ff', 'storage', 'STORAGE');
+    terminal(-13.5, -23, 0, '#b98cff', 'lab', 'LAB', 'lab');
+    terminal(13.5, -23, 0, '#ffd23f', 'command', 'COMMAND', 'command');
+    terminal(-28.5, -11, 0, '#ff9f43', 'garage', 'GARAGE', 'garage');
 
-    // mailbox & lanterns outside
-    for (const s of [-1, 1]) {
-      mesh(Geo.cyl(0.08, 0.1, 2.4, 6), Mat.std('#2a2a30', { metal: 0.7 }), s * 13.5, 1.2, D + 2, g);
-      mesh(Geo.sphere(0.25, 1), Mat.glow('#ffd88a', 4), s * 13.5, 2.5, D + 2, g).castShadow = false;
+    // ── Charging bay ──
+    for (const pz of [-8.6, -5]) for (const px of [10, 13.5, 17]) {
+      mesh(Geo.cyl(0.8, 0.9, 0.18, 12), M.dark, px, 0.15, pz, S);
+      const ring = new THREE.Mesh(Geo.torus(0.62, 0.05, 24), Mat.glow('#6bff9e', 2.2)); ring.rotation.x = Math.PI / 2; ring.position.set(px, 0.26, pz); D.add(ring);
+      this.chargePads.push({ x: px, z: pz, y: y0 + 1.25, ring });
     }
-    this.bake(g);
+    // ── Storage: shelving ──
+    const crate = Mat.std('#9a6a3a', { rough: 0.85 }), crateB = Mat.std('#4a6a8a', { rough: 0.6, metal: 0.4 });
+    for (const sx of [-6.2, 6.2]) for (let i = 0; i < 3; i++) {
+      box(1, 3, 2.6, M.dark, sx, 1.5, -16.5 - i * 2.8);
+      for (let k = 0; k < 3; k++) mesh(Geo.box(0.7, 0.6, 0.7), pick([crate, crateB]), sx - Math.sign(sx) * 0.05, 0.45 + k * 0.95, -16.2 - i * 2.8 + rand(-0.5, 0.5), S);
+      this.addCollider(sx, -16.5 - i * 2.8, 1.3, y0 + 3, 'wall');
+    }
+
+    // ── Lab: glowing tanks and holo screens ──
+    const lab = new THREE.Group(); D.add(lab);
+    for (const [x, z, c] of [[-18.5, -15, '#6bff9e'], [-18.5, -18.5, '#b98cff'], [-18.5, -22, '#3cf2ff']]) {
+      box(1.4, 0.4, 1.4, M.dark, x, 0.2, z); box(1.4, 0.3, 1.4, M.dark, x, 3.1, z);
+      const tank = mesh(Geo.cyl(0.55, 0.55, 2.5, 12, true), glass, x, 1.65, z, D); tank.renderOrder = 3;
+      mesh(Geo.cyl(0.48, 0.48, 2.2, 12), Mat.glow(c, 1.4), x, 1.55, z, lab);
+      this.addCollider(x, z, 0.8, y0 + 3.2, 'wall');
+    }
+    for (let i = 0; i < 3; i++) { box(2, 0.9, 0.9, M.panel2, -12 + i * 0, 0.45, -16 - i * 3); const scr = mesh(Geo.box(1.6, 0.9, 0.05), Mat.glow(['#b98cff', '#6bff9e', '#3cf2ff'][i], 1.3), -12, 1.6, -16.3 - i * 3, lab); scr.rotation.x = -0.2; this.addCollider(-12, -16 - i * 3, 1, y0 + 1, 'wall'); }
+    // ── Command Room: holo table showing the world ──
+    const cmd = new THREE.Group(); D.add(cmd);
+    mesh(Geo.cyl(2.4, 2.6, 0.9, 24), M.dark, 13.5, 0.45, -17, S);
+    mesh(Geo.torus(2.45, 0.05, 48), cyan, 13.5, 0.92, -17, S).rotation.x = Math.PI / 2;
+    this.addCollider(13.5, -17, 2.6, y0 + 1, 'wall');
+    const mapDisc = new THREE.Mesh(new THREE.CircleGeometry(2.1, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false }));
+    mapDisc.rotation.x = -Math.PI / 2; mapDisc.position.set(13.5, 1.0, -17); cmd.add(mapDisc);
+    this.cmdMap = mapDisc;
+    for (let k = 0; k < 2; k++) { const r = new THREE.Mesh(Geo.torus(2.2 + k * 0.25, 0.03, 48), Mat.glow('#ffd23f', 2)); r.rotation.x = Math.PI / 2; r.position.set(13.5, 1.15 + k * 0.7, -17); cmd.add(r); }
+    for (const x of [9, 13.5, 18]) { const s = mesh(Geo.box(3.2, 1.8, 0.06), Mat.glow('#ffd23f', 0.9), x, 2.8, -23.6, cmd); void s; }
+    // antenna mast on the command room roof
+    box(0.3, 7, 0.3, M.dark, 18, H + 3.5, -22);
+    const beaconLight = mesh(Geo.sphere(0.3, 1), Mat.glow('#ff4d6d', 4), 18, H + 7.2, -22, D);
+    this.mastLight = beaconLight;
+    // ── Garage: roll door, lift, gear racks ──
+    const gar = new THREE.Group(); D.add(gar);
+    box(5, 0.3, 3, M.dark, -28.5, 0.15, -5); box(0.3, 2.4, 0.3, Mat.std('#ffb347', { metal: 0.6 }), -30.5, 1.2, -5); box(0.3, 2.4, 0.3, Mat.std('#ffb347', { metal: 0.6 }), -26.5, 1.2, -5);
+    for (let i = 0; i < 3; i++) { box(0.8, 1.2, 0.5, M.panel2, -33.4, 1.6, -9 + i * 1.8); mesh(Geo.box(0.6, 0.08, 0.06), Mat.glow('#ff9f43', 2), -33.1, 2.1, -9 + i * 1.8, gar); }
+
+    // ── sealed rooms: a force field in the doorway until the room is built ──
+    const field = (key, x, z, w, rotY) => {
+      const f = new THREE.Mesh(Geo.box(w, 3.3, 0.08), Mat.glowT('#ff7a3d', 1.6, 0.35));
+      f.position.set(x, 1.7, z); f.rotation.y = rotY; D.add(f);
+      const lbl = this.makeLabel(ROOMS[key].name.toUpperCase() + ' — SEALED', '#ff9f43', 640, 100); lbl.position.set(x, y0 + 3.9, z); lbl.scale.set(3.8, 0.6, 1); this.group.add(lbl);
+      const cols = [];
+      for (let s = -w / 2; s <= w / 2 + 0.01; s += 0.5) cols.push(this.addCollider(x + Math.cos(rotY) * s, z - Math.sin(rotY) * s, 0.35, y0 + 3.4, 'wall'));
+      return { field: f, label: lbl, cols };
+    };
+    this.rooms.lab = Object.assign(field('lab', -13.5, -12, 3, 0), { lights: lab });
+    this.rooms.command = Object.assign(field('command', 13.5, -12, 3, 0), { lights: cmd });
+    this.rooms.garage = Object.assign(field('garage', -28.5, 0, 5.2, 0), { lights: gar });
+
+    // lanterns along the path to the pad
+    for (const s of [-1, 1]) for (const z of [3, 8]) { box(0.14, 2.2, 0.14, M.dark, s * 3.6, 1.1, z); box(0.3, 0.3, 0.3, warm, s * 3.6, 2.3, z); this.addCollider(s * 3.6, z, 0.25, y0 + 2.2, 'wall'); }
+    box(6, 0.06, 12, M.floor2, 0, 0.03, 4.5).receiveShadow = true;
+
+    this.bake(S);
+    this.refreshRooms();
+  },
+
+  // light up rooms that have been built and drop their force fields
+  refreshRooms() {
+    if (!this.rooms) return;
+    for (const [key, R] of Object.entries(this.rooms)) {
+      const open = !!(G.base && G.base.rooms && G.base.rooms[key]);
+      R.field.visible = R.label.visible = !open;
+      R.lights.visible = open;
+      for (const c of R.cols) c.top = open ? -1e9 : this.home.y + 3.4;
+      for (const t of this.terminals) if (t.room === key) t.locked = !open;
+    }
+  },
+  unlockRoom(key) {
+    const R = this.rooms && this.rooms[key];
+    if (!R) return;
+    Fx.shockRing(R.field.position.x, this.home.y + 1, R.field.position.z, '#6bff9e', 3, 30);
+    Fx.explosion(R.field.position.x, this.home.y + 1.7, R.field.position.z, '#ff9f43', 0.6);
+    this.refreshRooms();
   },
 
   buildHomeDome() {
     if (this.homeDome || !this.house) return;
-    const H = this.house, R = 21;
+    const H = this.house, R = 34;
     const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(1.1), transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 20, 0, TAU, 0, Math.PI / 2), mat);
     dome.position.set(H.x, H.y, H.z);
     const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(R + 0.05, 3), new THREE.MeshBasicMaterial({ color: new THREE.Color('#5ab8ff').multiplyScalar(2), wireframe: true, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
     wire.position.copy(dome.position);
-    // generator pylon in the mechanic room corner
-    const py = new THREE.Group(); py.position.set(H.x - 5.2, H.y, H.z + 6.6); this.group.add(py);
+    // generator pylon on the workshop roof
+    const py = new THREE.Group(); py.position.set(-13.5, H.y + 5.4, -7); this.group.add(py);
     mesh(Geo.cyl(0.5, 0.7, 0.4, 8), Mat.std('#2a3444', { metal: 0.7 }), 0, 0.2, 0, py);
     mesh(Geo.cyl(0.15, 0.2, 2.6, 6), Mat.std('#8aa0b8', { metal: 0.8 }), 0, 1.5, 0, py);
     const orb = mesh(Geo.sphere(0.4, 1), Mat.glow('#5ab8ff', 4), 0, 3, 0, py); orb.castShadow = false;
@@ -4995,9 +5266,10 @@ const World = {
       let g = groups.get(key); if (!g) { g = { F, list: [], ground: [] }; groups.set(key, g); }
       g.ground.push({ x, z, y: this.heightAt(x, z), r: rand(2, 5) });
     }
-    // a ring of flowers around the house
+    // flower beds around the base
     const ring = { F: HUB.flora, list: [], ground: [] };
-    for (let i = 0; i < 26; i++) { const a = (i / 26) * TAU, r = rand(20, 30); const x = Math.sin(a) * r, z = Math.cos(a) * r - 2; ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.2 }); }
+    for (let i = 0; i < 22; i++) { const x = (i % 2 ? 1 : -1) * rand(7, 22), z = rand(2, 22); ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.2 }); }
+    for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU, r = rand(36, 46); const x = Math.sin(a) * r - 6, z = Math.cos(a) * r - 11; ring.ground.push({ x, z, y: this.heightAt(x, z), r: 2.4 }); }
     groups.set('ring', ring);
     for (const g of groups.values()) {
       if (g.list.length) this.plantTrees(g.list, g.F);
@@ -5269,6 +5541,21 @@ const World = {
     }
     for (const S of this.shops) if (near(S.x, S.z, 120)) S.head.rotation.y = Math.sin(time * 0.8 + S.x) * 0.5;
     for (const pad of this.chargePads) pad.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + pad.x));
+    // Wren turns to look at you when you're close
+    if (this.wren && near(this.wren.x, this.wren.z, 30) && G.player) {
+      const w = this.wren, p = G.player, d = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
+      const want = d < 9 ? Math.atan2(p.pos.x - w.x, p.pos.z - w.z) : w.yaw;
+      w.model.rotation.y += angDiff(w.model.rotation.y, want) * (1 - Math.exp(-4 * dt));
+      const U = w.model.userData;
+      U.head.rotation.x = d < 9 ? clamp(-Math.atan2(p.pos.y + 1.6 - (w.y + 1.7), d) * 0.6, -0.3, 0.3) : 0;
+      U.arms[0].sh.rotation.x = Math.sin(time * 1.3) * 0.05 + (Dialog.cur && Dialog.cur.who === 'WREN' && d < 9 ? Math.sin(time * 5) * 0.25 - 0.3 : 0);
+      w.model.position.y = Math.sin(time * 1.6) * 0.01;
+    }
+    if (this.atriumHolo && near(0, 0, 120)) {
+      this.atriumHolo.rotation.y += dt * 0.6; this.atriumHolo.children.forEach((r, i) => { r.rotation.x += dt * (0.4 + i * 0.2); });
+      this.mastLight.visible = Math.sin(time * 3) > 0;
+      if (this.rooms.command.lights.visible) this.rooms.command.lights.children.forEach((r, i) => { if (i && i < 3) r.rotation.z += dt * (i % 2 ? 0.5 : -0.4); });
+    }
     if (this.homeDome) {
       const D = this.homeDome;
       D.wire.rotation.y += dt * 0.04;
@@ -5323,7 +5610,7 @@ const WorldMap = {
 
   // shaded relief of the whole world (rebuilt for each new world)
   buildRelief() {
-    if (this.reliefSeed === World.seed) return;
+    if (this.reliefSeed === World.seed) { this.attachHolo(); return; }
     this.reliefSeed = World.seed;
     const N = this.RES, cv = this.relief || (this.relief = document.createElement('canvas'));
     cv.width = cv.height = N;
@@ -5344,6 +5631,14 @@ const WorldMap = {
       d[k] = clamp(col.r * 255 * shade, 0, 255); d[k + 1] = clamp(col.g * 255 * shade, 0, 255); d[k + 2] = clamp(col.b * 255 * shade, 0, 255); d[k + 3] = 255;
     }
     g.putImageData(img, 0, 0);
+    this.tex = null;
+    this.attachHolo();
+  },
+  // the Command Room's holo table shows the same relief
+  attachHolo() {
+    if (!World.cmdMap || !this.relief) return;
+    if (!this.tex) this.tex = new THREE.CanvasTexture(this.relief);
+    if (World.cmdMap.material.map !== this.tex) { World.cmdMap.material.map = this.tex; World.cmdMap.material.needsUpdate = true; }
   },
 
   // ── fog of war ──
@@ -5397,6 +5692,7 @@ const WorldMap = {
     Sound.play('click');
     this.resize();
     this.draw();
+    Story.event('map');
   },
   close() {
     if (G.state !== 'map') return;
@@ -5817,14 +6113,14 @@ class Player {
     }
 
     this.fireCd -= dt;
-    if (I.mouse.down && this.fireCd <= 0 && !this.climbing && !frozen) {
+    if (I.mouse.down && this.fireCd <= 0 && !this.climbing && !frozen && !G.unarmed) {
       this.fireCd += 1 / this.fireRate;
       if (this.fireCd < 0) this.fireCd = 0;
       this.shoot();
     }
     if (this.fireCd < 0) this.fireCd = 0;
 
-    if ((I.mouse.rightPressed || I.hit('KeyG')) && !frozen) {
+    if ((I.mouse.rightPressed || I.hit('KeyG')) && !frozen && !G.unarmed) {
       if (this.energy < 100 && G.takeItem('supply', 'cell')) { this.energy = 100; UI.feed('Plasma cell consumed', '#b98cff'); }
       if (this.energy >= 100) this.throwGrenade();
       else Sound.play('deny');
@@ -6069,7 +6365,7 @@ class Enemy {
 
   // Robots only fight when provoked: hurting one turns its whole camp (and anyone close by) hostile.
   alert() {
-    if (this.aggro) return;
+    if (this.aggro || this.dummy) return;
     this.aggro = true; this.calmT = 0;
     Fx.glowBurst(this.pos.x, this.cy + 1.6, this.pos.z, '#ff3355', 0.9, 0.6, 4);
     for (const e of G.enemies) {
@@ -6136,6 +6432,13 @@ class Enemy {
   }
 
   update(dt) {
+    if (this.dummy) {
+      // a practice drone: just hovers and turns slowly
+      this.t += dt; this.flash = Math.max(0, this.flash - dt * 7);
+      this.pos.y = this.baseY + 2.4 + Math.sin(this.t * 1.5) * 0.3; this.facing += dt * 0.6;
+      this.sync(dt);
+      return;
+    }
     const p = G.player;
     const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
     const dd = Math.hypot(dx, dz) || 1;
@@ -6971,8 +7274,8 @@ class Boss {
 
 // ═════════════════════════ COMPANIONS ═════════════════════════
 // Bots run on batteries. As a battery drains the bot takes more damage and aims worse; when it runs low
-// the bot flies back to the biome's home portal, travels through it to the Charging Room, recharges,
-// then travels back through the portal and flies to you. Bots can also be swapped with ones kept at home.
+// the bot flies all the way home to a charging pad, recharges,
+// then flies back out to you. Bots can also be swapped with ones kept at home.
 //   state: follow · leaving (flying home) · charging (on a pad) · returning (flying back) · down
 const COMP_TRAVEL_SPEED = 18;   // m/s when flying home to recharge and back
 let _cid = 0;
@@ -7355,7 +7658,11 @@ const Touch = {
 
   start(e) {
     e.preventDefault();
+    const hitEl = (id, t) => { const el = document.getElementById(id); if (!el || !el.offsetParent) return false; const r = el.getBoundingClientRect(); return t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom; };
     for (const t of e.changedTouches) {
+      // HUD panels under the touch layer: the dialogue box and the quest tracker
+      if (document.getElementById('dialog').classList.contains('show') && hitEl('dialog', t)) { Dialog.skip(); continue; }
+      if (G.state === 'playing' && !G.cine && hitEl('objective', t)) { UI.openStation('journal'); return; }
       const btn = t.target.closest ? t.target.closest('[data-tbtn]') : null;
       if (btn) {
         const k = btn.dataset.tbtn;
@@ -7468,7 +7775,7 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE' })[it.kind] : 'USE';
     document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };
@@ -7516,6 +7823,17 @@ const UI = {
     $('btn-resume').onclick = () => this.closeOverlay();
     $('btn-p-workshop').onclick = () => this.openStation('field');
     $('btn-p-map').onclick = () => { G.state = 'playing'; this.hideAll(); WorldMap.open(); };
+    $('btn-p-journal').onclick = () => this.openStation('journal');
+    $('btn-p-recall').onclick = () => {
+      if (World.domeTrap) { Sound.play('deny'); return; }
+      this.closeOverlay();
+      G.recallT = 2.5;
+      this.banner('RECALLING…', 'Hold still — warping home', '#3cf2ff', 2.4);
+      Sound.play('uplink');
+    };
+    $('skip-intro').onclick = (e) => { e.stopPropagation(); Story.skip(); if (G.state === 'playing') Input.lock(canvas); };
+    $('dialog').addEventListener('pointerdown', (e) => { e.stopPropagation(); Dialog.skip(); });
+    $('objective').addEventListener('click', () => { if (Touch.enabled && G.state === 'playing') this.openStation('journal'); });
     $('btn-mute').onclick = () => this.toggleMute();
     $('btn-quit').onclick = () => this.toMenu();
     $('ws-continue').onclick = () => { Sound.play('click'); this.closeOverlay(); };
@@ -7569,6 +7887,7 @@ const UI = {
     Input.mouse.down = false;
     Input.unlock();
     $('btn-mute').textContent = Sound.muted ? 'Sound: Off' : 'Sound: On';
+    $('btn-p-recall').style.display = G.base.rooms && G.base.rooms.command && G.where !== 'hub' && !World.domeTrap ? '' : 'none';
     this.show('pause');
   },
 
@@ -7654,7 +7973,8 @@ const UI = {
   openStation(mode, shopSpot) {
     this.mode = mode;
     if (shopSpot) this.shopDef = ZONES[shopSpot.biome].shop;
-    const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'] }[mode];
+    const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'],
+      garage: ['garage'], lab: ['research', 'memories'], command: ['quests', 'travel', 'memories'], journal: ['quests', 'memories'] }[mode];
     if (!tabs.includes(this.tab)) this.tab = tabs[0];
     this.tabs = tabs;
     G.state = 'workshop';
@@ -7663,15 +7983,19 @@ const UI = {
     const shop = this.shopDef || null;
     const T = {
       field: ['FIELD KIT', 'Time is frozen. Build simple bots from the scrap in your hotbar.'],
-      mechanic: ['MECHANIC ROOM', 'Build bots and base systems from your storage and hotbar.'],
-      charging: ['CHARGING ROOM', 'Bots recharge here automatically when their batteries run low.'],
+      mechanic: ['WORKSHOP BENCH', 'Build bots, base systems and new rooms from your storage and hotbar.'],
+      charging: ['CHARGING BAY', 'Bots recharge here automatically when their batteries run low.'],
       storage: ['STORAGE ROOM', 'Unlimited storage. Click an item to move it between your hotbar and storage.'],
       shop: [shop ? shop.name : 'SHOP', 'Sell salvage for Botbucks. Buy weapons, gear, premium bots and upgrades.'],
+      garage: ['GARAGE', 'Build gear from the parts in your storage and hotbar.'],
+      lab: ['LAB', 'Research upgrades with rare parts. Replay the memories you have recovered.'],
+      command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
+      journal: ['JOURNAL', 'Your quests and the memories you have recovered. Time is paused.'],
     }[mode];
     $('ws-title').textContent = T[0];
     $('ws-sub').textContent = T[1];
     $('ws-title').style.color = mode === 'shop' && shop ? shop.color : '';
-    $('ws-continue').textContent = mode === 'field' ? 'Resume ▸' : 'Leave ▸';
+    $('ws-continue').textContent = mode === 'field' || mode === 'journal' ? 'Resume ▸' : 'Leave ▸';
     $('ws-stats').style.display = 'none';
     this.renderWorkshop();
     this.show('workshop');
@@ -7710,6 +8034,7 @@ const UI = {
   // ── crafting ──
   recipeState(r, useStorage) {
     if (r.id === 'shieldgen' && G.base.shield) return { ok: false, why: 'BUILT' };
+    if (r.kind === 'room' && G.base.rooms[r.id]) return { ok: false, why: 'BUILT' };
     if (r.id === 'charger' && G.base.charger >= r.max) return { ok: false, why: 'MAXED' };
     if (!G.canAfford(r.cost, useStorage)) return { ok: false, why: 'NEED PARTS' };
     return { ok: true };
@@ -7722,8 +8047,9 @@ const UI = {
     if (!st.ok) { Sound.play('deny'); this.toast(st.why === 'NEED PARTS' ? 'Not enough parts' : st.why === 'SQUAD FULL' ? 'Squad is full — scrap a bot or buy a Command Uplink' : 'Already done', true); return; }
     G.consume(r.cost, useStorage);
     if (r.kind === 'companion') { const w = G.addBot(r.id); this.toast(w === 'squad' ? `${r.name} online!` : `Squad is full — ${r.name} is waiting at home base`); }
-    else if (r.id === 'shieldgen') { G.base.shield = true; World.buildHomeDome(); this.toast('Shield Generator online — the house is protected'); }
+    else if (r.id === 'shieldgen') { G.base.shield = true; World.buildHomeDome(); this.toast('Shield Generator online — the base is protected'); }
     else if (r.id === 'charger') { G.base.charger++; this.toast(`Fast Chargers installed (${G.base.charger}/${r.max})`); }
+    else if (r.kind === 'room') { G.base.rooms[r.id] = true; World.unlockRoom(r.id); Story.event('room', r.id); this.toast(`${r.name} built — its force field is down`); saveGame(); }
     G.total.crafted = (G.total.crafted || 0) + 1;
     Sound.play('craft');
     this.afterAction(id);
@@ -7779,8 +8105,8 @@ const UI = {
     else if (S.kind === 'weapon') { G.addItem({ t: 'weapon', id }); msg = `${WEAPONS[id].name} added to your hotbar — select its slot to use it`; }
     else if (S.kind === 'gear') {
       if (id === 'backpack') { G.gear.backpack++; msg = `Backpack upgraded — ${G.barSize} hotbar slots`; }
-      else { G.gear[id] = true; msg = id === 'jetpack' ? 'Jetpack equipped! Hold Space / JUMP in mid-air to fly' : 'Fire Boots equipped — the Volcano portal will open for you'; }
-    } else if (S.kind === 'bot') { const w = G.addBot(S.bot); msg = w === 'squad' ? `${COMP_DEFS[S.bot].name} joins your squad — it's coming through the portal!` : `Squad is full — ${COMP_DEFS[S.bot].name} was sent to home base`; }
+      else { G.gear[id] = true; msg = id === 'jetpack' ? 'Jetpack equipped! Hold Space / JUMP in mid-air to fly' : 'Fire Boots equipped — lava barely hurts now'; }
+    } else if (S.kind === 'bot') { const w = G.addBot(S.bot); msg = w === 'squad' ? `${COMP_DEFS[S.bot].name} joins your squad — it's ready to fight!` : `Squad is full — ${COMP_DEFS[S.bot].name} was sent to home base`; }
     else if (S.kind === 'upgrade') {
       G.up[S.up]++;
       const p = G.player;
@@ -7851,6 +8177,42 @@ const UI = {
     this.renderWorkshop(); this.refreshHUD(true);
   },
 
+  // ── garage, lab & command room ──
+  gearCost(r) { if (r.id !== 'backpack') return r.cost; const k = 1 + G.gear.backpack; const c = {}; for (const [p, v] of Object.entries(r.cost)) c[p] = v * k; return c; },
+  gearState(r) {
+    if (r.id === 'backpack' ? G.gear.backpack >= r.max : G.gear[r.id]) return { ok: false, why: r.max ? 'MAXED' : 'OWNED' };
+    return G.canAfford(this.gearCost(r), true) ? { ok: true } : { ok: false, why: 'NEED PARTS' };
+  },
+  buildGear(id) {
+    const r = GEAR_RECIPES.find((x) => x.id === id), st = this.gearState(r);
+    if (!st.ok) { Sound.play('deny'); this.toast(st.why === 'NEED PARTS' ? 'Not enough parts' : 'Already done', true); return; }
+    G.consume(this.gearCost(r), true);
+    if (id === 'backpack') G.gear.backpack++; else G.gear[id] = true;
+    Sound.play('craft');
+    this.toast(id === 'backpack' ? `Backpack built — ${G.barSize} hotbar slots` : `${r.name} built and equipped`);
+    this.afterAction(id);
+  },
+  researchCost(id) { const k = 1 + G.up[id]; const c = {}; for (const [p, v] of Object.entries(RESEARCH[id])) c[p] = v * k; return c; },
+  research(id) {
+    const U = UPGRADES[id], cost = this.researchCost(id);
+    if (G.up[id] >= U.max || !G.canAfford(cost, true)) { Sound.play('deny'); this.toast(G.up[id] >= U.max ? 'Fully researched' : 'Not enough parts', true); return; }
+    G.consume(cost, true);
+    G.up[id]++;
+    if (id === 'armor') G.player.hp += 25;
+    if (id === 'firmware') G.companions.forEach((c) => (c.hp = c.maxHp));
+    if (id === 'split') setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
+    Sound.play('craft');
+    this.toast(`${U.name} researched (${G.up[id]}/${U.max})`);
+    this.afterAction(id);
+  },
+  travel(key) {
+    let x, z, y, label;
+    if (key === 'home') { x = World.spawn.x; z = World.spawn.z; label = 'Home Base'; }
+    else { const b = World.beacons.find((q) => q.id === +key); if (!b) return; const a = rand(0, TAU); x = b.x + Math.cos(a) * 4; z = b.z + Math.sin(a) * 4; y = b.island ? b.y : undefined; label = ZONES[b.biome].name + ' beacon'; }
+    this.closeOverlay();
+    G.travelTo(x, z, y, label);
+  },
+
   renderWorkshop() {
     const m = this.mode;
     // left column: hotbar & gear
@@ -7878,7 +8240,8 @@ const UI = {
     $('ws-items').innerHTML = '';
 
     // middle: tabs + content
-    const tabNames = { bots: 'Bots', base: 'Base', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies' };
+    const tabNames = { bots: 'Bots', base: 'Base & Rooms', charging: 'Charging', storage: 'Storage', sell: 'Sell', gear: 'Weapons & Gear', upgrades: 'Upgrades', supplies: 'Supplies',
+      garage: 'Gear', research: 'Research', memories: 'Memories', quests: 'Quests', travel: 'Quick Travel' };
     $('ws-tabs').innerHTML = this.tabs.map((t) => `<button class="tab ${t === this.tab ? 'active' : ''}" data-tab="${t}">${tabNames[t]}</button>`).join('');
     $('ws-tabs').querySelectorAll('.tab').forEach((t) => (t.onclick = () => { this.tab = t.dataset.tab; Sound.play('click'); this.renderWorkshop(); }));
     $('ws-tabs').style.display = this.tabs.length > 1 ? '' : 'none';
@@ -7886,18 +8249,49 @@ const UI = {
     const useStorage = m === 'mechanic';
     if (m === 'field' || m === 'mechanic') {
       const kind = this.tab === 'bots' ? 'companion' : this.tab;
-      const list = RECIPES.filter((r) => r.kind === kind);
+      const list = RECIPES.filter((r) => r.kind === kind || (kind === 'base' && r.kind === 'room'));
       mid = list.map((r) => {
         const st = this.recipeState(r, useStorage);
-        const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.id === 'shieldgen' ? '#5ab8ff' : '#6bff9e';
+        const color = r.kind === 'companion' ? COMP_DEFS[r.id].color : r.kind === 'room' ? ROOMS[r.id].color : r.id === 'shieldgen' ? '#5ab8ff' : '#6bff9e';
         const icon = r.kind === 'companion' ? compIconURL(r.id) : upgIconURL(r.id, color);
         let meta = '';
         if (r.kind === 'companion') { const d = COMP_DEFS[r.id]; const owned = G.companions.filter((c) => c.kind === r.id).length; meta = `<div class="meta">SIMPLE BOT · HULL ${Math.round(d.hp * (1 + 0.3 * G.up.firmware))}${d.range ? ' · RANGE ' + d.range + 'M' : ''}${owned ? ` · <b>${owned} ACTIVE</b>` : ''}</div>`; }
         if (r.id === 'charger') meta = `<div class="pips">${Array.from({ length: r.max }, (_, i) => `<i class="${i < G.base.charger ? 'on' : ''}"></i>`).join('')}</div>`;
         return this.card({ id: r.id, ok: st.ok, why: st.why, color, icon, name: r.name, desc: r.desc, meta, cost: this.costHTML(r.cost, useStorage), act: 'craft', verb: 'Build' });
       }).join('');
-      if (m === 'field') mid += `<div class="ws-note">Premium bots, weapons, gear, upgrades and supplies are sold in the biome shops. Base systems are built in the Mechanic Room at home.</div>`;
+      if (m === 'field') mid += `<div class="ws-note">Premium bots, weapons, gear, upgrades and supplies are sold in the biome shops. Base systems and new rooms are built at the Workshop bench at home.</div>`;
       if (m === 'mechanic') mid += `<div class="ws-note">Costs use your storage first, then your hotbar.</div>`;
+    } else if (this.tab === 'garage') {
+      mid = GEAR_RECIPES.map((r) => {
+        const st = this.gearState(r), color = r.id === 'fireboots' ? '#ff6a1a' : r.id === 'jetpack' ? '#ffb347' : '#3cf2ff';
+        const meta = r.max ? `<div class="pips">${Array.from({ length: r.max }, (_, i) => `<i class="${i < G.gear.backpack ? 'on' : ''}"></i>`).join('')}</div>` : '';
+        return this.card({ id: r.id, ok: st.ok, why: st.why, color, icon: upgIconURL(r.id, color), name: r.name, desc: r.desc, meta, cost: this.costHTML(this.gearCost(r), true), act: 'gear', verb: 'Build' });
+      }).join('') + '<div class="ws-note">Costs use your storage first, then your hotbar.</div>';
+    } else if (this.tab === 'research') {
+      mid = Object.keys(RESEARCH).map((id) => {
+        const U = UPGRADES[id], lvl = G.up[id], max = lvl >= U.max;
+        const cost = this.researchCost(id), ok = !max && G.canAfford(cost, true);
+        const meta = `<div class="pips">${Array.from({ length: U.max }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div>`;
+        return this.card({ id, ok, why: max ? 'MAXED' : 'NEED PARTS', color: '#b98cff', icon: upgIconURL(id, '#b98cff'), name: U.name, desc: U.desc, meta, cost: this.costHTML(cost, true), act: 'research', verb: 'Research' });
+      }).join('') + '<div class="ws-note">Each level costs more. Upgrades can also be bought in shops.</div>';
+    } else if (this.tab === 'memories') {
+      const n = Math.min(G.progress.story.logs, LORE_LOGS.length);
+      mid = n ? `<div class="lore-list">${LORE_LOGS.slice(0, n).map((L, i) => `<div class="lore-item"><div class="lore-from"><b>${i + 1}</b> · ${L.from}</div><div class="lore-text">${L.text}</div></div>`).join('')}</div>`
+        : '<div class="ws-note">No memories yet. Memory fragments glow purple at the far end of caves.</div>';
+      mid = `<div class="span-all">${mid}<div class="ws-note">${n} of ${LORE_LOGS.length} memories recovered.</div></div>`;
+    } else if (this.tab === 'quests') {
+      const q = Story.main(), side = Story.sides();
+      const row = (x, main) => `<div class="quest ${x.done ? 'done' : ''} ${main ? 'main' : ''}"><div class="q-title">${main ? 'MAIN · ' : ''}${x.title}${x.done ? ' ✓' : ''}</div><div class="q-step">${x.step}${x.prog ? ` <b>${x.prog[0]}/${x.prog[1]}</b>` : ''}</div></div>`;
+      const W = G.progress.beaten;
+      mid = `<div class="quest-grid">${row(q, true)}${side.map((x) => row(x)).join('')}</div>`;
+      mid += `<h3>The Wardens</h3><div class="warden-list">${ZONES.map((Z, i) => `<div class="warden ${W[i] ? 'free' : ''}" style="--c:${Z.boss.color}"><b>${Z.boss.name}</b><span>${Z.name} · ${W[i] ? 'Freed' : i === 4 && skyLocked() ? 'Sealed until the others are free' : 'Under the Static'}</span></div>`).join('')}</div>`;
+      if (!Story.tutorialDone) mid += `<div class="row-btns"><button class="btn" id="skip-tut">Skip the tutorial</button></div>`;
+      mid = `<div class="span-all">${mid}</div>`;
+    } else if (this.tab === 'travel') {
+      const online = World.beacons.filter((b) => b.state === 'done');
+      mid = `<div class="travel-list"><div class="travel" style="--c:#3cf2ff"><span><b>Home Base</b> — the landing pad</span><button class="btn tiny" data-travel="home">Travel</button></div>` +
+        online.map((b) => `<div class="travel" style="--c:${ZONES[b.biome].accent}"><span><b>${ZONES[b.biome].name}</b> beacon · ${Math.round(Math.hypot(b.x, b.z))} m from home</span><button class="btn tiny" data-travel="${b.id}">Travel</button></div>`).join('') + '</div>';
+      mid = `<div class="span-all">${mid}<div class="ws-note">${online.length ? 'Travel to any beacon you have powered.' : 'Power a beacon and it appears here.'} You can also recall home from the pause menu.</div></div>`;
     } else if (m === 'charging') {
       mid = `<div class="charge-list">${G.companions.length ? G.companions.map((c) => `
         <div class="squad-item" style="--c:${c.d.color}"><img src="${compIconURL(c.kind)}" alt="">
@@ -7906,9 +8300,9 @@ const UI = {
             <div class="mini-bar"><i style="width:${100 * c.hp / c.maxHp}%"></i></div>
             <div class="inv-desc">⚡ ${Math.floor(c.battery)}% · Hull ${Math.ceil(c.hp)}/${Math.round(c.maxHp)} · ${c.statusText}</div></div>
           ${c.active && c.battery < 100 ? `<button class="btn tiny" data-recall="${c.id}">Charge</button>` : ''}
-        </div>`).join('') : '<div class="ws-note">No bots yet — build one in the Mechanic Room.</div>'}</div>
+        </div>`).join('') : '<div class="ws-note">No bots yet — build one at the Workshop bench.</div>'}</div>
         <div class="ws-note">Bots drain their battery while they follow you out in the world. Below 15% they fly all the way home, charge on these pads, and fly back to you by themselves.
-        A drained bot is fragile and its aim gets sloppy — so stay sharp: you do most of the fighting.<br><br>Charge speed: <b>${Math.round(100 / (100 / 32 * (1 + 0.6 * G.base.charger)))} s</b> for a full battery${G.base.charger < 2 ? ' — build Fast Chargers in the Mechanic Room' : ''}.</div>`;
+        A drained bot is fragile and its aim gets sloppy — so stay sharp: you do most of the fighting.<br><br>Charge speed: <b>${Math.round(100 / (100 / 32 * (1 + 0.6 * G.base.charger)))} s</b> for a full battery${G.base.charger < 2 ? ' — build Fast Chargers at the Workshop bench' : ''}.</div>`;
     } else if (m === 'storage') {
       const keys = Object.keys(G.storage).filter((k) => G.storage[k] > 0).sort();
       mid = `<div class="row-btns"><button class="btn primary" id="dep-all">Store all materials</button></div><div class="store-grid">${keys.length ? keys.map((k) => {
@@ -7942,6 +8336,10 @@ const UI = {
     const R = $('ws-recipes');
     R.querySelectorAll('[data-act="craft"]').forEach((b) => (b.onclick = () => this.craft(b.dataset.id)));
     R.querySelectorAll('[data-act="buy"]').forEach((b) => (b.onclick = () => this.buy(b.dataset.id)));
+    R.querySelectorAll('[data-act="gear"]').forEach((b) => (b.onclick = () => this.buildGear(b.dataset.id)));
+    R.querySelectorAll('[data-act="research"]').forEach((b) => (b.onclick = () => this.research(b.dataset.id)));
+    R.querySelectorAll('[data-travel]').forEach((b) => (b.onclick = () => this.travel(b.dataset.travel)));
+    const st = $('skip-tut'); if (st) st.onclick = () => { Story.skip(); this.renderWorkshop(); };
     R.querySelectorAll('[data-wd]').forEach((b) => (b.onclick = () => this.withdraw(b.dataset.wd, +b.dataset.n)));
     R.querySelectorAll('[data-recall]').forEach((b) => (b.onclick = () => { const c = G.companions.find((x) => x.id === +b.dataset.recall); if (c) { c.state = 'leaving'; c.stateT = 1.4; } this.renderWorkshop(); }));
     const da = $('dep-all'); if (da) da.onclick = () => this.depositAll();
@@ -8140,16 +8538,17 @@ const UI = {
       obj = charging.inside ? `Defend the uplink — ${Math.floor(charging.progress * 100)}%` : 'Return to the uplink ring!';
       prog = charging.progress;
     } else if (G.objective === 'boss') obj = G.boss ? `Destroy ${G.boss.name}` : 'Something is coming…';
-    else obj = this.goal().text;
-    $('obj-zone').textContent = R.name.toUpperCase();
-    $('obj-zone').style.color = R === REGIONS.hub ? '' : R.accent;
+    const Q = this.questT && G.time - this.questT < 0.5 ? this.quest : (this.questT = G.time, this.quest = Story.main());
+    if (!obj) { obj = Q.step; if (Q.prog && Q.id !== 'wake') { prog = Q.prog[0] / Q.prog[1]; obj += ` (${Q.prog[0]}/${Q.prog[1]})`; } }
+    $('obj-zone').textContent = (Q.title || R.name).toUpperCase();
+    $('obj-zone').style.color = '#ffd23f';
     $('obj-text').textContent = obj;
     $('obj-text').classList.toggle('warn', (!!charging && !charging.inside) || !!G.raid);
     $('obj-prog').style.display = prog >= 0 ? '' : 'none';
     $('obj-prog-fill').style.width = (prog * 100).toFixed(1) + '%';
     if (!this.objT || G.time - this.objT > 1) {
       this.objT = G.time;
-      $('obj-kills').textContent = `WARDENS ${G.progress.beaten.filter(Boolean).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%  ·  SECRETS ${World.secrets.filter((s) => s.found).length}/${World.secrets.length}`;
+      $('obj-kills').textContent = `${R.name.toUpperCase()}  ·  WARDENS ${G.progress.beaten.filter(Boolean).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%`;
     }
 
     // boss bar
@@ -8169,7 +8568,8 @@ const UI = {
       const txt = {
         cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
         beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
-        mechanic: 'Use the <b>Mechanic Room</b>', charging: 'Open the <b>Charging Room</b>', storage: 'Open <b>Storage</b>',
+        mechanic: 'Use the <b>Workbench</b>', charging: 'Open the <b>Charging Bay</b>', storage: 'Open <b>Storage</b>',
+        garage: 'Use the <b>Garage</b>', lab: 'Use the <b>Lab</b>', command: 'Use the <b>Command Room</b>', talk: 'Talk to <b>Wren</b>', rack: 'Take the <b>Pulse Blaster</b>',
         shop: it.kind === 'shop' ? `Trade at <b>${ZONES[it.obj.biome].shop.name}</b>` : '',
       }[it.kind];
       pr.innerHTML = `${key} ${txt}`;
@@ -8204,6 +8604,8 @@ const UI = {
     M.push({ x: home.x, z: home.z, color: '#3cf2ff', shape: 'ring', label: true, big: Math.hypot(home.x - p.pos.x, home.z - p.pos.z) > 120 });
     if (G.where === 'hub') for (const t of World.terminals) M.push({ x: t.x, z: t.z, color: t.color, shape: 'square', range: 60 });
     const goal = this.goal().A;
+    const Q = this.quest;
+    if (Q && Q.target) M.push({ x: Q.target.x, z: Q.target.z, color: '#ffd23f', shape: 'quest', label: true, big: true });
     for (const A of World.arenas) {
       if (G.progress.beaten[A.i]) continue;
       M.push({ x: A.x, z: A.z, color: A.color, shape: 'skull', label: A === goal, big: A === goal, range: A === goal ? 0 : 450 });
@@ -8268,6 +8670,7 @@ const UI = {
       if (m.shape === 'diamond') { g.moveTo(x, y - s); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x - s, y); g.closePath(); g.fill(); }
       else if (m.shape === 'square') { g.fillRect(x - s / 2 - 1, y - s / 2 - 1, s + 2, s + 2); }
       else if (m.shape === 'ring') { g.arc(x, y, s, 0, TAU); g.stroke(); }
+      else if (m.shape === 'quest') { g.moveTo(x, y - s - 2); g.lineTo(x + s, y); g.lineTo(x, y + s + 2); g.lineTo(x - s, y); g.closePath(); g.fill(); g.fillStyle = '#05060a'; g.fillRect(x - 1, y - 3, 2, 4); g.fillRect(x - 1, y + 2, 2, 1.5); }
       else if (m.shape === 'pin') { g.arc(x, y - 2, s, 0, TAU); g.fill(); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y - 2, 1.6, 0, TAU); g.fill(); }
       else if (m.shape === 'cave') { g.arc(x, y + 2, s, Math.PI, 0); g.closePath(); g.fill(); }
       else if (m.shape === 'cloud') { g.arc(x - 3, y + 1, 3, 0, TAU); g.arc(x + 3, y + 1, 3, 0, TAU); g.arc(x, y - 1.5, 3.6, 0, TAU); g.fill(); }
@@ -8327,6 +8730,315 @@ const UI = {
     g.beginPath(); g.arc(R, R, R - 2, 0, TAU); g.stroke();
     g.fillStyle = '#ffffff';
     g.beginPath(); g.moveTo(R, R - 6); g.lineTo(R + 4.5, R + 5); g.lineTo(R, R + 2.5); g.lineTo(R - 4.5, R + 5); g.closePath(); g.fill();
+  },
+};
+
+</script>
+<script>
+'use strict';
+// The story: Rivet wakes on Wren Halloway's assembly table, learns the basics, and sets out to free the
+// five Wardens from the Static. Quests are worked out from the game state (so saves can't get out of
+// sync), dialogue plays in a box above the hotbar, and the opening is a short in-engine scene.
+
+const WREN = { name: 'WREN', color: '#ffb347' };
+const L = (text, who = WREN) => ({ who: who.name, color: who.color, text });
+
+const STORY = {
+  opening: [
+    L('…and power. Easy. Easy. There — your optics are coming up.'),
+    L("Can you hear me? Blink once if you— oh. You don't have eyelids. Never mind."),
+    L("You've been in pieces on this table for three weeks. Don't sit up too fast."),
+    L("Welcome to the world, Rivet. I'm Wren Halloway. I built you. Well… most of you."),
+  ],
+  talk: [
+    L('Look at you, standing on your own two servos.'),
+    L("Out there every machine has gone wild. There's a signal in the air. We call it the Static, and it turns anything with a circuit against us."),
+    L("Anything except you, it seems. Grab the Pulse Blaster from the rack by the door — I'll sleep better if you're armed."),
+  ],
+  armed: [L("Now let's see if you can hit something. I've hung three practice drones out in the yard. Out the front door.")],
+  targets: [L("Not bad at all! You shouldn't go out alone, though. Build a Gunner Drone at the workbench in here — I left scrap in storage.")],
+  bot: [
+    L("Your first squadmate! When its battery runs low it flies home to charge on the pads, then comes back to you."),
+    L('Last thing: open your world map and have a look at the valley.'),
+  ],
+  map: [
+    L("See those five domes? Each one holds a Warden — great machines that used to guard this valley. The Static has them now."),
+    L("The nearest is Brambleback, in the Green Plains to the south. Its signal beacons keep its dome sealed. Power them up and… well. Be careful, Rivet."),
+  ],
+  // Wren's reaction each time you come home after freeing a Warden
+  report: [
+    [L("You freed Brambleback? Then the Wardens can be saved — not just scrapped!"), L("When its Static broke I heard a voice in the radio noise. Something about a leader who went up to the citadel and never came down.")],
+    [L('Glacieros locked parts of itself inside the ice caves to keep its mind clear. Clever old machine.'), L('Rivet… your core flared when its signal cleared. Like the two of you recognised each other.')],
+    [L("The Colossus kept saying 'the little light that fell'. I found your core in a crater up north, you know. Still warm."), L("I never told anyone that.")],
+    [L("Infernus thanked you. By name. I never told it your name, Rivet."), L('Whatever that core is, the Wardens know it. We need to find out why.')],
+    [L("The skies are clear. Whatever the Conductor is, it's lost its Wardens."), L("Come home safe, Rivet. We have a lot to talk about.")],
+  ],
+  // what each Warden says as the Static leaves it
+  freed: [
+    "…the noise… is gone. Little one. You carry a light I know.",
+    'Cold… clear… I remember now. We were five. No — we were six.',
+    'The peaks are quiet again. Climb, little light. Climb higher than the Static can reach.',
+    'The fire answers to me again. Find the citadel. Bring our leader home.',
+    'You flew where the Static lives. The Conductor will not forgive this.',
+  ],
+  chatter: [
+    L("Bring me Logic Boards and Power Cores and I can open up more of this place. The Lab's been sealed since the Static came."),
+    L("If you're hurt, come home. Walking through that door patches you right up."),
+    L("Caves are the best place for old salvage. And old secrets."),
+    L("Don't forget the map — markers are free, getting lost isn't."),
+  ],
+};
+
+// ═════════════════════════ Dialogue box ═════════════════════════
+const Dialog = {
+  queue: [], cur: null, t: 0, shown: 0,
+  say(lines, onDone) {
+    this.queue.push(...lines.map((l) => Object.assign({}, l)));
+    if (onDone) this.queue[this.queue.length - 1].onDone = onDone;
+    if (!this.cur) this.next();
+  },
+  busy() { return !!this.cur; },
+  clear() { this.queue = []; this.cur = null; this.el().classList.remove('show'); },
+  el() { return document.getElementById('dialog'); },
+  next() {
+    const prev = this.cur;
+    this.cur = this.queue.shift() || null;
+    if (prev && prev.onDone) prev.onDone();
+    const el = this.el();
+    if (!this.cur) { el.classList.remove('show'); return; }
+    this.t = 0; this.shown = 0;
+    el.querySelector('.d-who').textContent = this.cur.who;
+    el.querySelector('.d-who').style.color = this.cur.color;
+    el.style.setProperty('--c', this.cur.color);
+    el.querySelector('.d-text').textContent = '';
+    el.classList.add('show');
+    Sound.play('chirp', null, 0.6);
+  },
+  // advance: finish the typing first, then move on
+  skip() {
+    if (!this.cur) return;
+    if (this.shown < this.cur.text.length) this.shown = this.cur.text.length;
+    else this.next();
+  },
+  update(dt) {
+    if (!this.cur) return;
+    this.t += dt;
+    const n = Math.min(this.cur.text.length, Math.floor(this.t * 55));
+    if (n > this.shown) this.shown = n;
+    this.el().querySelector('.d-text').textContent = this.cur.text.slice(0, this.shown);
+    // lines move on by themselves after a reading pause
+    if (this.shown >= this.cur.text.length && this.t > 2.2 + this.cur.text.length * 0.045) this.next();
+  },
+};
+
+// ═════════════════════════ Story & quests ═════════════════════════
+const TUTORIAL = ['look', 'talk', 'rack', 'targets', 'bot', 'map'];
+const TUT_TEXT = {
+  look: 'Get your bearings — look around',
+  talk: 'Talk to Wren',
+  rack: 'Take the Pulse Blaster from the rack by the workshop door',
+  targets: 'Shoot the practice drones in the yard',
+  bot: 'Build a Gunner Drone at the workbench',
+  get map() { return Touch.enabled ? 'Open the world map (MAP)' : 'Open the world map (M)'; },
+};
+
+const Story = {
+  get S() { return G.progress.story; },
+  get F() { return G.progress.story.flags; },
+
+  // flags for a brand-new game
+  fresh() { return { intro: false, tutorial: 0, armed: false, targets: 0, order: [], reported: 0, look: 0 }; },
+  // saves made before the story existed: everything up to now counts as done
+  migrate(story, beaten) {
+    if (story.flags) return;
+    const order = beaten.map((b, i) => (b ? i : -1)).filter((i) => i >= 0);
+    story.flags = { intro: true, tutorial: TUTORIAL.length, armed: true, targets: 3, order, reported: order.length, look: 0 };
+  },
+  get tutorialDone() { return this.F.tutorial >= TUTORIAL.length; },
+  get step() { return TUTORIAL[this.F.tutorial]; },
+
+  // ── the opening scene ──
+  startOpening() {
+    const W = World.wakeSpot, p = G.player;
+    p.pos.set(W.x, W.y, W.z);
+    G.cine = { t: 0, phase: 'lying', k: 0 };
+    document.body.classList.add('cine');
+    const fade = document.getElementById('fade');
+    fade.style.transition = 'none'; fade.style.opacity = 1;
+    setTimeout(() => { fade.style.transition = 'opacity 2.5s'; fade.style.opacity = 0; }, 400);
+    Dialog.clear();
+    setTimeout(() => Dialog.say(STORY.opening, () => { if (G.cine) G.cine.phase = 'sit'; }), 1200);
+  },
+  endOpening() {
+    const p = G.player, W = World.wakeSpot;
+    G.cine = null;
+    document.body.classList.remove('cine');
+    document.getElementById('fade').style.opacity = 0;
+    p.pos.set(W.x + 1.5, World.home.y, W.z + 0.6);
+    p.vel.set(0, 0, 0); p.fallTop = p.pos.y; p.grounded = true;
+    const w = World.wren;
+    p.yaw = Math.atan2(-(w.x - p.pos.x), -(w.z - p.pos.z)); p.pitch = 0;
+    this.F.intro = true;
+    this.F.look = 0;
+  },
+  // the camera during the opening: lying on the table looking up, then sitting up
+  cineCamera(dt) {
+    const c = G.cine, W = World.wakeSpot, w = World.wren;
+    c.t += dt;
+    const yaw = Math.atan2(-(w.x - W.x), -(w.z - W.z));
+    if (c.phase === 'lying') {
+      const sway = Math.sin(c.t * 0.7) * 0.05;
+      camera.position.set(W.x, W.y + 0.35, W.z - 0.4);
+      camera.rotation.set(1.25 + sway, yaw + 0.5 + Math.sin(c.t * 0.4) * 0.12, 0.25);
+      if (c.t > 30) c.phase = 'sit';
+    } else {
+      c.k = Math.min(1, c.k + dt / 2.6);
+      const e = c.k * c.k * (3 - 2 * c.k);
+      camera.position.set(lerp(W.x, W.x + 1.5, Math.max(0, e - 0.5) * 2), lerp(W.y + 0.35, World.home.y + 1.65, e), lerp(W.z - 0.4, W.z + 0.6, e));
+      camera.rotation.set(lerp(1.25, 0, e), lerp(yaw + 0.5, yaw, e), lerp(0.25, 0, e));
+      if (c.k >= 1) this.endOpening();
+    }
+    G.vm.visible = false;
+  },
+  skip() {
+    // skip the opening and the tutorial in one go
+    if (G.cine) this.endOpening();
+    Dialog.clear();
+    this.F.armed = true; this.F.targets = 3; this.F.tutorial = TUTORIAL.length;
+    this.giveBlaster();
+    for (const e of G.enemies) if (e.dummy) { e.dead = true; e.destroy(); }
+    document.getElementById('skip-intro').classList.remove('show');
+    UI.banner('READY TO GO', 'Free the Wardens — check your map', '#3cf2ff', 3);
+    saveGame();
+  },
+  giveBlaster() {
+    if (!G.bar.some((it) => it && it.t === 'weapon')) {
+      G.bar.unshift({ t: 'weapon', id: 'blaster', n: 1 });
+      G.bar.length = Math.max(G.barSize, G.bar.length);
+      if (G.bar.length > G.barSize) { const extra = G.bar.splice(G.barSize); for (const it of extra) if (it) G.store(it, it.n || 1); }
+    }
+    G.sel = 0; G.equip('blaster');
+    World.rack.gun.visible = false;
+    UI.hotbarDirty = true;
+  },
+
+  // ── tutorial progress ──
+  advance() {
+    this.F.tutorial++;
+    Sound.play('online');
+    if (this.step === 'targets') this.spawnTargets();
+    if (this.tutorialDone) {
+      document.getElementById('skip-intro').classList.remove('show');
+      UI.banner('QUEST: THE FIRST WARDEN', 'Power Brambleback\'s beacons in the Green Plains', '#ffd23f', 4);
+      saveGame();
+    }
+  },
+  spawnTargets() {
+    if (G.enemies.some((e) => e.dummy)) return;
+    for (const [x, z] of [[-6, 28], [0, 32], [6, 28]]) {
+      const e = new Enemy('drone', x, z, false, false, null, null, 0);
+      e.dummy = true; e.baseY = World.heightAt(x, z); e.pos.y = e.baseY + 2.4;
+      G.enemies.push(e);
+    }
+  },
+  event(name, data) {
+    if (!G.progress.story || !this.F) return;
+    const step = this.step;
+    if (name === 'target') {
+      this.F.targets++;
+      if (step === 'targets' && this.F.targets >= 3) { this.advance(); Dialog.say(STORY.targets); }
+      else if (step === 'targets') UI.feed(`Practice drone down (${this.F.targets}/3)`, '#ffd23f');
+    } else if (name === 'bot' && step === 'bot') { this.advance(); Dialog.say(STORY.bot); }
+    else if (name === 'map' && step === 'map') { this.advance(); setTimeout(() => Dialog.say(STORY.map), 300); }
+    else if (name === 'boss') {
+      if (!this.F.order.includes(data)) this.F.order.push(data);
+      const Z = ZONES[data];
+      setTimeout(() => Dialog.say([{ who: Z.boss.name, color: Z.boss.color, text: STORY.freed[data] }]), 2600);
+    } else if (name === 'room') UI.banner(`${ROOMS[data].name.toUpperCase()} ONLINE`, 'The force field drops — the room is ready', ROOMS[data].color, 3);
+  },
+  update(dt) {
+    Dialog.update(dt);
+    if (!this.F || this.tutorialDone || G.cine) return;
+    if (this.step === 'look') {
+      this.F.look += (Math.abs(Input.mouse.dx) + Math.abs(Input.mouse.dy)) * 0.002 + dt * 0.15;
+      if (this.F.look > 1.6) { this.advance(); Dialog.say([L(Touch.enabled ? "Good. Come over here — walk with the left stick, then tap USE." : "Good. Come over here — WASD to walk, then press E to talk.")]); }
+    }
+    if (this.step === 'bot' && (G.companions.length || G.reserve.length)) this.event('bot');
+  },
+
+  // ── talking to Wren ──
+  talk() {
+    const F = this.F;
+    Dialog.clear();
+    if (!this.tutorialDone) {
+      if (this.step === 'look' || this.step === 'talk') { if (this.step === 'look') this.F.tutorial++; this.advance(); Dialog.say(STORY.talk); return; }
+      const hint = { rack: STORY.talk[2], targets: STORY.armed[0], bot: STORY.targets[0], map: STORY.bot[1] }[this.step];
+      Dialog.say([hint]);
+      return;
+    }
+    if (F.reported < F.order.length) {
+      const i = F.order[F.reported];
+      F.reported++;
+      Dialog.say(STORY.report[i]);
+      saveGame();
+      return;
+    }
+    const q = this.main();
+    Dialog.say([L(q.done ? pick(STORY.chatter).text : `${q.title}: ${q.step}.`), pick(STORY.chatter)].map((l) => (typeof l === 'string' ? L(l) : l)));
+  },
+  takeBlaster() {
+    if (this.F.armed) return;
+    this.F.armed = true;
+    this.giveBlaster();
+    Sound.play('pickup');
+    UI.banner('PULSE BLASTER', Touch.enabled ? 'Hold FIRE to shoot' : 'Left-click to shoot', '#3cf2ff', 2.5);
+    if (this.step === 'rack') { this.advance(); Dialog.say(STORY.armed); }
+  },
+
+  // ── quests ──
+  arenaStep(A) {
+    const Z = ZONES[A.i], p = G.player;
+    if (!A.sealed) return { step: `Enter ${Z.boss.name}'s dome in the ${Z.name}`, target: { x: A.x, z: A.z, label: Z.boss.name } };
+    if (A.i === 4 && G.region !== REGIONS.sky && World.skyPeak) {
+      const k = World.skyPeak;
+      return { step: 'Reach the Sky Islands — the way up starts from the tallest peak below them', target: { x: k.x, z: k.z, label: 'WAY UP' } };
+    }
+    const left = A.beacons.filter((b) => b.state !== 'done');
+    const done = A.beacons.length - left.length;
+    let b = left[0], bd = 1e9;
+    for (const x of left) { const d = Math.hypot(x.x - p.pos.x, x.z - p.pos.z); if (d < bd) { bd = d; b = x; } }
+    return { step: `Power ${Z.boss.name}'s beacons in the ${Z.name}`, prog: [done, A.beacons.length], target: b ? { x: b.x, z: b.z, label: 'BEACON' } : null };
+  },
+  main() {
+    const F = this.F, B = G.progress.beaten;
+    if (!F) return { title: '', step: '' };
+    if (!this.tutorialDone) {
+      const s = this.step;
+      const target = s === 'talk' ? World.wren : s === 'rack' ? World.rack : s === 'bot' ? World.terminals[0] : s === 'targets' ? { x: 0, z: 30 } : null;
+      return { id: 'wake', title: 'Rise and Shine', step: TUT_TEXT[s] + (s === 'targets' ? ` (${Math.min(3, F.targets)}/3)` : ''), target: target && { x: target.x, z: target.z, label: s === 'talk' ? 'WREN' : '' }, prog: [F.tutorial, TUTORIAL.length] };
+    }
+    const ground = [0, 1, 2, 3].filter((i) => B[i]).length;
+    const title = ground === 0 ? 'The First Warden' : ground < 4 ? 'The Wardens Remember' : !B[4] ? 'Above the Static' : 'Free Skies';
+    if (F.reported < F.order.length) return { id: 'report', title, step: 'Return home and tell Wren what happened', target: { x: World.wren.x, z: World.wren.z, label: 'WREN' } };
+    if (ground === 0) return Object.assign({ id: 'first', title }, this.arenaStep(World.arenas[0]));
+    if (ground < 4) {
+      const A = UI.goal().A || World.arenas.find((a) => !B[a.i]);
+      const q = Object.assign({ id: 'wardens', title }, this.arenaStep(A));
+      q.step = `${ground}/4 freed · ` + q.step;
+      return q;
+    }
+    if (!B[4]) return Object.assign({ id: 'sky', title }, this.arenaStep(World.arenas.find((a) => a.i === 4)));
+    return { id: 'free', title, step: 'The Outlands are free — explore, and find every memory', done: true };
+  },
+  sides() {
+    const S = this.S, rooms = (G.base.rooms) || {};
+    const nRooms = ['garage', 'lab', 'command'].filter((k) => rooms[k]).length;
+    return [
+      { id: 'echoes', title: 'Echoes in the Dark', step: 'Find memory fragments hidden in caves', prog: [Math.min(S.logs, LORE_LOGS.length), LORE_LOGS.length], done: S.logs >= LORE_LOGS.length },
+      { id: 'home', title: 'A Proper Home', step: 'Build the Garage, Lab and Command Room at the workbench', prog: [nRooms, 3], done: nRooms >= 3 },
+      { id: 'parts', title: 'Lost and Found', step: 'Collect lost bot parts — every three make a premium bot', prog: [S.botparts % 3, 3], done: false },
+      { id: 'sprites', title: 'Little Lights', step: 'Find Scrap Sprites — every three add a stamina vessel', prog: [G.spritesFound, World.sprites.length], done: G.spritesFound >= World.sprites.length },
+    ];
   },
 };
 
@@ -8551,6 +9263,17 @@ const G = {
     return best;
   },
   banner(text, sub, color, dur = 3) { UI.banner(text, sub, color, dur); },
+  get unarmed() { return !!(this.progress.story && this.progress.story.flags && !this.progress.story.flags.armed); },
+  // Command Room: warp to a powered beacon (or home); the squad follows
+  travelTo(x, z, y, label) {
+    const p = this.player;
+    Fx.tintFlash('#3cf2ff', 1); Sound.play('portal');
+    p.pos.set(x, y ?? World.heightAt(x, z), z); p.vel.set(0, 0, 0); p.fallTop = p.pos.y; p.invuln = 2;
+    p.gliding = false; p.climbing = null; p.jetting = false;
+    for (const c of this.companions) if (c.active) c.pos.set(x + rand(-2, 2), p.pos.y + 2, z + rand(-2, 2));
+    WorldMap.reveal(x, z, 120);
+    UI.banner('ARRIVED', label || '', '#3cf2ff', 2);
+  },
   hint(text) { UI.hint(text); },
 
   vol(pos) {
@@ -8596,6 +9319,7 @@ const G = {
   killEnemy(e, drops) {
     if (e.dead) return;
     e.dead = true;
+    if (e.dummy) { Fx.explosion(e.pos.x, e.cy, e.pos.z, '#ffd23f', 0.6); Sound.play('explode', false); UI.hitmarker(true); e.destroy(); Story.event('target'); return; }
     if (e.isBoss) { this.bossKilled(e); return; }
     const big = e.r > 1.5;
     Fx.explosion(e.pos.x, e.cy, e.pos.z, e.d.color, e.r / 1.1 + (e.elite ? 0.5 : 0));
@@ -8737,6 +9461,7 @@ const G = {
     this.objective = 'explore'; this.fight = null; this.vacuumT = 8;
     World.openDome(A);
     this.progress.beaten[L] = true;
+    Story.event('boss', L);
     Sound.setIntensity(0);
     this.safeSpot = { x: A.x, y: A.y, z: A.z, yaw: this.player.yaw };
     saveGame();
@@ -8786,14 +9511,16 @@ function buildWorld(seed) {
 
 function newRun() {
   const seed = World.pristine && World.seed ? World.seed : newSeed();
-  G.bar = [{ t: 'weapon', id: 'blaster', n: 1 }, { t: 'supply', id: 'repair', n: 1 }, { t: 'part', id: 'scrap', n: 2 }, { t: 'part', id: 'wire', n: 1 }];
+  // Rivet wakes up unarmed: the Pulse Blaster waits on the workshop rack
+  G.bar = [{ t: 'supply', id: 'repair', n: 1 }, { t: 'part', id: 'scrap', n: 2 }, { t: 'part', id: 'wire', n: 1 }];
   G.sel = 0; G.weapon = 'blaster';
   G.storage = { 'part:scrap': 4, 'part:wire': 2 };
   G.reserve = [];
   G.bucks = 40;
   G.gear = { jetpack: false, fireboots: false, backpack: 0 };
-  G.base = { shield: false, charger: 0 };
+  G.base = { shield: false, charger: 0, rooms: {} };
   G.progress = NEW_PROGRESS(seed);
+  G.progress.story.flags = Story.fresh();
   G.up = NEW_UP();
   G.vessels = 0; G.spritesFound = 0;
   G.companions.forEach((c) => c.destroy());
@@ -8831,6 +9558,8 @@ function applyState(json) {
   G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
   G.progress.world = Object.assign(NEW_PROGRESS(0).world, s.progress.world);
   G.progress.story = Object.assign(NEW_PROGRESS(0).story, s.progress.story);
+  Story.migrate(G.progress.story, G.progress.beaten);
+  G.base.rooms = G.base.rooms || {};
   G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
   G.companions.forEach((c) => c.destroy());
   G.player = new Player(); G.player.hp = s.hp;
@@ -8879,7 +9608,11 @@ function enterWorld(fresh, respawn) {
   World.pristine = false;
   clearEntities();
   applyWorldProgress();
+  World.refreshRooms();
+  if (G.base.shield) World.buildHomeDome();
   WorldMap.load(G.progress.world.fog);
+  WorldMap.buildRelief();
+  G.cine = null; document.body.classList.remove('cine');
   const p = G.player;
   const S = !respawn && G.savedPos ? { x: G.savedPos[0], y: G.savedPos[1], z: G.savedPos[2], yaw: G.savedPos[3] } : null;
   if (S) p.pos.set(S.x, S.y + 0.1, S.z); else p.pos.set(World.spawn.x, World.heightAt(World.spawn.x, World.spawn.z), World.spawn.z);
@@ -8909,12 +9642,11 @@ function enterWorld(fresh, respawn) {
   UI.hideAll();
   UI.hotbarDirty = true;
   takeSnapshot();
-  if (fresh) {
-    saveGame();
-    UI.banner('HOME BASE', 'One connected world surrounds your house — explore it all', '#3cf2ff', 4);
-    setTimeout(() => { if (G.state === 'playing' && G.where === 'hub') UI.hint(`Walk into the house: Mechanic, Charging and Storage rooms — ${Touch.enabled ? 'tap USE' : 'press E'} at a terminal`); }, 4500);
-    setTimeout(() => { if (G.state === 'playing' && G.where === 'hub') UI.hint(`Open the world map with ${Touch.enabled ? 'the MAP button' : 'M'} — the Green Plains lie south of home`); }, 13000);
-  }
+  Dialog.clear();
+  if (fresh || !Story.F.intro) { saveGame(); Story.startOpening(); }
+  if (Story.step === 'targets') Story.spawnTargets();
+  if (World.rack) World.rack.gun.visible = !Story.F.armed;
+  document.getElementById('skip-intro').classList.toggle('show', !Story.tutorialDone);
   UI.refreshHUD(true);
 }
 
@@ -9000,7 +9732,7 @@ function startRaid() {
   UI.banner('RAID!', 'Robots are attacking home base', '#ff3b5c', 3.5);
   Sound.play('warn');
   Sound.setIntensity(1);
-  if (!G.base.shield) setTimeout(() => UI.hint('Build a Shield Generator in the Mechanic Room — its dome keeps raiders out'), 4000);
+  if (!G.base.shield) setTimeout(() => UI.hint('Build a Shield Generator at the Workshop bench — its dome keeps raiders out'), 4000);
 }
 
 // A camp: a group of robots hanging out around a scrap brazier. They spot you when you
@@ -9062,7 +9794,9 @@ function nextInteractable() {
   };
   const cell = (x, z, R) => Math.abs(x - p.pos.x) < R && Math.abs(z - p.pos.z) < R;
   for (const c of World.caches) if (!c.opened && cell(c.x, c.z, 4)) near(c.x, c.z, 3.2, 'cache', c);
-  for (const t of World.terminals) near(t.x, t.z, 2.6, t.kind, t);
+  for (const t of World.terminals) if (!t.locked) near(t.x, t.z, 2.6, t.kind, t);
+  if (World.wren) near(World.wren.x, World.wren.z, 2.8, 'talk', World.wren);
+  if (World.rack && !Story.F.armed) near(World.rack.x, World.rack.z, 2.4, 'rack', World.rack);
   for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 3.4, 'shop', S);
   const busy = World.beacons.some((b) => b.state === 'charging');
   for (const b of World.beacons) {
@@ -9083,7 +9817,9 @@ function interact(it) {
     }
     case 'launch': launchFrom(it.obj); break;
     case 'shop': UI.openStation('shop', it.obj); break;
-    case 'mechanic': case 'storage': case 'charging': UI.openStation(it.kind); break;
+    case 'mechanic': case 'storage': case 'charging': case 'garage': case 'lab': case 'command': UI.openStation(it.kind); break;
+    case 'talk': Story.talk(); break;
+    case 'rack': Story.takeBlaster(); break;
   }
 }
 
@@ -9337,8 +10073,9 @@ function update(dt) {
       UI.showGameOver();
       return;
     }
-  } else if (!p.dead && !G.levelDone) {
+  } else if (!p.dead && !G.levelDone && !G.cine) {
     if (Input.hit('KeyV')) UI.toggleView();
+    if (Input.hit('KeyJ')) { UI.openStation('journal'); return; }
     // hotbar: number keys / mouse wheel select a slot, X drops the selected item
     for (let k = 0; k < 10; k++) if (Input.hit('Digit' + ((k + 1) % 10))) G.selectSlot(k);
     if (Input.wheel) { G.selectSlot(G.sel + Math.sign(Input.wheel)); Input.wheel = 0; }
@@ -9352,6 +10089,9 @@ function update(dt) {
     explore(dt);
   }
 
+  Story.update(dt);
+  if (G.recallT > 0) { G.recallT -= dt; if (Math.random() < dt * 30) Fx.glowBurst(p.pos.x + rand(-1, 1), p.pos.y + rand(0, 2), p.pos.z + rand(-1, 1), '#3cf2ff', 0.6, 0.4, 2); if (G.recallT <= 0 && !p.dead && !World.domeTrap) G.travelTo(World.spawn.x, World.spawn.z, undefined, 'Home Base'); }
+  if (Input.hit('Enter')) Dialog.skip();
   updateRegion(dt);
   streamCamps(dt);
   updateObjectives(dt);
@@ -9893,6 +10633,7 @@ function updateAvatar(dt) {
 function updateCamera(dt) {
   const p = G.player;
   const shake = Fx.shake * Fx.shake;
+  if (G.cine) { Story.cineCamera(dt); return; }
   updateAvatar(dt);
   G.bubble.visible = p.shield > 0 && !p.dead;
   if (G.bubble.visible) { G.bubble.position.set(p.pos.x, p.pos.y + 1, p.pos.z); G.bubble.rotation.y += dt; G.bubble.scale.setScalar(1 + 0.03 * Math.sin(G.time * 6)); }

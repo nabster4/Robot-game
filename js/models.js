@@ -713,3 +713,42 @@ function buildSecretModel(type) {
   g.add(glowSprite(S.color, 2.2, 1.4));
   return g;
 }
+
+// A low-poly person (Wren the mechanic). Faces +Z. userData: head, arms[2] for idle gestures.
+function buildPersonModel(o) {
+  const g = new THREE.Group();
+  const skin = Mat.std(o.skin, { rough: 0.8, metal: 0 }), suit = Mat.std(o.suit, { rough: 0.75, metal: 0.05 });
+  const dark = Mat.std('#2a2420', { rough: 0.8, metal: 0.1 }), hair = Mat.std(o.hair, { rough: 0.9, metal: 0 });
+  const trim = Mat.std(o.trim, { rough: 0.6, metal: 0.2 });
+  for (const s of [-1, 1]) {
+    mesh(Geo.box(0.16, 0.12, 0.28), dark, s * 0.11, 0.06, 0.04, g);          // boots
+    mesh(Geo.box(0.15, 0.8, 0.17), suit, s * 0.11, 0.52, 0, g);              // legs
+  }
+  mesh(Geo.box(0.42, 0.6, 0.24), suit, 0, 1.2, 0, g);                         // torso (overalls)
+  mesh(Geo.box(0.44, 0.08, 0.26), Mat.std('#5a4030', { rough: 0.8 }), 0, 0.93, 0, g);   // tool belt
+  for (const k of [-0.12, 0.05, 0.16]) mesh(Geo.box(0.05, 0.12, 0.05), trim, k, 0.86, 0.14, g);
+  mesh(Geo.box(0.3, 0.2, 0.02), trim, 0, 1.3, 0.125, g);                     // bib pocket
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(s * 0.27, 1.45, 0); g.add(sh);
+    mesh(Geo.box(0.12, 0.34, 0.13), suit, 0, -0.16, 0, sh);
+    const fore = new THREE.Group(); fore.position.y = -0.33; sh.add(fore);
+    mesh(Geo.box(0.1, 0.3, 0.11), skin, 0, -0.15, 0, fore);
+    mesh(Geo.box(0.11, 0.1, 0.12), Mat.std('#3a3a40', { rough: 0.7 }), 0, -0.33, 0, fore);   // glove
+    sh.rotation.z = s * 0.08;
+    arms.push({ sh, fore });
+  }
+  const head = new THREE.Group(); head.position.y = 1.56; g.add(head);
+  mesh(Geo.box(0.1, 0.08, 0.1), skin, 0, 0.04, 0, head);                     // neck
+  mesh(Geo.box(0.26, 0.28, 0.26), skin, 0, 0.22, 0, head);
+  mesh(Geo.box(0.28, 0.1, 0.28), hair, 0, 0.38, -0.01, head);                 // hair
+  mesh(Geo.box(0.28, 0.2, 0.08), hair, 0, 0.26, -0.13, head);
+  mesh(Geo.sphere(0.09, 1), hair, 0, 0.42, -0.16, head);                      // bun
+  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.035, 0.02), Mat.std('#1a1a1a'), s * 0.06, 0.24, 0.135, head);   // eyes
+  // goggles pushed up on the forehead
+  mesh(Geo.box(0.3, 0.05, 0.05), dark, 0, 0.33, 0.12, head);
+  for (const s of [-1, 1]) mesh(Geo.cyl(0.05, 0.05, 0.04, 10), Mat.std('#5aa8d8', { rough: 0.2, metal: 0.6, emissive: '#2a6a9a', ei: 0.5 }), s * 0.07, 0.33, 0.15, head).rotation.x = Math.PI / 2;
+  g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+  g.userData = { head, arms };
+  return g;
+}

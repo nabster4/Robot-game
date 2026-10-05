@@ -51,7 +51,11 @@ const Touch = {
 
   start(e) {
     e.preventDefault();
+    const hitEl = (id, t) => { const el = document.getElementById(id); if (!el || !el.offsetParent) return false; const r = el.getBoundingClientRect(); return t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom; };
     for (const t of e.changedTouches) {
+      // HUD panels under the touch layer: the dialogue box and the quest tracker
+      if (document.getElementById('dialog').classList.contains('show') && hitEl('dialog', t)) { Dialog.skip(); continue; }
+      if (G.state === 'playing' && !G.cine && hitEl('objective', t)) { UI.openStation('journal'); return; }
       const btn = t.target.closest ? t.target.closest('[data-tbtn]') : null;
       if (btn) {
         const k = btn.dataset.tbtn;
@@ -164,7 +168,7 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', garage: 'GEAR', lab: 'LAB', command: 'CMD', talk: 'TALK', rack: 'TAKE' })[it.kind] : 'USE';
     document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };

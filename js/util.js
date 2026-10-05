@@ -1,13 +1,17 @@
 'use strict';
-// ───────────────────────── Math & helpers ─────────────────────────
+// ───────────────────────── Math helpers ─────────────────────────
 const TAU = Math.PI * 2;
-const rand = (a, b) => a + Math.random() * (b - a);
-const randi = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+// the random source for gameplay helpers; world building swaps in a seeded one (useRng) so a
+// saved biome can be rebuilt exactly (three.js's own Math.random use is left alone)
+let _rng = Math.random;
+function useRng(f) { _rng = f || Math.random; }
+const rand = (a, b) => a + _rng() * (b - a);
+const randi = (a, b) => Math.floor(a + _rng() * (b - a + 1));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
-const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
-const d2 = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay; return dx * dx + dy * dy; };
-const pick = (a) => a[(Math.random() * a.length) | 0];
+const pick = (a) => a[(_rng() * a.length) | 0];
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const dist2D = (ax, az, bx, bz) => Math.hypot(bx - ax, bz - az);
 
 function angDiff(a, b) {
   let d = (b - a) % TAU;
@@ -19,7 +23,7 @@ function angDiff(a, b) {
 function weighted(list) {
   let tot = 0;
   for (const [, w] of list) tot += w;
-  let r = Math.random() * tot;
+  let r = _rng() * tot;
   for (const [v, w] of list) { if ((r -= w) <= 0) return v; }
   return list[list.length - 1][0];
 }
@@ -34,63 +38,80 @@ function rgb(hex) {
 }
 const rgba = (hex, a) => `rgba(${rgb(hex)},${a})`;
 
-function segDist(px, py, ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
-  const l = dx * dx + dy * dy;
-  let t = l ? ((px - ax) * dx + (py - ay) * dy) / l : 0;
-  t = clamp(t, 0, 1);
-  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
-}
-
 function fmtTime(s) {
   const m = Math.floor(s / 60), ss = Math.floor(s % 60);
   return m + ':' + String(ss).padStart(2, '0');
 }
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
+// distance from point P to segment AB (3D, plain numbers)
+function segPointDist(ax, ay, az, bx, by, bz, px, py, pz) {
+  const dx = bx - ax, dy = by - ay, dz = bz - az;
+  const l = dx * dx + dy * dy + dz * dz;
+  let t = l ? ((px - ax) * dx + (py - ay) * dy + (pz - az) * dz) / l : 0;
+  t = clamp(t, 0, 1);
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t), pz - (az + dz * t));
 }
 
-function poly(ctx, pts, s = 1) {
-  ctx.beginPath();
-  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * s, y * s) : ctx.moveTo(x * s, y * s)));
-  ctx.closePath();
+// ───────────────────────── Seeded noise ─────────────────────────
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function regPoly(ctx, n, r, rot = 0) {
-  ctx.beginPath();
-  for (let i = 0; i < n; i++) {
-    const a = rot + (i / n) * TAU;
-    const x = Math.cos(a) * r, y = Math.sin(a) * r;
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-  }
-  ctx.closePath();
+function makePerlin(seed) {
+  const rnd = mulberry32(seed);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  const grad = (h, x, y) => {
+    switch (h & 7) {
+      case 0: return x + y; case 1: return -x + y; case 2: return x - y; case 3: return -x - y;
+      case 4: return x; case 5: return -x; case 6: return y; default: return -y;
+    }
+  };
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  return (x, y) => {
+    let X = Math.floor(x), Y = Math.floor(y);
+    x -= X; y -= Y; X &= 255; Y &= 255;
+    const u = fade(x), v = fade(y);
+    const a = perm[X] + Y, b = perm[X + 1] + Y;
+    return lerp(lerp(grad(perm[a], x, y), grad(perm[b], x - 1, y), u),
+      lerp(grad(perm[a + 1], x, y - 1), grad(perm[b + 1], x - 1, y - 1), u), v);
+  };
 }
 
-// ───────────────────────── Input ─────────────────────────
+// ───────────────────────── Input (pointer-lock FPS) ─────────────────────────
 const Input = {
   keys: {},
   pressed: {},
-  mouse: { x: 0, y: 0, down: false, right: false, rightPressed: false },
+  mouse: { down: false, right: false, rightPressed: false, dx: 0, dy: 0 },
+  wheel: 0,
+  locked: false,
   key(c) { return !!this.keys[c]; },
   hit(c) { return !!this.pressed[c]; },
-  endFrame() { this.pressed = {}; this.mouse.rightPressed = false; },
+  endFrame() { this.pressed = {}; this.mouse.rightPressed = false; this.mouse.dx = 0; this.mouse.dy = 0; this.wheel = 0; },
   init(canvas) {
-    const block = ['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
     window.addEventListener('keydown', (e) => {
-      if (block.includes(e.code) && e.target === document.body) e.preventDefault();
+      // while playing, keys belong to the game: never let Space/Enter "click" a button that kept focus
+      const playing = document.body.classList.contains('playing');
+      if (playing && e.target !== document.body && e.target.blur) e.target.blur();
+      if (['Tab', 'Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) && (playing || e.target === document.body)) e.preventDefault();
       if (e.code === 'Tab') e.preventDefault();
       this.keys[e.code] = true;
       if (!e.repeat) this.pressed[e.code] = true;
     });
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
-    window.addEventListener('mousemove', (e) => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    document.addEventListener('mousemove', (e) => {
+      if (!this.locked && !this.fallback) return;
+      this.mouse.dx += e.movementX || 0;
+      this.mouse.dy += e.movementY || 0;
+    });
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.mouse.down = true;
       if (e.button === 2) { this.mouse.right = true; this.mouse.rightPressed = true; }
@@ -100,10 +121,20 @@ const Input = {
       if (e.button === 2) this.mouse.right = false;
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('blur', () => {
-      this.keys = {};
-      this.mouse.down = false;
-      this.mouse.right = false;
+    canvas.addEventListener('wheel', (e) => { this.wheel += Math.sign(e.deltaY); }, { passive: true });
+    window.addEventListener('blur', () => { this.keys = {}; this.mouse.down = false; this.mouse.right = false; });
+    document.addEventListener('pointerlockerror', () => { this.fallback = true; });
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      if (this.onLockChange) this.onLockChange(this.locked);
     });
   },
+  lock(canvas) {
+    if (this.touchMode) return;
+    try {
+      const p = canvas.requestPointerLock();
+      if (p && p.catch) p.catch(() => { this.fallback = true; });
+    } catch (e) { this.fallback = true; /* pointer lock unavailable (e.g. embedded frame) — free mouse-look */ }
+  },
+  unlock() { if (document.pointerLockElement) document.exitPointerLock(); },
 };
