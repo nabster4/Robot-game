@@ -20,6 +20,8 @@ function setBeam(m, ax, ay, az, bx, by, bz, radius) {
 }
 
 // ═════════════════════════ PLAYER ═════════════════════════
+// ground steeper than this (rise per metre, ~45°) can't be walked up — it has to be climbed
+const CLIFF_SLOPE = 1.0;
 class Player {
   constructor() {
     this.pos = new THREE.Vector3();
@@ -43,7 +45,7 @@ class Player {
     this.frozenT = 0; this.slowT = 0; this.burnT = 0; this.burnTick = 0;
     this.shield = 0; this.shieldMax = 0;
   }
-  get maxHp() { return 100 + 25 * G.up.armor; }
+  get maxHp() { return 100 + 25 * G.up.armor + 10 * ((G.progress.story && G.progress.story.plating) || 0); }
   get maxStamina() { return 100 + 20 * (G.vessels || 0); }
   get weapon() { return WEAPONS[G.weapon] || WEAPONS.blaster; }
   get fireRate() { return this.weapon.rate * Math.pow(1.2, G.up.overclock); }
@@ -87,6 +89,7 @@ class Player {
     this.look(I);
     if (I.touchMode) touchAimAssist(this, dt);
     G.focus = false;
+    this.inCave = !!World.caveAt(this.pos.x, this.pos.z, this.pos.y);
     this.effects(dt);
     const frozen = this.frozenT > 0;
 
@@ -103,8 +106,9 @@ class Player {
     const sprinting = wantSprint && this.grounded && !this.exhausted && wl > 0.1;
     if (sprinting) this.useStamina(13 * dt);
     let spd = this.speed * (sprinting ? 1.6 : 1) * (this.exhausted ? 0.75 : 1) * (this.slowT > 0 ? 0.6 : 1);
-    const inHaz = this.grounded && World.inHazard(this.pos.x, this.pos.z) && World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= World.heightAt(this.pos.x, this.pos.z) + 0.01;
-    if (inHaz) spd *= World.zone.hazard.slow;
+    const liq = this.grounded && !this.inCave ? World.hazardAt(this.pos.x, this.pos.z) : null;
+    const inHaz = !!liq && World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= World.heightAt(this.pos.x, this.pos.z) + 0.01;
+    if (inHaz) spd *= liq.slow;
 
     // dash
     this.dashCd -= dt;
@@ -148,7 +152,8 @@ class Player {
       this.jetting = false;
     }
 
-    if (this.climbing) {
+    if (this.climbing && this.climbing.terrain) this.climbTerrain(dt, mf, mr);
+    else if (this.climbing) {
       // ── climbing a rock / pillar ──
       const c = this.climbing;
       const ox = this.pos.x - c.x, oz = this.pos.z - c.z;
@@ -206,7 +211,15 @@ class Player {
           }
         }
       } else this.vel.y -= 26 * dt;
+      const ox = this.pos.x, oz = this.pos.z;
       this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y += this.vel.y * dt;
+      // caves: the roof stops jumps and the tunnel walls keep you inside
+      if (this.inCave) {
+        World.caveClamp(this.pos, this.r);
+        const cv = World.caveAt(this.pos.x, this.pos.z, this.pos.y);
+        if (cv && this.pos.y + 1.85 > cv.ceil) { this.pos.y = cv.ceil - 1.85; this.vel.y = Math.min(0, this.vel.y); this.jetting = false; this.gliding = false; }
+      }
+      const cliff = this.inCave ? null : this.terrainBlock(ox, oz);
       const hit = World.collide(this.pos, this.r, this.pos.y + 0.4);
       // start climbing when pushing into something climbable
       // building walls and trees can't be climbed; rocks, pillars and cliffs can
@@ -215,6 +228,19 @@ class Player {
         if ((dx / dl) * fx + (dz / dl) * fz > 0.35) {
           this.climbing = hit; this.gliding = false; this.vel.set(0, 0, 0);
           if (G.hint) G.hint(Touch.enabled ? 'Climbing — push the stick up to climb, JUMP to leap off' : 'Climbing — hold forward to climb, Space to leap off');
+        }
+      }
+      // pushing into a cliff face starts a (slow) climb
+      if (cliff && !this.climbing && !this.exhausted && this.stamina > 3 && mf > 0.5 && this.dashT <= 0 && !this.jetting && cliff.x * fx + cliff.z * fz > 0.45) {
+        this.climbing = { terrain: true, ux: cliff.x, uz: cliff.z, x: this.pos.x + cliff.x * 5, z: this.pos.z + cliff.z * 5, r: 0.5 };
+        this.gliding = false; this.vel.set(0, 0, 0);
+        if (G.hint) G.hint(Touch.enabled ? 'Climbing the cliff — push the stick up, JUMP to leap off · watch your stamina' : 'Climbing the cliff — hold W to climb, Space to leap off · watch your stamina');
+      }
+      // too steep to stand on: slide down
+      if (this.grounded && !this.inCave && !cliff) {
+        const g = World.gradAt(this.pos.x, this.pos.z);
+        if (g.s > CLIFF_SLOPE * 1.05 && World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= World.heightAt(this.pos.x, this.pos.z) + 0.01) {
+          this.vel.x -= g.x * 18 * dt; this.vel.z -= g.z * 18 * dt;
         }
       }
     }
@@ -234,19 +260,17 @@ class Player {
       else if (this.grounded) this.pos.y = gy;
     } else this.grounded = false;
     if (this.grounded) this.fuel = Math.min(100, this.fuel + 45 * dt);
-    // sky islands: falling into the cloud sea drops you back on the last island you stood on
-    if (World.sky) {
-      if (this.grounded && gy > World.hazardLevel + 2) this.safe = { x: this.pos.x, y: this.pos.y, z: this.pos.z };
-      if (this.pos.y < World.hazardLevel + 1) this.fellIntoVoid();
-    }
+    // nothing can fall out of the world
+    if (this.pos.y < World.heightAt(this.pos.x, this.pos.z) - 8 && !this.inCave && !World.caveAt(this.pos.x, this.pos.z, this.pos.y)) this.pos.y = World.heightAt(this.pos.x, this.pos.z);
     this.airT = this.grounded || this.climbing ? 0 : this.airT + dt;
     if (this.launchT > 0) { this.launchT -= dt; Fx.trail(this.pos.x, this.pos.y + 0.5, this.pos.z, '#6bff9e', 0.8, 0.5, 2); }
 
     // hazard (fire boots make lava bearable)
-    if (inHaz && World.zone.hazard.dmg) {
+    if (inHaz && liq.dmg) {
       this.hazardT -= dt;
-      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(World.zone.hazard.dmg * 0.5 * (G.gear.fireboots ? 0.15 : 1), null, true); }
-      if (Math.random() < dt * 20) Fx.glowBurst(this.pos.x + rand(-0.6, 0.6), World.hazardLevel + 0.1, this.pos.z + rand(-0.6, 0.6), World.zone.hazard.glow, 0.5, 0.4, 2);
+      if (this.hazardT <= 0) { this.hazardT = 0.5; this.hurt(liq.dmg * 0.5 * (G.gear.fireboots ? 0.15 : 1), null, true); }
+      if (Math.random() < dt * 20) Fx.glowBurst(this.pos.x + rand(-0.6, 0.6), WORLD.lava + 0.1, this.pos.z + rand(-0.6, 0.6), liq.glow, 0.5, 0.4, 2);
+      if (!G.gear.fireboots && G.hint) G.hint('Lava burns! Fire Boots make it bearable');
     }
 
     // head bob
@@ -279,6 +303,55 @@ class Player {
     if (I.hit('KeyR')) this.useRepair();
   }
 
+  // Steep terrain is a wall: you can't walk or jump up it (but you can climb it).
+  // Returns the uphill direction when the move was blocked.
+  terrainBlock(ox, oz) {
+    if (World.caveAt(this.pos.x, this.pos.z, this.pos.y)) return null;
+    const h = World.heightAt(this.pos.x, this.pos.z);
+    const feet = this.grounded ? Math.max(this.pos.y, World.heightAt(ox, oz)) : this.pos.y;
+    if (h <= feet + 0.05) return null;
+    const g = World.gradAt(this.pos.x, this.pos.z);
+    if (g.s < CLIFF_SLOPE) return null;
+    // slide along the face: drop the uphill part of the move
+    const dx = this.pos.x - ox, dz = this.pos.z - oz, into = dx * g.x + dz * g.z;
+    if (into <= 0) return null;
+    this.pos.x -= g.x * into; this.pos.z -= g.z * into;
+    if (World.heightAt(this.pos.x, this.pos.z) > feet + 0.05 && World.slopeAt(this.pos.x, this.pos.z) > CLIFF_SLOPE) { this.pos.x = ox; this.pos.z = oz; }
+    const vin = this.vel.x * g.x + this.vel.z * g.z;
+    if (vin > 0) { this.vel.x -= g.x * vin; this.vel.z -= g.z * vin; }
+    return g;
+  }
+
+  // ── climbing a cliff face: slower than walking, drains stamina ──
+  climbTerrain(dt, mf, mr) {
+    const c = this.climbing;
+    const climbV = mf > 0.2 ? 2.0 : mf < -0.2 ? -2.6 : 0;
+    this.vel.set(0, climbV, 0);
+    this.pos.y += climbV * dt;
+    // shuffle sideways along the face
+    const px = -c.uz, pz = c.ux;
+    if (mr) { this.pos.x += px * mr * 1.6 * dt; this.pos.z += pz * mr * 1.6 * dt; }
+    // hug the rock: step into the slope as you rise, back out if you'd be inside it
+    for (let i = 0; i < 12 && World.heightAt(this.pos.x + c.ux * 0.12, this.pos.z + c.uz * 0.12) < this.pos.y - 0.05; i++) { this.pos.x += c.ux * 0.12; this.pos.z += c.uz * 0.12; }
+    for (let i = 0; i < 12 && World.heightAt(this.pos.x, this.pos.z) > this.pos.y + 0.05; i++) { this.pos.x -= c.ux * 0.12; this.pos.z -= c.uz * 0.12; }
+    const g = World.gradAt(this.pos.x + c.ux * 0.8, this.pos.z + c.uz * 0.8);
+    if (g.s > 0.3) { c.ux = lerp(c.ux, g.x, 0.1); c.uz = lerp(c.uz, g.z, 0.1); const l = Math.hypot(c.ux, c.uz) || 1; c.ux /= l; c.uz /= l; }
+    c.x = this.pos.x + c.ux * 5; c.z = this.pos.z + c.uz * 5;
+    if (climbV || mr) this.useStamina(15 * dt); else this.useStamina(3 * dt);
+    this.walk += Math.abs(climbV) * dt * 2;
+    if (!this.climbing) return;
+    const ahead = World.heightAt(this.pos.x + c.ux * 1.2, this.pos.z + c.uz * 1.2);
+    if (climbV > 0 && ahead <= this.pos.y + 0.6 && World.slopeAt(this.pos.x + c.ux * 1.2, this.pos.z + c.uz * 1.2) < CLIFF_SLOPE) {
+      // over the top
+      this.pos.x += c.ux * 1.2; this.pos.z += c.uz * 1.2;
+      this.pos.y = Math.max(this.pos.y, World.heightAt(this.pos.x, this.pos.z)) + 0.05;
+      this.climbing = null; this.vel.set(c.ux * 2, 2, c.uz * 2);
+      Sound.play('land');
+    } else if (World.slopeAt(this.pos.x, this.pos.z) < CLIFF_SLOPE * 0.8 && this.pos.y <= World.heightAt(this.pos.x, this.pos.z) + 0.2) {
+      this.climbing = null;
+    }
+  }
+
   openGlider() {
     if (this.exhausted || this.stamina <= 1 || this.pos.y - World.groundAt(this.pos.x, this.pos.z, this.pos.y) <= 1.6) return;
     this.gliding = true; this.launchT = 0;
@@ -291,7 +364,8 @@ class Player {
     this.fallTop = gy;
     if (drop < 9 || this.dead) return;
     // water breaks the fall
-    if (World.inHazard(this.pos.x, this.pos.z) && !World.zone.hazard.dmg && !World.zone.hazard.void && gy <= World.heightAt(this.pos.x, this.pos.z) + 0.01) return;
+    const liq = World.hazardAt(this.pos.x, this.pos.z);
+    if (liq && !liq.dmg && gy <= World.heightAt(this.pos.x, this.pos.z) + 0.01) return;
     const dmg = Math.round((drop - 9) * 2.8);
     this.invuln = 0;
     this.hurt(dmg, null);
@@ -407,20 +481,24 @@ class Player {
 
 // ═════════════════════════ ENEMIES ═════════════════════════
 class Enemy {
-  constructor(type, x, z, elite = false, aggro = false, camp = null) {
+  constructor(type, x, z, elite = false, aggro = false, camp = null, island = null, tier = G.level) {
     const d = ENEMY_TYPES[type];
-    const L = G.level;
+    const L = tier;
     this.type = type; this.d = d; this.ai = d.ai;
     this.elite = elite;
     this.r = d.r * (elite ? 1.2 : 1);
     this.maxHp = this.hp = d.hp * (1 + 0.28 * L) * (elite ? 2.4 : 1);
     this.speed = d.speed * (1 + 0.05 * L) * rand(0.9, 1.1);
     this.dmg = d.dmg * (1 + 0.15 * L) * (elite ? 1.3 : 1);
-    this.pos = new THREE.Vector3(x, World.floorAt(x, z) + d.hover, z);
+    island = island || (camp && camp.island) || null;
+    this.baseY = island ? island.top : World.floorAt(x, z);
+    this.pos = new THREE.Vector3(x, this.baseY + d.hover, z);
     this.vel = new THREE.Vector3();
     this.home = { x, z };
-    this.island = World.sky && d.hover < 2 ? World.islandAt(x, z) : null;   // ground robots never walk off their island
-    this.baseY = World.floorAt(x, z);
+    this.tier = L;
+    this.island = d.hover < 2 ? island : null;   // ground robots never walk off their island
+    this.homeIsland = island;
+    this.high = !!island;                         // flyers from the sky camps stay up high
     this.wander = { x, z, t: 0 };
     this.aggro = aggro;
     this.camp = camp;          // the group this robot hangs out with
@@ -645,7 +723,7 @@ class Enemy {
             const n = this.elite ? 5 : 3;
             for (let i = 0; i < n; i++) {
               const a = rand(0, TAU);
-              const e = new Enemy('swarmer', this.pos.x + Math.sin(a) * 2, this.pos.z + Math.cos(a) * 2, false, true);
+              const e = new Enemy('swarmer', this.pos.x + Math.sin(a) * 2, this.pos.z + Math.cos(a) * 2, false, true, this.camp, this.homeIsland, this.tier);
               e.vel.set(Math.sin(a) * 10, 0, Math.cos(a) * 10);
               G.enemies.push(e);
             }
@@ -659,8 +737,16 @@ class Enemy {
 
     const k = 1 - Math.exp(-5 * dt);
     this.vel.x += (tx - this.vel.x) * k; this.vel.z += (tz - this.vel.z) * k;
+    const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
-    const ground = World.floorAt(this.pos.x, this.pos.z);
+    // walkers stay out of deep water & lava and can't scale cliffs
+    if (this.d.hover <= 1 && !this.island) {
+      const h1 = World.heightAt(this.pos.x, this.pos.z);
+      if (h1 < WORLD.water + 0.2 || (h1 > World.heightAt(ox, oz) + 0.05 && World.slopeAt(this.pos.x, this.pos.z) > CLIFF_SLOPE)) {
+        this.pos.x = ox; this.pos.z = oz; this.vel.x *= -0.3; this.vel.z *= -0.3; this.strafe *= -1; this.wander.t = 0;
+      }
+    }
+    const ground = this.island ? this.island.top : World.floorAt(this.pos.x, this.pos.z);
     World.collide(this.pos, this.r * 0.8, this.d.hover > 2 ? this.pos.y - 1 : ground + 0.5);
     if (this.island) {
       const is = this.island, ix = this.pos.x - is.x, iz = this.pos.z - is.z, id = Math.hypot(ix, iz), lim = Math.max(1, is.r - this.r - 0.6);
@@ -677,8 +763,8 @@ class Enemy {
       const A = World.arena, ax = this.pos.x - A.x, az = this.pos.z - A.z, ad = Math.hypot(ax, az) || 1, R = A.r + 2 + this.r;
       if (ad < R) { this.pos.x = A.x + (ax / ad) * R; this.pos.z = A.z + (az / ad) * R; }
     }
-    const gNow = World.floorAt(this.pos.x, this.pos.z);
-    const flyBase = World.sky ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, World.hazardLevel);
+    const gNow = this.island ? this.island.top : World.floorAt(this.pos.x, this.pos.z);
+    const flyBase = this.high ? Math.max(gNow, this.aggro ? p.pos.y : this.baseY) : Math.max(gNow, WORLD.water);
     if (this.d.hover > 1) this.pos.y = lerp(this.pos.y, flyBase + this.d.hover + Math.sin(this.t * 2) * 0.35, 1 - Math.exp(-3 * dt));
     else this.pos.y = gNow + this.d.hover;
 
@@ -764,7 +850,7 @@ class Boss {
     this.contactCd = 0; this.dead = false; this.hidden = false;
     this.facing = Math.atan2(G.player.pos.x - x, G.player.pos.z - z);
     this.walkPh = 0; this.anim = 0;
-    this.pos = new THREE.Vector3(x, World.floorAt(x, z) + this.hover, z);
+    this.pos = new THREE.Vector3(x, World.arenaFloor(x, z) + this.hover, z);
     this.vel = new THREE.Vector3();
     this.model = buildBossModel(this.kind, this.color);
     this.model.position.copy(this.pos);
@@ -783,7 +869,7 @@ class Boss {
   get cy() { return this.pos.y + this.K.cyOff; }
   // hit-test centre: tall bosses use a vertical capsule
   aimY(y) { return this.K.capHi ? clamp(y, this.pos.y + this.K.capLo, this.pos.y + this.K.capHi) : this.cy; }
-  get ground() { return World.floorAt(this.pos.x, this.pos.z); }
+  get ground() { return World.arenaFloor(this.pos.x, this.pos.z); }
   blocks() { return false; }
 
   // where shots leave the boss
@@ -857,7 +943,7 @@ class Boss {
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), r = i === 0 ? 0 : rand(3, 14);
       const x = p.pos.x + Math.cos(a) * r + p.vel.x * 0.6, z = p.pos.z + Math.sin(a) * r + p.vel.z * 0.6;
-      const y = World.floorAt(x, z) + 0.15;
+      const y = World.arenaFloor(x, z) + 0.15;
       const s = glowSprite('#ff3a1a', 5, 2); s.position.set(x, y + 0.2, z); G.scene.add(s);
       this.markers.push({ x, y, z, sprite: s });
     }
@@ -1070,7 +1156,7 @@ class Boss {
         if (this.pState === 'crouch') {
           this.anim = -1;
           this.pTarget = { x: p.pos.x, z: p.pos.z };
-          const g = World.floorAt(p.pos.x, p.pos.z) + 0.3;
+          const g = World.arenaFloor(p.pos.x, p.pos.z) + 0.3;
           setBeam(this.teleLine, this.pos.x, this.ground + 0.4, this.pos.z, p.pos.x, g, p.pos.z, 1.2);
           this.teleLine.material.opacity = 0.2 + 0.2 * Math.sin(this.t * 30);
           if (this.subT <= 0) { this.pState = 'leap'; this.subT = 0.9; this.pFrom = { x: this.pos.x, z: this.pos.z }; Sound.play('dash'); }
@@ -1116,7 +1202,7 @@ class Boss {
           const hand = { x: this.pos.x + Math.sin(this.facing + 0.6) * 4, y: this.pos.y + 12, z: this.pos.z + Math.cos(this.facing + 0.6) * 4 };
           const T = 1.5;
           const tx2 = p.pos.x + p.vel.x * T * 0.7 + rand(-2, 2), tz2 = p.pos.z + p.vel.z * T * 0.7 + rand(-2, 2);
-          this.lob(hand.x, hand.y, hand.z, tx2, World.floorAt(tx2, tz2), tz2, T, 20, 1.2, '#b89a6a', { big: true });
+          this.lob(hand.x, hand.y, hand.z, tx2, World.arenaFloor(tx2, tz2), tz2, T, 20, 1.2, '#b89a6a', { big: true });
           this.anim = 1;
           Sound.play('throw');
           this.sub--; this.subT = P2 ? 0.55 : 0.8;
@@ -1254,7 +1340,7 @@ class Boss {
       this.shock.scale.set(w.r, w.r, 1);
       this.shock.material.opacity = Math.max(0, 1 - w.r / 42);
       const pd = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
-      if (!w.hit && Math.abs(pd - w.r) < 1.1 && p.pos.y < World.floorAt(p.pos.x, p.pos.z) + 0.7) {
+      if (!w.hit && Math.abs(pd - w.r) < 1.1 && p.pos.y < World.arenaFloor(p.pos.x, p.pos.z) + 0.7) {
         w.hit = true;
         if (w.effect === 'freeze') { p.hurt(this.dmg * 0.8, this.pos); p.freeze(1.8); }
         else { p.hurt(this.dmg * 1.6, this.pos); p.vel.y = 7; }
@@ -1358,8 +1444,8 @@ class Boss {
 // Bots run on batteries. As a battery drains the bot takes more damage and aims worse; when it runs low
 // the bot flies back to the biome's home portal, travels through it to the Charging Room, recharges,
 // then travels back through the portal and flies to you. Bots can also be swapped with ones kept at home.
-//   state: follow · leaving · away · charging · transitBack · returning · down
-const PORTAL_TRANSIT = 8;   // seconds to travel through the portal each way
+//   state: follow · leaving (flying home) · charging (on a pad) · returning (flying back) · down
+const COMP_TRAVEL_SPEED = 18;   // m/s when flying home to recharge and back
 let _cid = 0;
 class Companion {
   constructor(kind, battery = 100) {
@@ -1394,9 +1480,9 @@ class Companion {
   get active() { return this.state === 'follow' || this.state === 'returning'; }
   get offline() { return this.active ? 0 : 1; }   // legacy flag for older checks
   get statusText() {
-    if (this.state === 'away' && this.transitT > 0) return `Travelling home (${Math.ceil(this.transitT)}s)`;
-    if (this.swapTo && (this.state === 'leaving' || this.state === 'away')) return 'Going home to swap';
-    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: 'Flying to the portal', away: this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', charging: 'Charging', transitBack: `Coming through the portal (${Math.ceil(this.transitT)}s)`, returning: 'Flying back to you', down: 'Knocked out' }[this.state];
+    const home = (s) => `${s} (${Math.round(Math.hypot(this.pos.x - World.home.x, this.pos.z - World.home.z))} m from home)`;
+    if (this.swapTo && this.state === 'leaving') return home('Going home to swap');
+    return { follow: this.battery < 30 ? 'Battery low' : 'Active', leaving: home('Flying home'), charging: this.hp < this.maxHp ? 'Repairing at base' : 'Charging at base', returning: `Flying back to you (${Math.round(Math.hypot(this.pos.x - G.player.pos.x, this.pos.z - G.player.pos.z))} m)`, down: 'Knocked out' }[this.state];
   }
   // fly straight toward a point at a steady speed; returns the remaining distance
   flyTo(x, y, z, speed, dt) {
@@ -1430,23 +1516,18 @@ class Companion {
     Sound.play('online');
   }
 
-  // called when the player travels between home base and a biome
+  // called after loading a save: bots that were away sit on their charging pads
   onTravel() {
     const p = G.player;
-    this.transitT = 0;
     if (this.state === 'follow' || this.state === 'returning') {
       this.state = 'follow';
       this.pos.set(p.pos.x + rand(-2, 2), p.pos.y + 2, p.pos.z + rand(-2, 2));
-      this.attach();
-    } else if (G.where === 'hub') {
-      // bots that were charging back home are on their pads
+    } else {
       this.state = 'charging';
       const pad = this.pad();
       this.pos.set(pad.x, pad.y, pad.z);
-      this.attach();
-    } else {
-      this.state = 'away'; this.detach();
     }
+    this.attach();
     this.target = null; this.model.rotation.z = 0; this.model.userData.parts.halo.visible = true;
   }
 
@@ -1454,6 +1535,16 @@ class Companion {
     const pads = World.chargePads;
     const i = G.companions.indexOf(this);
     return pads.length ? pads[Math.max(0, i) % pads.length] : { x: G.player.pos.x, y: G.player.pos.y + 2, z: G.player.pos.z };
+  }
+
+  // cross-country flight: keep well above the ground on the way
+  cruise(x, y, z, dt) {
+    const near = Math.hypot(x - this.pos.x, z - this.pos.z);
+    const clear = World.floorAt(this.pos.x, this.pos.z) + (near > 25 ? 14 : 3);
+    const ahead = near > 25 ? World.floorAt(this.pos.x + (x - this.pos.x) / near * 20, this.pos.z + (z - this.pos.z) / near * 20) + 14 : -1e9;
+    const rest = this.flyTo(x, Math.max(y, clear, ahead), z, COMP_TRAVEL_SPEED, dt);
+    if (Math.random() < dt * 10) Fx.trail(this.pos.x, this.pos.y, this.pos.z, this.d.color, 0.4, 0.3, 2);
+    return near < 1 ? rest : near;
   }
 
   update(dt, idx, total) {
@@ -1466,8 +1557,8 @@ class Companion {
 
     switch (this.state) {
       case 'down': {
-        const gy = World.floorAt(this.pos.x, this.pos.z) + 0.4;
-        this.pos.y = lerp(this.pos.y, Math.max(gy, World.hazardLevel + 0.4), 1 - Math.exp(-3 * dt));
+        const gy = World.floorAt(this.pos.x, this.pos.z, this.pos.y) + 0.4;
+        this.pos.y = lerp(this.pos.y, Math.max(gy, WORLD.water + 0.4), 1 - Math.exp(-3 * dt));
         if (Math.random() < dt * 5) Fx.smoke(this.pos.x, this.pos.y, this.pos.z, 0.5, 1, rand(-0.3, 0.3), 1.2, rand(-0.3, 0.3));
         m.position.copy(this.pos); m.rotation.z = 0.8; m.userData.parts.halo.visible = false;
         if (!World.domeTrap) this.stateT -= dt;
@@ -1475,78 +1566,44 @@ class Companion {
         return;
       }
       case 'leaving': {
+        // fly all the way home to a charging pad
         m.userData.parts.halo.visible = true;
-        if (hub) {
-          const pad = this.pad();
-          const k = 1 - Math.exp(-2.5 * dt);
-          this.pos.x += (pad.x - this.pos.x) * k; this.pos.z += (pad.z - this.pos.z) * k;
-          this.pos.y += (pad.y + (Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z) > 3 ? 4 : 0) - this.pos.y) * k;
-          if (Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z) < 0.4) {
+        const pad = this.pad();
+        const far = Math.hypot(pad.x - this.pos.x, pad.z - this.pos.z);
+        if (far > 3) this.cruise(pad.x, pad.y + 4, pad.z, dt);
+        else {
+          const k = 1 - Math.exp(-3 * dt);
+          this.pos.x += (pad.x - this.pos.x) * k; this.pos.y += (pad.y - this.pos.y) * k; this.pos.z += (pad.z - this.pos.z) * k;
+          if (far < 0.4 && Math.abs(pad.y - this.pos.y) < 0.4) {
             if (this.swapTo) { G.completeSwap(this); return; }
-            this.state = 'charging'; Sound.play('online', null, 0.6);
-          }
-        } else {
-          // fly all the way back to the biome's home portal and go through it
-          const P = World.homePortal;
-          const tx = P ? P.x : this.pos.x, ty = P ? P.y + 3.9 : this.pos.y + 30, tz = P ? P.z : this.pos.z;
-          const rest = this.flyTo(tx, Math.max(ty, Math.min(this.pos.y + 1, ty + 12)), tz, 13, dt);
-          if (Math.random() < dt * 10) Fx.trail(this.pos.x, this.pos.y, this.pos.z, this.d.color, 0.4, 0.3, 2);
-          if (rest < 1.2 || (!P && this.pos.y > ty - 1)) {
-            Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, this.d.color, 3, 0.4, 3);
-            if (P) Fx.shockRing(P.x, P.y + 3.9, P.z, this.d.color, 2, 20);
-            Sound.play('portal', null, 0.4 * G.vol(this.pos));
-            this.state = 'away'; this.transitT = PORTAL_TRANSIT; this.detach();
+            this.state = 'charging'; Sound.play('online', null, 0.6 * G.vol(this.pos));
           }
         }
         m.position.copy(this.pos);
         return;
       }
-      case 'away': {
-        // first the trip through the portal, then charging at home
-        if (this.transitT > 0) { this.transitT -= dt; if (this.transitT > 0 && !hub) return; }
-        if (this.swapTo) { G.completeSwap(this); return; }
-        this.battery = Math.min(100, this.battery + this.chargeRate * dt);
-        this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.05 * dt);
-        if (hub) { this.onTravel(); return; }
-        if (this.battery >= 100 && this.hp >= this.maxHp) { this.state = 'transitBack'; this.transitT = PORTAL_TRANSIT; }
-        return;
-      }
-      case 'transitBack': {
-        if (hub) { this.onTravel(); return; }
-        this.transitT -= dt;
-        if (this.transitT <= 0) {
-          // pop out of the home portal and fly back to the player
-          const P = World.homePortal;
-          this.state = 'returning';
-          if (P) this.pos.set(P.x, P.y + 3.9, P.z); else this.pos.set(p.pos.x, p.pos.y + 14, p.pos.z);
-          this.attach();
-          Fx.glowBurst(this.pos.x, this.pos.y, this.pos.z, this.d.color, 3, 0.4, 3);
-          UI.feed(`${this.d.name} is back through the portal — on its way to you`, this.d.color);
-          Sound.play('online', null, 0.8);
-        }
-        return;
-      }
       case 'charging': {
+        if (this.swapTo) { G.completeSwap(this); return; }
         const pad = this.pad();
         this.pos.set(pad.x, pad.y + Math.sin(this.t * 2) * 0.08, pad.z);
         this.battery = Math.min(100, this.battery + this.chargeRate * 1.4 * dt);
         this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.08 * dt);
-        if (Math.random() < dt * 6) Fx.glow.emit(pad.x + rand(-0.5, 0.5), pad.y - 1, pad.z + rand(-0.5, 0.5), 0, rand(1, 2), 0, 0.8, 0.1, new THREE.Color('#6bff9e'), 2, 0, 0, 1);
+        if (Math.random() < dt * 6 && G.vol(this.pos) > 0.2) Fx.glow.emit(pad.x + rand(-0.5, 0.5), pad.y - 1, pad.z + rand(-0.5, 0.5), 0, rand(1, 2), 0, 0.8, 0.1, new THREE.Color('#6bff9e'), 2, 0, 0, 1);
         m.position.copy(this.pos); m.rotation.set(0, this.t * 0.8, 0);
         m.userData.bodyMat.emissiveIntensity = 0.2 + 0.2 * Math.sin(this.t * 5);
         if (this.battery >= 100 && this.hp >= this.maxHp) {
           if (hub) { this.state = 'follow'; UI.feed(`${this.d.name} fully charged`, this.d.color); Sound.play('online', null, 0.6); }
-          else this.state = 'away';
+          else { this.state = 'returning'; UI.feed(`${this.d.name} is charged and flying back to you`, this.d.color); }
         }
         return;
       }
     }
 
-    // ── returning: a long flight from the portal back to the player ──
+    // ── returning: a long flight from home base back to the player ──
     if (this.state === 'returning') {
       const far = Math.hypot(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
       if (far > 8) {
-        this.flyTo(p.pos.x, Math.max(p.pos.y + this.d.height + 2, World.floorAt(this.pos.x, this.pos.z) + 3), p.pos.z, 15, dt);
+        this.cruise(p.pos.x, p.pos.y + this.d.height + 2, p.pos.z, dt);
         if (World.domeTrap && Math.hypot(this.pos.x - World.arena.x, this.pos.z - World.arena.z) < World.arena.r + 6) World.keepInside(this.pos, this.r);
         m.position.copy(this.pos);
         return;
@@ -1554,7 +1611,7 @@ class Companion {
     }
     // ── follow / returning ──
     if (!hub && this.state === 'follow') {
-      this.battery = Math.max(0, this.battery - 0.55 * dt);
+      this.battery = Math.max(0, this.battery - 0.45 * dt);
       if (this.battery < 15 && !World.domeTrap) { this.goCharge('battery low'); return; }
     }
     if (hub && this.state === 'follow' && (this.battery < 95 || this.hp < this.maxHp * 0.95)) { this.state = 'leaving'; return; }
@@ -1569,7 +1626,8 @@ class Companion {
     const a = fa + rel;
     const orbit = this.d.orbit + (this.kind === 'shield' ? 0 : 1.6);
     let tx = p.pos.x + Math.cos(a) * orbit, tz = p.pos.z + Math.sin(a) * orbit;
-    let ty = Math.max(p.pos.y, World.floorAt(tx, tz)) + this.d.height + Math.sin(this.t * 2) * 0.15;
+    let ty = p.inCave ? p.pos.y + 1.7 : Math.max(p.pos.y, World.floorAt(tx, tz, p.pos.y)) + this.d.height + Math.sin(this.t * 2) * 0.15;
+    if (p.inCave) { tx = lerp(p.pos.x, tx, 0.4); tz = lerp(p.pos.z, tz, 0.4); }
     // bomber: fly over distant enemy groups to drop bombs
     if (this.kind === 'bomber' && this.target && !this.target.dead && this.charge > 0.05) {
       const T = this.target;

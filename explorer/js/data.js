@@ -248,3 +248,58 @@ const SHOP_ITEMS = {
   up_firmware:  { kind: 'upgrade', up: 'firmware',  price: 300 },
   up_slot:      { kind: 'upgrade', up: 'slot',      price: 380 },
 };
+
+// ───────────────────────── The connected world ─────────────────────────
+// The coast is a terrain biome without its own boss arena (its Warden waits under the sea).
+const COAST = {
+  id: 'coast', name: 'Saltglass Coast', short: 'COAST',
+  intro: 'Dunes of glassy sand that slide into a warm, deep sea.',
+  sky: { top: '#3a9ae8', horizon: '#e4f6ff', bottom: '#9ad4ea' }, sun: '#fff4d8', sunDir: [0.6, 0.55, 0.45], stars: false,
+  fog: '#bfe4f4', fogDensity: 0.0034,
+  hemi: ['#eaf8ff', '#7a9a6a', 1.15], sunI: 2.3,
+  ground: { low: '#c9b47a', mid: '#e0cf94', high: '#b8c26a', rock: '#9a8a74', patch: '#efe2b0', patch2: '#8ab05a' },
+  accent: '#4ae0d0', ambient: 'pollen', ambientColor: '#ffffff',
+  flora: { trees: 0, kind: 'round', trunk: '#7a5a34', leaves: ['#4aa84a', '#6cc24a'], flowers: ['#ff9fb8', '#ffffff', '#ffd23f'], grass: ['#a8b85a', '#c8c06a'] },
+  pool: [['drone', 5], ['swarmer', 3], ['grunt', 3], ['sniper', 1.5]],
+};
+
+// What the HUD, music, weather and enemy camps use for each part of the world.
+// `zone` = palette / music index (ZONES 0-4, 5 = home), `tier` = enemy strength.
+const REGIONS = {
+  hub: { id: 'hub', name: 'Home Base', short: 'HOME', zone: 5, tier: 0, accent: '#3cf2ff', ambient: 'pollen', ambientColor: '#fff4a8' },
+  sky: { id: 'sky', name: 'Sky Islands', short: 'SKY', zone: 4, tier: 4, accent: '#ffe14d', ambient: 'pollen', ambientColor: '#ffffff' },
+  terra: [
+    { id: 'plains', name: 'Green Plains', short: 'PLAINS', zone: 0, tier: 0, accent: '#6bff9e', ambient: 'pollen', ambientColor: '#fff4a8' },
+    { id: 'snow', name: 'Snowy Plains', short: 'SNOW', zone: 1, tier: 1, accent: '#8ae9ff', ambient: 'snow' },
+    { id: 'mountains', name: 'The Mountains', short: 'MOUNTAINS', zone: 2, tier: 2, accent: '#ffcf6a', ambient: 'dust', ambientColor: '#e8e0d0' },
+    { id: 'volcano', name: 'Fiery Volcano', short: 'VOLCANO', zone: 3, tier: 3, accent: '#ff8c42', ambient: 'embers' },
+    { id: 'coast', name: 'Saltglass Coast', short: 'COAST', zone: 0, tier: 1, accent: '#4ae0d0', ambient: 'pollen', ambientColor: '#ffffff' },
+  ],
+};
+
+// ───────────────────────── Secrets hidden in caves ─────────────────────────
+const SECRETS = {
+  log:      { name: 'Memory Fragment', color: '#b98cff', desc: 'A shard of recorded memory.' },
+  plating:  { name: 'Warden Plating',  color: '#ffd23f', desc: '+10 maximum hull, permanently.' },
+  botpart:  { name: 'Lost Bot Part',   color: '#6bd8ff', desc: 'Find three to assemble a free premium bot.' },
+  treasure: { name: 'Hidden Hoard',    color: '#ff9f43', desc: 'Botbucks and a Quantum Chip.' },
+};
+const SECRET_ORDER = ['log', 'botpart', 'treasure', 'log', 'plating', 'botpart', 'log', 'treasure', 'botpart', 'log', 'plating'];
+// premium bots assembled from every third Lost Bot Part
+const BOTPART_REWARDS = ['bubble', 'tesla', 'rocket', 'laser', 'bomber', 'shield'];
+
+// Memory fragments play in the order you find them, so the story always reads in sequence.
+const LORE_LOGS = [
+  { from: 'WREN HALLOWAY · workshop note', text: 'Day one. The frame is welded, the servos answer, and the core I pulled from the crater is still warm. I don\'t know whose heart it was. I only know it would not stop beating.' },
+  { from: 'UNKNOWN · corrupted record', text: '…five of us were set to guard the valley… one to the ice, one to the peaks, one to the fire, one to the fields, one to the deep… and one above to lead us…' },
+  { from: 'WREN HALLOWAY · workshop note', text: 'Every robot that hears the Static turns. Mine doesn\'t. Whatever is in that core is shouting louder than the signal.' },
+  { from: 'WARDEN RECORD · Brambleback', text: 'Field patrol log. A hum from the citadel today. The leader went up to the citadel to answer it. The leader did not come back down.' },
+  { from: 'UNKNOWN · corrupted record', text: 'THE CONDUCTOR IS ORDER. THE STATIC IS ORDER. WARDENS WILL SERVE ORDER. WARDENS WILL FORGET.' },
+  { from: 'WARDEN RECORD · Glacieros', text: 'I locked the cold away in the caves so the Static could not freeze my thoughts. It found me anyway. If you read this, the ice still remembers the way in.' },
+  { from: 'WREN HALLOWAY · workshop note', text: 'The citadel lift at home base won\'t open for me. It wants five Warden keys and a heartbeat it recognises. Maybe that\'s why the core came to me.' },
+  { from: 'WARDEN RECORD · Colossus', text: 'Climb, little ones. Higher than the Static can reach. It is quiet near the peaks.' },
+  { from: 'UNKNOWN · memory shard', text: 'Bright light. A falling citadel. Someone tearing their own heart out and throwing it down, so the Conductor could not keep it.' },
+  { from: 'WARDEN RECORD · Infernus', text: 'The forge villages cooled my bridges once. Without them the fire spreads. Without them I burn alone.' },
+  { from: 'WREN HALLOWAY · workshop note', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
+  { from: 'UNKNOWN · memory shard', text: 'The deep one beneath the coast still sings to keep the sea calm. Its song is getting quieter.' },
+];

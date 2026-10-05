@@ -6,7 +6,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NoToneMapping;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 1200);
+const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 750);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const post = new PostFX(renderer);
@@ -18,6 +18,7 @@ function resize() {
   const low = G.settings.quality === 'low';
   DPR = Math.min(window.devicePixelRatio || 1, low ? (Touch.enabled ? 0.9 : 0.75) : 1.25);
   post.setSamples(low ? 0 : 4);
+  camera.far = low ? 520 : 750;
   renderer.setPixelRatio(DPR);
   renderer.setSize(W, H, false);
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -36,13 +37,14 @@ const G = {
   level: 0, time: 0, timeScale: 1,
   settings: { sens: 1, invert: false, quality: 'high', view: 'first' },
   vessels: 0, spritesFound: 0, updrafts: [], focus: false,
-  where: 'hub',                 // 'hub' (home base) or 'biome'
+  where: 'hub',                 // 'hub' (near home base) or 'biome' (anywhere else in the world)
+  region: null,                 // REGIONS entry the player is in
   bar: [], sel: 0, weapon: 'blaster',   // Minecraft-style hotbar: one item per slot
   storage: {}, bucks: 0,        // unlimited storage at home · Botbucks
   reserve: [],                  // bots waiting at home base: { kind, battery, hp, t }
   gear: { jetpack: false, fireboots: false, backpack: 0 },
   base: { shield: false, charger: 0 },
-  progress: { unlocked: 0, beaten: [false, false, false, false, false] },
+  progress: { beaten: [false, false, false, false, false], world: { seed: 0 }, story: {} },
   scene, camera,
   player: null,
   enemies: [], bullets: [], ebullets: [], pickups: [], spawns: [], companions: [],
@@ -128,13 +130,6 @@ const G = {
     this.weapon = w ? w.id : 'blaster';
     setViewModelWeapon(this.vm, this.weapon, 1 + this.up.split);
   },
-  // why a biome portal is closed (null when it is open)
-  portalLock(i) {
-    if (i > this.progress.unlocked) return `Defeat ${ZONES[i - 1].boss.name} in ${ZONES[i - 1].name}`;
-    if (ZONES[i].id === 'volcano' && !this.gear.fireboots) return 'Fire Boots required (Mountains shop)';
-    if (ZONES[i].id === 'sky' && !this.gear.jetpack) return 'Jetpack required (Mountains shop)';
-    return null;
-  },
 
   // ─── squad & bots kept at home ───
   get chargeRate() { return (100 / 32) * (1 + 0.6 * this.base.charger); },
@@ -142,9 +137,7 @@ const G = {
   // a new bot joins the squad, or waits at home base if the squad is full
   addBot(kind) {
     if (this.companions.length < this.slots) {
-      const c = new Companion(kind);
-      this.companions.push(c);
-      if (this.where === 'biome') { c.detach(); c.state = 'transitBack'; c.transitT = 8; }   // it comes out through the portal
+      this.companions.push(new Companion(kind));
       this.refreshReserveModels();
       return 'squad';
     }
@@ -161,7 +154,7 @@ const G = {
     if (c.state === 'follow' || c.state === 'returning' || c.state === 'down') {
       c.state = 'leaving'; c.target = null;
       UI.feed(`${c.d.name} is heading home${e ? ` to swap with ${COMP_DEFS[e.kind].name}` : ''}`, c.d.color);
-    } else if (c.state === 'away' || c.state === 'charging') this.completeSwap(c);
+    } else if (c.state === 'charging') this.completeSwap(c);
     else c.swapTo = c.swapTo;   // already in transit: it swaps once it reaches home
     return true;
   },
@@ -177,9 +170,9 @@ const G = {
       const nc = new Companion(e.kind, this.reserveBattery(e));
       if (e.hp !== null && e.hp !== undefined) nc.hp = Math.min(nc.maxHp, e.hp + nc.maxHp * 0.5);
       this.companions.splice(Math.max(0, i), 0, nc);
-      if (this.where === 'hub') { const pad = nc.pad(); nc.pos.set(pad.x, pad.y, pad.z); nc.state = 'follow'; }
-      else { nc.detach(); nc.state = 'transitBack'; nc.transitT = 8; }
-      UI.feed(`${nc.d.name} is on its way${this.where === 'hub' ? '' : ' through the portal'}`, nc.d.color);
+      const pad = nc.pad(); nc.pos.set(pad.x, pad.y, pad.z);
+      nc.state = this.where === 'hub' ? 'follow' : 'returning';
+      UI.feed(`${nc.d.name} is on its way${this.where === 'hub' ? '' : ' — flying out from home base'}`, nc.d.color);
     } else UI.feed(`${c.d.name} is resting at home base`, c.d.color);
     this.refreshReserveModels();
     UI.squadSig = null;
@@ -191,15 +184,15 @@ const G = {
     const c = new Companion(e.kind, this.reserveBattery(e));
     if (e.hp !== null && e.hp !== undefined) c.hp = Math.min(c.maxHp, e.hp + c.maxHp * 0.5);
     this.companions.push(c);
-    if (this.where === 'hub') { const pad = c.pad(); c.pos.set(pad.x, pad.y, pad.z); }
-    else { c.detach(); c.state = 'transitBack'; c.transitT = 8; UI.feed(`${c.d.name} is on its way through the portal`, c.d.color); }
+    const pad = c.pad(); c.pos.set(pad.x, pad.y, pad.z);
+    if (this.where !== 'hub') { c.state = 'returning'; UI.feed(`${c.d.name} is flying out from home base`, c.d.color); }
     this.refreshReserveModels();
   },
   // bots kept at home sit on the far charging pads
   refreshReserveModels() {
     for (const m of this.reserveModels || []) scene.remove(m);
     this.reserveModels = [];
-    if (this.where !== 'hub' || !World.chargePads.length) return;
+    if (!World.chargePads || !World.chargePads.length) return;
     const pads = World.chargePads;
     this.reserve.slice(0, pads.length).forEach((e, k) => {
       const pad = pads[pads.length - 1 - k];
@@ -242,14 +235,16 @@ const G = {
     return best;
   },
 
-  queueSpawn(type, x, z, elite = false, t = 1.1, aggro = true) {
+  // opts: { island, tier, boss (arena index) }
+  queueSpawn(type, x, z, elite = false, t = 1.1, aggro = true, opts = {}) {
     const lim = World.half * 0.9;
     x = clamp(x, -lim, lim); z = clamp(z, -lim, lim);
-    const y = World.floorAt(x, z);
-    const beam = makeBeam(type === 'boss' ? ZONES[this.level].boss.color : ENEMY_TYPES[type].color, 2.5, type === 'boss' ? 3 : 0.8, 0.5);
+    const y = type === 'boss' ? World.arenaFloor(x, z) : opts.island ? opts.island.top : World.floorAt(x, z);
+    const color = type === 'boss' ? ZONES[opts.boss].boss.color : ENEMY_TYPES[type].color;
+    const beam = makeBeam(color, 2.5, type === 'boss' ? 3 : 0.8, 0.5);
     setBeam(beam, x, y, z, x, y + 40, z);
     scene.add(beam);
-    this.spawns.push({ type, x, z, y, elite, aggro, t, max: t, beam });
+    this.spawns.push({ type, x, z, y, elite, aggro, t, max: t, beam, color, island: opts.island || null, tier: opts.tier ?? this.level, boss: opts.boss });
   },
 
   damageEnemy(e, dmg, hx, hy, hz, color, quiet = false) {
@@ -400,30 +395,29 @@ const G = {
     this.spawns.length = 0;
     for (const bb of this.ebullets) bb.dead = true;
     b.destroy();
-    const L = this.level;
+    const A = this.fight || World.arena, L = A.i;
     const loot = { scrap: 3, wire: 2, servo: 2, circuit: 2, core: 1 + Math.floor(L / 2), lens: 1 + Math.floor(L / 2), quantum: 1 + Math.floor(L / 2) };
     for (const [k, n] of Object.entries(loot)) for (let i = 0; i < n; i++) this.dropPart(k, b.pos.x, b.cy, b.pos.z, 2);
     for (let i = 0; i < 10; i++) this.dropBucks(15 + L * 10, b.pos.x, b.cy, b.pos.z, 2);
     this.stats.kills++;
-    this.objective = 'extract';
-    World.openDome();
-    const first = !this.progress.beaten[L];
+    this.objective = 'explore'; this.fight = null; this.vacuumT = 8;
+    World.openDome(A);
     this.progress.beaten[L] = true;
-    if (first && L + 1 < ZONES.length) this.progress.unlocked = Math.max(this.progress.unlocked, L + 1);
     Sound.setIntensity(0);
+    this.safeSpot = { x: A.x, y: A.y, z: A.z, yaw: this.player.yaw };
+    saveGame();
     setTimeout(() => {
-      if (this.objective !== 'extract') return;
-      World.buildPortal();
       Sound.play('portal');
-      const next = ZONES[L + 1];
-      const sub = first && next ? `The ${next.name} portal is now open at home base!` : L === ZONES.length - 1 ? 'The skies are free! Step into the portal' : 'Portal home is open — step inside when ready';
+      const left = this.progress.beaten.filter((x) => !x).length;
+      const sub = L === 4 ? 'The skies are free!' : left === 1 ? 'Only the Sky Islands remain — their beacons are unsealed' : `${left} Wardens remain — check your map`;
       this.banner(`${ZONES[L].boss.name} DESTROYED`, sub, '#6bff9e', 5);
       Sound.play('win');
+      if (L === 4) setTimeout(() => { if (this.state !== 'playing') return; this.state = 'victory'; Input.unlock(); Object.keys(this.stats).forEach((k) => (this.total[k] = (this.total[k] || 0) + this.stats[k])); this.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; UI.showVictory(); }, 4000);
     }, 1800);
   },
 };
 
-// ═════════════════════════ Run / zone setup ═════════════════════════
+// ═════════════════════════ The world: setup, saving & regions ═════════════════════════
 function clearEntities() {
   for (const e of G.enemies) e.destroy();
   for (const b of G.bullets) scene.remove(b.mesh);
@@ -432,12 +426,32 @@ function clearEntities() {
   for (const s of G.spawns) scene.remove(s.beam);
   G.enemies = []; G.bullets = []; G.ebullets = []; G.pickups = []; G.spawns = [];
   G.boss = null; G.bossDeath = null; G.raid = null;
+  if (World.campSites) for (const c of World.campSites) { c.live = false; c.alerted = false; }
   Fx.clear();
 }
 
 const NEW_UP = () => ({ armor: 0, overclock: 0, split: 0, thruster: 0, magnet: 0, firmware: 0, slot: 0 });
+const NEW_PROGRESS = (seed) => ({
+  beaten: [false, false, false, false, false],
+  world: { seed, beacons: [], caches: [], sprites: [], secrets: [], caves: [], fog: '', pins: [] },
+  story: { logs: 0, plating: 0, botparts: 0 },
+});
+const newSeed = () => ((Math.random() * 2 ** 31) | 0) || 1;
+
+// (re)build the world for a seed; a world that hasn't been played in yet is reused as it is
+function buildWorld(seed) {
+  if (World.group && World.seed === seed && World.pristine) return;
+  clearEntities();
+  World.dispose();
+  useRng(mulberry32(seed));
+  try { World.build(scene, seed); } finally { useRng(null); }
+  World.pristine = true;
+  G.updrafts = [...World.updraftCols];
+  for (const b of World.braziers) G.updrafts.push({ x: b.x, z: b.z, y: b.y, r: 3.2 });
+}
 
 function newRun() {
+  const seed = World.pristine && World.seed ? World.seed : newSeed();
   G.bar = [{ t: 'weapon', id: 'blaster', n: 1 }, { t: 'supply', id: 'repair', n: 1 }, { t: 'part', id: 'scrap', n: 2 }, { t: 'part', id: 'wire', n: 1 }];
   G.sel = 0; G.weapon = 'blaster';
   G.storage = { 'part:scrap': 4, 'part:wire': 2 };
@@ -445,7 +459,7 @@ function newRun() {
   G.bucks = 40;
   G.gear = { jetpack: false, fireboots: false, backpack: 0 };
   G.base = { shield: false, charger: 0 };
-  G.progress = { unlocked: 0, beaten: [false, false, false, false, false] };
+  G.progress = NEW_PROGRESS(seed);
   G.up = NEW_UP();
   G.vessels = 0; G.spritesFound = 0;
   G.companions.forEach((c) => c.destroy());
@@ -453,137 +467,199 @@ function newRun() {
   G.player = new Player();
   G.total = { kills: 0, parts: 0, crafted: 0, time: 0, damageTaken: 0, caches: 0 };
   setViewModelWeapon(G.vm, 'blaster', 1);
-  startHub(true);
+  enterWorld(true);
 }
 
+// Saves are versioned. Version 1 saves (separate biomes behind portals) keep the player's items,
+// upgrades, bots and Botbucks; the world itself is new.
+const SAVE_VERSION = 2;
+const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
-  return JSON.stringify({ bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
-    up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: G.player.hp, total: G.total,
-    reserve: G.reserve.map((e) => ({ kind: e.kind, battery: G.reserveBattery(e), hp: e.hp })), vessels: G.vessels, spritesFound: G.spritesFound });
+  const p = G.player;
+  const W = G.progress.world;
+  W.fog = WorldMap.packFog();
+  return JSON.stringify({ v: SAVE_VERSION, bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
+    up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: p.hp, total: G.total,
+    reserve: G.reserve.map((e) => ({ kind: e.kind, battery: G.reserveBattery(e), hp: e.hp })), vessels: G.vessels, spritesFound: G.spritesFound,
+    pos: G.safeSpot ? [G.safeSpot.x, G.safeSpot.y, G.safeSpot.z, G.safeSpot.yaw] : null });
 }
 function applyState(json) {
   const s = JSON.parse(json);
-  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base; G.progress = s.progress;
+  if (!s.v || s.v < 2) {
+    // an old save from before the connected world: keep the gear, start the world and story fresh
+    const beaten = (s.progress && s.progress.beaten) || [];
+    s.progress = NEW_PROGRESS(newSeed());
+    s.progress.legacy = beaten.filter(Boolean).length;
+    s.pos = null;
+    G.migrated = true;
+  }
+  G.bar = s.bar.map((it) => (it ? Object.assign({ n: 1 }, it) : null)); G.sel = s.sel || 0; G.storage = s.storage; G.bucks = s.bucks; G.gear = s.gear; G.base = s.base;
+  G.progress = Object.assign(NEW_PROGRESS(s.progress.world ? s.progress.world.seed : newSeed()), s.progress);
+  G.progress.world = Object.assign(NEW_PROGRESS(0).world, s.progress.world);
+  G.progress.story = Object.assign(NEW_PROGRESS(0).story, s.progress.story);
   G.up = Object.assign(NEW_UP(), s.up); G.total = s.total;
   G.companions.forEach((c) => c.destroy());
   G.player = new Player(); G.player.hp = s.hp;
   G.reserve = (s.reserve || []).map((e) => ({ kind: e.kind, battery: e.battery, hp: e.hp, t: G.time }));
-  G.companions = s.comps.map((d) => { const c = new Companion(d.kind, d.battery); c.hp = Math.min(c.maxHp, d.hp); if (d.away) { c.state = 'away'; c.detach(); } return c; });
+  G.companions = s.comps.map((d) => { const c = new Companion(d.kind, d.battery); c.hp = Math.min(c.maxHp, d.hp); if (d.away) c.state = 'charging'; return c; });
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
   G.weapon = s.weapon || 'blaster';
+  G.savedPos = s.pos;
   G.checkWeapon();
   setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
   UI.hotbarDirty = true;
 }
 function takeSnapshot() { G.snapshot = stateJSON(); }
+// dying puts you back where you last saved, but what you've done in the world stays done
 function restoreSnapshot() {
-  const worlds = G.progress.worlds;
+  const progress = G.progress;
   applyState(G.snapshot);
-  if (worlds) G.progress.worlds = worlds;
+  G.progress = progress;
 }
-
-// progress is saved every time you get home
-const SAVE_KEY = 'sf-outlands-save';
-function saveGame() { try { localStorage.setItem(SAVE_KEY, stateJSON()); } catch (e) { /* storage unavailable */ } }
+function saveGame() {
+  takeSnapshot();
+  try { localStorage.setItem(SAVE_KEY, G.snapshot); } catch (e) { /* storage unavailable */ }
+  G.saveT = 0;
+}
 function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function savedSeed() {
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.v >= 2 && s.progress.world ? s.progress.world.seed : null; } catch (e) { return null; }
+}
 function continueGame() {
   let json = null;
   try { json = localStorage.getItem(SAVE_KEY); } catch (e) { /* storage unavailable */ }
   if (!json) { newRun(); return; }
   G.player = new Player();
   applyState(json);
-  startHub(false);
-}
-
-// A camp: a group of robots hanging out around a scrap brazier. They spot you when you
-// come close (an alarm meter fills), or instantly if you attack or start an uplink nearby.
-function spawnCamp(x, z, n, aggro = false, pool = ZONES[G.level].pool, lvl = G.level) {
-  const camp = World.buildBrazier(x, z);
-  G.updrafts.push({ x, z, y: camp.y, r: 3.2 });
-  for (let i = 0; i < n; i++) {
-    const type = weighted(pool);
-    const elite = lvl > 0 && Math.random() < 0.06 * lvl;
-    const k = type === 'swarmer' || type === 'icemite' || type === 'embermite' ? 3 : 1;
-    for (let j = 0; j < k; j++) {
-      const a = rand(0, TAU), r = rand(2.8, World.sky ? 4.5 : 6);
-      const ex = x + Math.cos(a) * r, ez = z + Math.sin(a) * r;
-      if (!World.sky && World.inHazard(ex, ez)) continue;
-      const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp);
-      e.facing = Math.atan2(x - ex, z - ez);
-      G.enemies.push(e);
-    }
+  enterWorld(false);
+  if (G.migrated) {
+    G.migrated = false;
+    setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the Outlands are now one connected world', '#3cf2ff', 5), 600);
+    saveGame();
   }
-  return camp;
 }
 
-// common setup when arriving anywhere (home base or a biome)
-function arrive(Z, i, spawnYaw, seed) {
+// set up the world for play from the current state (new game, continue, or respawn)
+function enterWorld(fresh, respawn) {
+  buildWorld(G.progress.world.seed);
+  World.pristine = false;
   clearEntities();
-  World.dispose();
-  G.updrafts = [];
-  // a saved seed rebuilds a biome exactly as it was, so saved progress lines up with it
-  if (seed) useRng(mulberry32(seed));
-  try { World.build(scene, Z, i); } finally { useRng(null); }
-  G.updrafts.push(...World.updraftCols);
+  applyWorldProgress();
+  WorldMap.load(G.progress.world.fog);
   const p = G.player;
-  p.pos.set(World.spawn.x, World.surf(World.spawn.x, World.spawn.z), World.spawn.z);
+  const S = !respawn && G.savedPos ? { x: G.savedPos[0], y: G.savedPos[1], z: G.savedPos[2], yaw: G.savedPos[3] } : null;
+  if (S) p.pos.set(S.x, S.y + 0.1, S.z); else p.pos.set(World.spawn.x, World.heightAt(World.spawn.x, World.spawn.z), World.spawn.z);
   p.vel.set(0, 0, 0);
-  p.yaw = spawnYaw;
+  p.yaw = S ? S.yaw : 0;
   p.pitch = -0.05;
   p.dead = false; p.invuln = 2; p.energy = 100; p.dashCd = 0;
   p.gliding = false; p.climbing = null; p.stamina = p.maxStamina; p.exhausted = false;
   p.jetting = false; p.fuel = 100; p.fallTop = p.pos.y; p.safe = null;
   p.frozenT = 0; p.burnT = 0; p.slowT = 0;
-  p.hp = Math.min(p.hp, p.maxHp);
+  p.hp = respawn || fresh ? p.maxHp : Math.max(1, Math.min(p.hp, p.maxHp));
+  G.safeSpot = null;
   setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
   G.companions.forEach((c) => c.onTravel());
-  // swaps that were under way finish now that we've changed places
   for (const c of G.companions.slice()) if (c.swapTo) G.completeSwap(c);
   for (const e of G.reserve) e.pending = false;
   G.refreshReserveModels();
   G.levelDone = false; G.dying = 0; G.timeScale = 1;
   G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
   G.hintShown = {};
+  G.objective = 'explore'; G.fight = null; G.vacuumT = 0;
+  G.region = null; G.regionT = 0; G.campT = 0; G.saveT = 0; G.raidT = -1;
+  World.envBlend(p.pos.x, p.pos.z, p.pos.y, 1);
+  updateRegion(0, true);
   G.state = 'playing';
   Sound.setIntensity(0);
   UI.hideAll();
   UI.hotbarDirty = true;
+  takeSnapshot();
+  if (fresh) {
+    saveGame();
+    UI.banner('HOME BASE', 'One connected world surrounds your house — explore it all', '#3cf2ff', 4);
+    setTimeout(() => { if (G.state === 'playing' && G.where === 'hub') UI.hint(`Walk into the house: Mechanic, Charging and Storage rooms — ${Touch.enabled ? 'tap USE' : 'press E'} at a terminal`); }, 4500);
+    setTimeout(() => { if (G.state === 'playing' && G.where === 'hub') UI.hint(`Open the world map with ${Touch.enabled ? 'the MAP button' : 'M'} — the Green Plains lie south of home`); }, 13000);
+  }
+  UI.refreshHUD(true);
 }
 
-// ─────────── Home base ───────────
-function startHub(fresh) {
-  G.where = 'hub';
-  G.level = 0;
-  arrive(HUB, 99, 0);
-  G.objective = 'home';
-  G.player.hp = G.player.maxHp;      // home sweet home: fully repaired
-  takeSnapshot();
-  saveGame();
-  Weather.init(scene, HUB.ambient, HUB.ambientColor);
-  Sound.setZone(5);
-  UI.banner('HOME BASE', fresh ? 'Five portals surround your house — start with the Green Plains' : 'Progress saved · your bots recharge in the Charging Room', '#3cf2ff', 4);
-  if (fresh) {
-    setTimeout(() => { if (G.where === 'hub' && G.state === 'playing') UI.hint(`Walk into the house: Mechanic, Charging and Storage rooms — ${Touch.enabled ? 'tap USE' : 'press E'} at a terminal`); }, 4500);
-    setTimeout(() => { if (G.where === 'hub' && G.state === 'playing') UI.hint('Build a Gunner Drone in the Mechanic Room, then take the Green Plains portal (in front of the house)'); }, 13000);
+// re-apply everything the player has already done in this world
+function applyWorldProgress() {
+  const W = G.progress.world;
+  for (const b of World.beacons) {
+    const done = W.beacons.includes(b.id);
+    b.state = done ? 'done' : 'idle'; b.progress = done ? 1 : 0;
+    World.setBeaconColor(b, done ? '#6bff9e' : '#ffb347', done ? 5 : 4);
   }
-  // raids: once you've made enemies, they sometimes come knocking
+  for (const A of World.arenas) {
+    const beaten = G.progress.beaten[A.i];
+    const open = beaten || (A.beacons.length && A.beacons.every((b) => b.state === 'done'));
+    A.sealed = !open; A.opening = false; A.fade = open ? 0 : 1;
+    A.dome.visible = A.domeWire.visible = !open;
+    A.dome.material.opacity = 0.12; A.domeWire.material.opacity = 0.25; A.domeWire.scale.setScalar(1);
+  }
+  World.domeTrap = false;
+  World.caches.forEach((c, k) => { const o = W.caches.includes(k); c.opened = o; c.openT = o ? 1 : 0; c.lid.rotation.x = o ? -1.9 : 0; c.sprite.material.opacity = o ? 0 : 1; });
+  World.sprites.forEach((sp, k) => { sp.found = W.sprites.includes(k); sp.model.visible = !sp.found; });
+  World.secrets.forEach((s) => { s.found = W.secrets.includes(s.id); s.model.visible = !s.found; });
+  World.caves.forEach((c) => { c.found = W.caves.includes(c.id); });
+}
+function remember(list, v) {
+  const W = G.progress.world;
+  if (!W[list].includes(v)) W[list].push(v);
+}
+
+// Which part of the world the player is in drives the music, weather, HUD and how tough robots are.
+function updateRegion(dt, force) {
+  const p = G.player;
+  const R = World.regionAt(p.pos.x, p.pos.z, p.pos.y);
+  if (!force && G.region === R) { G.regionT = 0; return; }
+  G.regionT += dt;
+  if (!force && G.regionT < 1.2) return;
+  const first = !G.region;
+  const was = G.region;
+  G.region = R; G.regionT = 0;
+  G.where = R === REGIONS.hub ? 'hub' : 'biome';
+  G.level = R.tier;
+  Weather.init(scene, R.ambient, R.ambientColor || R.accent);
+  Sound.setZone(R.zone);
+  if (G.where === 'hub') arriveHome(first);
+  else if (!first) UI.banner(R.name.toUpperCase(), regionIntro(R), R.accent, 3);
+  void was;
+}
+function regionIntro(R) {
+  if (R === REGIONS.sky) return ZONES[4].intro;
+  return R.id === 'coast' ? COAST.intro : (ZONES.find((z) => z.id === R.id) || {}).intro || '';
+}
+
+// home sweet home: fully repaired, progress saved, raids possible
+function arriveHome(first) {
+  const p = G.player;
+  if (!first) {
+    p.hp = p.maxHp;
+    UI.banner('HOME BASE', 'Hull repaired · progress saved · bots charge on the pads', '#3cf2ff', 3);
+  }
+  Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
+  G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 };
+  G.safeSpot = { x: World.spawn.x, y: World.heightAt(World.spawn.x, World.spawn.z), z: World.spawn.z, yaw: 0 };
+  saveGame();
   const beaten = G.progress.beaten.filter(Boolean).length;
-  if (beaten && !fresh && Math.random() < 0.5) G.raidT = rand(25, 45); else G.raidT = -1;
-  UI.refreshHUD(true);
+  if (!first && beaten && !G.raid && Math.random() < 0.35) G.raidT = rand(25, 45);
 }
 
 function startRaid() {
   const beaten = G.progress.beaten.filter(Boolean).length;
-  const zi = Math.max(0, Math.min(ZONES.length - 1, beaten - 1));
-  const Z = ZONES[zi];
-  const pool = Z.id === 'sky' ? [['drone', 3], ['grunt', 3], ['sniper', 1]] : Z.pool;
+  const zi = Math.max(0, Math.min(3, beaten - 1));
+  const pool = ZONES[zi].pool;
   G.raid = { camps: [] };
   let n = 0;
-  for (let t = 0; t < 30 && n < 2; t++) {
-    const a = rand(0, TAU), r = rand(85, 110), x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (!World.isClear(x, z, 6)) continue;
+  for (let t = 0; t < 40 && n < 2; t++) {
+    const a = rand(0, TAU), r = rand(70, 95), x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (!World.isClear(x, z, 6) && World.heightAt(x, z) < WORLD.water + 1) continue;
+    const camp = { x, z, y: World.heightAt(x, z), r: 6, alerted: true, raid: true };
     const before = G.enemies.length;
-    spawnCamp(x, z, randi(3, 4), true, pool, zi);
+    spawnCampRobots(camp, randi(3, 4), true, pool, zi);
     for (const e of G.enemies.slice(before)) e.hunter = true;
     n++;
   }
@@ -593,72 +669,54 @@ function startRaid() {
   if (!G.base.shield) setTimeout(() => UI.hint('Build a Shield Generator in the Mechanic Room — its dome keeps raiders out'), 4000);
 }
 
-// ─────────── Biomes ───────────
-function startZone(i) {
-  G.where = 'biome';
-  G.level = i;
-  const Z = ZONES[i];
-  const W = biomeSave(i);
-  arrive(Z, i, Math.atan2(0, 165), W.seed);
-  const p = G.player;
-  p.yaw = Math.atan2(World.spawn.x - World.arena.x, World.spawn.z - World.arena.z);
-  const restored = restoreBiome(W);
-
-  // roaming machine camps
-  if (World.sky) {
-    for (const is of World.islands) if (is.kind === 'camp' || is.kind === 'beacon') {
-      const a = rand(0, TAU), off = is.kind === 'beacon' ? is.r * 0.55 : 0;
-      spawnCamp(is.x + Math.cos(a) * off, is.z + Math.sin(a) * off, randi(3, 4 + Math.floor(i / 2)));
-    }
-  } else {
-    const camps = 8 + i * 2;
-    for (let c = 0; c < camps; c++) {
-      const at = World.randomClear(7, 40);
-      if (!at || Math.hypot(at[0] - World.spawn.x, at[1] - World.spawn.z) < 55) continue;
-      spawnCamp(at[0], at[1], randi(3, 4 + Math.floor(i / 2)));
+// A camp: a group of robots hanging out around a scrap brazier. They spot you when you
+// come close (an alarm meter fills), or instantly if you attack or start an uplink nearby.
+function spawnCampRobots(camp, n, aggro, pool, tier) {
+  for (let i = 0; i < n; i++) {
+    const type = weighted(pool);
+    const elite = tier > 0 && Math.random() < 0.06 * tier;
+    const k = ENEMY_TYPES[type].ai === 'swarm' ? 3 : 1;
+    for (let j = 0; j < k; j++) {
+      const a = rand(0, TAU), r = rand(2.8, camp.island ? 4.5 : 6);
+      const ex = camp.x + Math.cos(a) * r, ez = camp.z + Math.sin(a) * r;
+      if (!camp.island && World.heightAt(ex, ez) < WORLD.water + 0.3) continue;
+      const e = new Enemy(type, ex, ez, elite && j === 0, aggro, camp, null, tier);
+      e.facing = Math.atan2(camp.x - ex, camp.z - ez);
+      G.enemies.push(e);
     }
   }
-
-  G.objective = 'beacons';
-  if (restored.allBeacons) { G.objective = 'arena'; World.openDome(); World.domeFade = 0; }
-  G.reinforceT = 45;
-  takeSnapshot();
-  Weather.init(scene, Z.ambient, Z.ambientColor || Z.accent);
-  Sound.setZone(i);
-  UI.banner(`${Z.name.toUpperCase()}`, Z.intro, Z.accent, 4.5);
-  if (restored.beacons) setTimeout(() => { if (G.level === i && G.where === 'biome') UI.hint(restored.allBeacons ? `Welcome back — every beacon is online. ${Z.boss.name} waits in the arena` : `Welcome back — ${restored.beacons}/${World.beacons.length} beacons are still online`); }, 4200);
-  else setTimeout(() => { if (G.level === i && G.where === 'biome' && G.objective === 'beacons') UI.hint(`Find and activate ${Z.beacons} signal beacons — follow the light pillars`); }, 4200);
-  setTimeout(() => { if (G.level === i && G.where === 'biome' && G.state === 'playing') UI.hint(`${Z.shop.name} is right by the portal — sell salvage for Botbucks`); }, 11000);
-  if (i === 0) setTimeout(() => { if (G.level === 0 && G.where === 'biome' && G.state === 'playing') UI.hint('Robots spot you when you get close — watch the ? meter over their heads'); }, 19000);
-  if (World.sky) setTimeout(() => { if (G.where === 'biome' && World.sky) UI.hint(Touch.enabled ? 'Hold JUMP in mid-air to fly with the jetpack between islands' : 'Hold Space in mid-air to fly with the jetpack between islands'); }, 5000);
-  UI.refreshHUD(true);
 }
 
-// ─────────── Per-biome progress (kept between visits and in the save) ───────────
-function biomeSave(i) {
-  if (!G.progress.worlds) G.progress.worlds = {};
-  let W = G.progress.worlds[i];
-  if (!W) W = G.progress.worlds[i] = { seed: (Math.random() * 2 ** 31) | 0 || 1, beacons: [], caches: [], sprites: [] };
-  return W;
-}
-function restoreBiome(W) {
-  let n = 0;
-  for (const b of World.beacons) if (W.beacons.includes(b.id)) { b.state = 'done'; b.progress = 1; World.setBeaconColor(b, '#6bff9e', 5); n++; }
-  World.caches.forEach((c, k) => { if (W.caches.includes(k)) { c.opened = true; c.openT = 1; c.lid.rotation.x = -1.9; c.sprite.material.opacity = 0; } });
-  World.sprites.forEach((sp, k) => { if (W.sprites.includes(k)) { sp.found = true; sp.model.visible = false; } });
-  return { beacons: n, allBeacons: World.beacons.length > 0 && n >= World.beacons.length };
-}
-function remember(list, v) {
-  if (G.where !== 'biome') return;
-  const W = biomeSave(G.level);
-  if (!W[list].includes(v)) W[list].push(v);
+// Robot camps come to life as you approach and pack up when you're far away.
+const CAMP_WAKE = 160, CAMP_SLEEP = 270, CAMP_RESPAWN = 300;
+function streamCamps(dt) {
+  G.campT -= dt;
+  if (G.campT > 0) return;
+  G.campT = 0.5;
+  const p = G.player;
+  let live = G.enemies.length;
+  for (const c of World.campSites) {
+    const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
+    if (!c.live) {
+      if (d < CAMP_WAKE && d > 40 && G.time > (c.respawnAt || 0) && live < 46 && !World.domeTrap) {
+        c.live = true; c.alerted = false;
+        const before = G.enemies.length;
+        spawnCampRobots(c, c.size, false, c.pool, c.tier);
+        live += G.enemies.length - before;
+      }
+    } else if (d > CAMP_SLEEP) {
+      for (const e of G.enemies) if (e.camp === c && !e.dead) { e.dead = true; e.destroy(); }
+      c.live = false; c.alerted = false;
+    } else if (!G.enemies.some((e) => e.camp === c && !e.dead)) {
+      c.live = false; c.alerted = false; c.respawnAt = G.time + CAMP_RESPAWN;
+    }
+  }
 }
 
-function goHome() {
-  Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
-  Sound.play('portal');
-  Fx.tintFlash('#3cf2ff', 1);
-  startHub(false);
+// ─────────── Beacons, boss domes & the Wardens ───────────
+function skyLocked() {
+  const left = [0, 1, 2, 3].filter((i) => !G.progress.beaten[i]);
+  return left.length ? `Sealed by the Static — defeat ${left.map((i) => ZONES[i].boss.name).join(', ')} first` : null;
 }
 
 function nextInteractable() {
@@ -668,47 +726,31 @@ function nextInteractable() {
     const d = Math.hypot(x - p.pos.x, z - p.pos.z);
     if (d < r && d < bd && Math.abs(p.pos.y - (obj && obj.y !== undefined ? obj.y : p.pos.y)) < dy) { bd = d; best = { kind, obj }; }
   };
-  for (const c of World.caches) if (!c.opened) near(c.x, c.z, 3.2, 'cache', c);
+  const cell = (x, z, R) => Math.abs(x - p.pos.x) < R && Math.abs(z - p.pos.z) < R;
+  for (const c of World.caches) if (!c.opened && cell(c.x, c.z, 4)) near(c.x, c.z, 3.2, 'cache', c);
   for (const t of World.terminals) near(t.x, t.z, 2.6, t.kind, t);
-  for (const P of World.hubPortals) near(P.x, P.z, 5, 'portal', P, 4);
-  if (World.homePortal && !World.domeTrap) near(World.homePortal.x, World.homePortal.z, 4.5, 'home', World.homePortal, 4);
-  if (World.shop) near(World.shop.x, World.shop.z, 3.4, 'shop', World.shop);
-  if (G.objective === 'beacons' && !World.beacons.some((b) => b.state === 'charging')) {
-    for (const b of World.beacons) if (b.state === 'idle') near(b.x, b.z, 5.5, 'beacon', b, 6);
+  for (const S of World.shops) if (cell(S.x, S.z, 5)) near(S.x, S.z, 3.4, 'shop', S);
+  const busy = World.beacons.some((b) => b.state === 'charging');
+  for (const b of World.beacons) {
+    if (!cell(b.x, b.z, 7)) continue;
+    if (b.state === 'idle' && !busy && !World.domeTrap) near(b.x, b.z, 5.5, 'beacon', b, 6);
+    else if (b.state === 'done') near(b.x, b.z, 5.5, 'launch', b);
   }
-  for (const b of World.beacons) if (b.state === 'done') near(b.x, b.z, 5.5, 'launch', b);
   return best;
 }
 
 function interact(it) {
   switch (it.kind) {
     case 'cache': openCache(it.obj); break;
-    case 'beacon': startUplink(it.obj); break;
-    case 'launch': launchFrom(it.obj); break;
-    case 'mechanic': case 'storage': case 'charging': case 'shop': UI.openStation(it.kind); break;
-    case 'home': goHome(); break;
-    case 'portal': {
-      const lock = G.portalLock(it.obj.i);
-      if (lock) { Sound.play('deny'); UI.banner('PORTAL LOCKED', lock, '#8a94a8', 2.6); return; }
-      Sound.play('portal');
-      Fx.tintFlash(ZONES[it.obj.i].accent, 1);
-      startZone(it.obj.i);
-      break;
+    case 'beacon': {
+      const lock = it.obj.biome === 4 ? skyLocked() : null;
+      if (lock) { Sound.play('deny'); UI.banner('BEACON LOCKED', lock, '#8a94a8', 3); return; }
+      startUplink(it.obj); break;
     }
+    case 'launch': launchFrom(it.obj); break;
+    case 'shop': UI.openStation('shop', it.obj); break;
+    case 'mechanic': case 'storage': case 'charging': UI.openStation(it.kind); break;
   }
-}
-
-// portals work by just walking into them (E still works too)
-function walkThroughPortals() {
-  const p = G.player;
-  const inside = (P) => Math.hypot(P.x - p.pos.x, P.z - p.pos.z) < 1.9 && Math.abs(p.pos.y - P.y) < 3.5;
-  for (const P of World.hubPortals) {
-    if (!inside(P)) continue;
-    const lock = G.portalLock(P.i);
-    if (!lock) { interact({ kind: 'portal', obj: P }); return; }
-    if (!G.lockMsgT || G.time - G.lockMsgT > 3) { G.lockMsgT = G.time; Sound.play('deny'); UI.banner('PORTAL LOCKED', lock, '#8a94a8', 2.6); }
-  }
-  if (World.homePortal && !World.domeTrap && inside(World.homePortal)) goHome();
 }
 
 function openCache(c) {
@@ -735,9 +777,10 @@ function launchFrom(b) {
   Fx.shockRing(b.x, b.y + 0.6, b.z, '#6bff9e', 4, 60);
   Fx.explosion(b.x, b.y + 1, b.z, '#6bff9e', 0.8);
   Sound.play('launch');
-  // the view from up high reveals nearby caches on the compass
+  // the view from up high reveals nearby caches on the compass and the map
   let n = 0;
   for (const c of World.caches) if (!c.opened && !c.revealed && Math.hypot(c.x - b.x, c.z - b.z) < 170) { c.revealed = true; n++; }
+  WorldMap.reveal(b.x, b.z, 260);
   UI.banner('SKY LAUNCH', n ? `${n} salvage caches revealed on your compass` : 'Open your glider in mid-air', '#6bff9e', 2.4);
   UI.hint(`${Touch.enabled ? 'Tap GLIDE' : 'Press Space'} in mid-air to open your glider — a long fall without it hurts!`);
 }
@@ -749,126 +792,139 @@ function startUplink(b) {
     if (e.isBoss || e.dead) continue;
     if (Math.hypot(e.pos.x - b.x, e.pos.z - b.z) < 110) { e.aggro = true; e.hunter = true; }
   }
-  World.setBeaconColor(b, ZONES[G.level].accent);
+  const acc = b.biome === 4 ? ZONES[4].accent : ZONES[b.biome].accent;
+  World.setBeaconColor(b, acc);
   Sound.play('uplink');
-  UI.banner('UPLINK STARTED', 'Stay inside the ring and defend the beacon', ZONES[G.level].accent, 2.6);
+  UI.banner('UPLINK STARTED', 'Stay inside the ring and defend the beacon', acc, 2.6);
   Sound.setIntensity(1);
 }
 
 function updateObjectives(dt) {
   const p = G.player;
-  if (G.where === 'hub') {
-    if (G.raidT > 0) { G.raidT -= dt; if (G.raidT <= 0) startRaid(); }
-    if (G.raid && !G.enemies.some((e) => !e.dead)) {
-      G.raid = null;
-      UI.banner('RAID REPELLED', 'Home base is safe · +40 Botbucks', '#6bff9e', 3);
-      G.bucks += 40; Sound.play('win'); Sound.setIntensity(0);
-    }
-    return;
+  if (G.raidT > 0 && G.where === 'hub') { G.raidT -= dt; if (G.raidT <= 0) startRaid(); }
+  if (G.raid && !G.enemies.some((e) => !e.dead && e.camp && e.camp.raid)) {
+    G.raid = null;
+    UI.banner('RAID REPELLED', 'Home base is safe · +40 Botbucks', '#6bff9e', 3);
+    G.bucks += 40; Sound.play('win'); Sound.setIntensity(0);
   }
-  const Z = ZONES[G.level];
-  if (G.objective === 'beacons') {
-    for (const b of World.beacons) {
-      if (b.state !== 'charging') continue;
-      const inside = Math.hypot(p.pos.x - b.x, p.pos.z - b.z) < 14;
-      if (inside && !p.dead) b.progress = Math.min(1, b.progress + dt / 22);
-      b.inside = inside;
-      b.spawnT -= dt;
-      if (b.spawnT <= 0 && G.enemies.length < 30 + G.level * 4) {
-        b.spawnT = rand(3.2, 4.8) - G.level * 0.2;
-        const is = World.sky ? World.islandAt(b.x, b.z) : null;
-        const a = rand(0, TAU), r = is ? rand(5, is.r - 2) : rand(26, 36);
-        const sx = b.x + Math.cos(a) * r, sz = b.z + Math.sin(a) * r;
-        const n = 1 + Math.floor(G.level / 2) + (Math.random() < 0.5 ? 1 : 0);
-        for (let k = 0; k < n; k++) {
-          const t = weighted(Z.pool);
-          const cnt = ENEMY_TYPES[t].ai === 'swarm' ? 3 : 1;
-          for (let j = 0; j < cnt; j++) G.queueSpawn(t, sx + rand(-4, 4) * (is ? 0.4 : 1), sz + rand(-4, 4) * (is ? 0.4 : 1), G.level > 0 && Math.random() < 0.05 * G.level, 1.1, true);
-        }
-      }
-      if (b.progress >= 1) {
-        b.state = 'done';
-        remember('beacons', b.id);
-        saveGame();
-        for (const e of G.enemies) e.hunter = false;
-        setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
-        World.setBeaconColor(b, '#6bff9e', 5);
-        Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
-        Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
-        Sound.play('beaconDone');
-        for (let k = 0; k < 3; k++) G.dropPart(weighted([['circuit', 2], ['core', 1], ['servo', 2], ['lens', 1]]), b.x, b.y + 3, b.z, 1.3);
-        for (let k = 0; k < 4; k++) G.dropBucks(10 + G.level * 3, b.x, b.y + 3, b.z, 1.3);
-        for (const pk of G.pickups) pk.pulled = pk.pulled || pk.pos.distanceTo(p.pos) < 50;
-        const done = World.beacons.filter((x) => x.state === 'done').length;
-        if (done >= World.beacons.length) {
-          G.objective = 'arena';
-          World.openDome();
-          UI.banner('CORE GATE OPEN', `${Z.boss.name} awaits in the central arena`, Z.boss.color, 3.5);
-          Sound.play('warn');
-        } else {
-          UI.banner(`BEACON ${done} / ${World.beacons.length} ONLINE`, 'Find the next signal pillar', '#6bff9e', 2.8);
-        }
-        Sound.setIntensity(0);
+  // beacon uplinks
+  for (const b of World.beacons) {
+    if (b.state !== 'charging') continue;
+    const Z = ZONES[b.biome], tier = b.biome;
+    const dist = Math.hypot(p.pos.x - b.x, p.pos.z - b.z);
+    const inside = dist < 14 && Math.abs(p.pos.y - b.y) < 12;
+    if (dist > 140 || p.dead) {
+      // walked away: the uplink drops
+      b.state = 'idle'; b.progress = 0; World.setBeaconColor(b, '#ffb347');
+      for (const e of G.enemies) e.hunter = false;
+      UI.feed('Uplink lost — you left the beacon', '#ff9f43');
+      continue;
+    }
+    if (inside) b.progress = Math.min(1, b.progress + dt / 22);
+    b.inside = inside;
+    b.spawnT -= dt;
+    if (b.spawnT <= 0 && G.enemies.length < 30 + tier * 4) {
+      b.spawnT = rand(3.2, 4.8) - tier * 0.2;
+      const is = b.island;
+      const a = rand(0, TAU), r = is ? rand(5, is.r - 2) : rand(26, 36);
+      const sx = b.x + Math.cos(a) * r, sz = b.z + Math.sin(a) * r;
+      if (!is && World.heightAt(sx, sz) < WORLD.water + 0.3) continue;
+      const n = 1 + Math.floor(tier / 2) + (Math.random() < 0.5 ? 1 : 0);
+      for (let k = 0; k < n; k++) {
+        const t = weighted(Z.pool);
+        const cnt = ENEMY_TYPES[t].ai === 'swarm' ? 3 : 1;
+        for (let j = 0; j < cnt; j++) G.queueSpawn(t, sx + rand(-4, 4) * (is ? 0.4 : 1), sz + rand(-4, 4) * (is ? 0.4 : 1), tier > 0 && Math.random() < 0.05 * tier, 1.1, true, { island: is, tier });
       }
     }
-  } else if (G.objective === 'arena') {
-    const A = World.arena;
-    if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r - 6 && Math.abs(p.pos.y - A.y) < 12) {
-      G.objective = 'boss';
-      // the dome slams shut: you and your squad are locked in until the boss falls
-      World.trapDome();
-      for (const c of G.companions) if (c.active) { World.keepInside(c.pos, c.r); }
-      // it's just you (and your bots) against the boss: robots caught inside are destroyed
-      for (const e of G.enemies) if (!e.isBoss && !e.dead && Math.hypot(e.pos.x - A.x, e.pos.z - A.z) < A.r + 3) G.killEnemy(e, false);
-      for (const s of G.spawns) scene.remove(s.beam);
-      G.spawns.length = 0;
-      for (const b of G.ebullets) if (World.insideDome(b.pos.x, b.pos.y, b.pos.z)) b.dead = true;
-      const a = Math.atan2(p.pos.x - A.x, p.pos.z - A.z) + Math.PI;
-      G.queueSpawn('boss', A.x + Math.sin(a) * 12, A.z + Math.cos(a) * 12, false, 2.2);
-      UI.banner('⚠ WARNING ⚠', `${Z.boss.name} — ${Z.boss.title.toUpperCase()}`, '#ff3355', 3.2);
-      setTimeout(() => UI.hint('The dome has sealed — there is no way out until the boss is destroyed'), 3400);
-      Sound.play('warn');
-      Sound.play('slam');
-      Sound.setIntensity(2);
-    }
-  } else if (G.objective === 'extract' && World.portal) {
-    const P = World.portal;
-    if (Math.hypot(p.pos.x - P.x, p.pos.z - P.z) < 2.8 && Math.abs(p.pos.y - P.y) < 6 && !p.dead) {
-      G.objective = 'done';
-      G.levelDone = true;
-      Sound.play('portal');
-      Fx.tintFlash('#6bff9e', 1);
-      Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
-      const last = G.level >= ZONES.length - 1;
-      setTimeout(() => {
-        if (last) { G.stats = { kills: 0, parts: 0, time: 0, damageTaken: 0, caches: 0 }; startHub(false); G.state = 'victory'; Input.unlock(); UI.showVictory(); }
-        else startHub(false);
-      }, 700);
+    if (b.progress >= 1) beaconOnline(b);
+  }
+  // walking into an open dome starts the fight
+  if (!World.domeTrap && !p.dead) {
+    for (const A of World.arenas) {
+      if (A.sealed || G.progress.beaten[A.i]) continue;
+      if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r - 6 && Math.abs(p.pos.y - A.y) < 12) { startBossFight(A); break; }
     }
   }
+}
 
-  // reinforcements while exploring
-  if (G.objective === 'beacons' || G.objective === 'arena') {
-    G.reinforceT -= dt;
-    if (G.reinforceT <= 0) {
-      G.reinforceT = Math.max(45, 75 - G.level * 5);
-      if (G.enemies.length < 24 + G.level * 4) {
-        for (let tries = 0; tries < 10; tries++) {
-          const a = rand(0, TAU), r = rand(80, 120);
-          const x = p.pos.x + Math.cos(a) * r, z = p.pos.z + Math.sin(a) * r;
-          if (World.sky) {
-            const is = World.islandAt(x, z);
-            if (!is || is.r < 8 || is.kind === 'arena' || is.kind === 'spawn') continue;
-            spawnCamp(is.x, is.z, randi(2, 3), false);
-            break;
-          }
-          if (Math.abs(x) > World.half * 0.72 || Math.abs(z) > World.half * 0.72 || !World.isClear(x, z, 6)) continue;
-          spawnCamp(x, z, randi(2, 3), false);
-          break;
-        }
-      }
-    }
+function beaconOnline(b) {
+  const p = G.player;
+  const A = b.arena, Z = ZONES[A.i];
+  b.state = 'done';
+  remember('beacons', b.id);
+  for (const e of G.enemies) e.hunter = false;
+  setTimeout(() => UI.hint(`Activated beacons can launch you skyward — ${Touch.enabled ? 'tap LAUNCH' : 'press E'} at the base`), 3200);
+  World.setBeaconColor(b, '#6bff9e', 5);
+  Fx.explosion(b.x, b.y + 9, b.z, '#6bff9e', 1.2);
+  Fx.shockRing(b.x, b.y + 1, b.z, '#6bff9e', 6, 60);
+  Sound.play('beaconDone');
+  for (let k = 0; k < 3; k++) G.dropPart(weighted([['circuit', 2], ['core', 1], ['servo', 2], ['lens', 1]]), b.x, b.y + 3, b.z, 1.3);
+  for (let k = 0; k < 4; k++) G.dropBucks(10 + A.i * 3, b.x, b.y + 3, b.z, 1.3);
+  for (const pk of G.pickups) pk.pulled = pk.pulled || pk.pos.distanceTo(p.pos) < 50;
+  const done = A.beacons.filter((x) => x.state === 'done').length;
+  if (done >= A.beacons.length) {
+    World.openDome(A);
+    UI.banner('CORE GATE OPEN', `${Z.boss.name} awaits in its dome — check your map`, Z.boss.color, 3.5);
+    Sound.play('warn');
+  } else UI.banner(`BEACON ${done} / ${A.beacons.length} ONLINE`, `${Z.boss.name}'s dome weakens — find the next signal pillar`, '#6bff9e', 2.8);
+  Sound.setIntensity(0);
+  G.safeSpot = { x: b.x + 4, y: b.y, z: b.z + 4, yaw: p.yaw };
+  saveGame();
+}
+
+function startBossFight(A) {
+  const p = G.player;
+  const Z = ZONES[A.i];
+  G.objective = 'boss'; G.fight = A;
+  // the dome slams shut: you and your squad are locked in until the boss falls
+  World.trapDome(A);
+  for (const c of G.companions) if (c.active) World.keepInside(c.pos, c.r);
+  // it's just you (and your bots) against the boss: robots caught inside are destroyed
+  for (const e of G.enemies) if (!e.isBoss && !e.dead && Math.hypot(e.pos.x - A.x, e.pos.z - A.z) < A.r + 3) G.killEnemy(e, false);
+  for (const s of G.spawns) scene.remove(s.beam);
+  G.spawns.length = 0;
+  for (const b of G.ebullets) if (World.insideDome(b.pos.x, b.pos.y, b.pos.z)) b.dead = true;
+  const a = Math.atan2(p.pos.x - A.x, p.pos.z - A.z) + Math.PI;
+  G.queueSpawn('boss', A.x + Math.sin(a) * 12, A.z + Math.cos(a) * 12, false, 2.2, true, { boss: A.i });
+  UI.banner('⚠ WARNING ⚠', `${Z.boss.name} — ${Z.boss.title.toUpperCase()}`, '#ff3355', 3.2);
+  setTimeout(() => UI.hint('The dome has sealed — there is no way out until the boss is destroyed'), 3400);
+  Sound.play('warn');
+  Sound.play('slam');
+  Sound.setIntensity(2);
+}
+
+// ─────────── Secrets, Scrap Sprites & the map ───────────
+function collectSecret(s) {
+  s.found = true;
+  s.model.visible = false;
+  remember('secrets', s.id);
+  const S = SECRETS[s.type], st = G.progress.story;
+  Fx.shockRing(s.x, s.y, s.z, S.color, 1.6, 30);
+  for (let i = 0; i < 18; i++) Fx.spark(s.x, s.y, s.z, rand(-1, 1), rand(0.2, 1.5), rand(-1, 1), rand(2, 6), pick([S.color, '#ffffff']), 0.8, 0.12, 4);
+  Sound.play('sprite');
+  if (s.type === 'log') {
+    const L = LORE_LOGS[Math.min(st.logs, LORE_LOGS.length - 1)];
+    st.logs++;
+    UI.showLore(L, Math.min(st.logs, LORE_LOGS.length), LORE_LOGS.length);
+  } else if (s.type === 'plating') {
+    st.plating++;
+    G.player.hp += 10;
+    UI.banner('WARDEN PLATING', `Maximum hull is now ${G.player.maxHp}`, S.color, 3);
+  } else if (s.type === 'botpart') {
+    st.botparts++;
+    if (st.botparts % 3 === 0) {
+      const kind = BOTPART_REWARDS[(st.botparts / 3 - 1) % BOTPART_REWARDS.length];
+      const where = G.addBot(kind);
+      UI.banner('BOT ASSEMBLED', `Three lost parts make a ${COMP_DEFS[kind].name}${where === 'home' ? ' — it waits at home base' : ''}`, COMP_DEFS[kind].color, 3.5);
+    } else UI.banner('LOST BOT PART', `${3 - (st.botparts % 3)} more to assemble a premium bot`, S.color, 2.8);
+  } else {
+    G.bucks += 60; UI.bump('bucks');
+    G.dropPart('quantum', s.x, s.y + 0.5, s.z, 0.5);
+    G.dropPart('core', s.x, s.y + 0.5, s.z, 0.5);
+    UI.banner('HIDDEN HOARD', '+60 Botbucks and rare parts', S.color, 2.8);
   }
+  G.safeSpot = null;
+  saveGame();
 }
 
 function collectSprite(sp) {
@@ -887,7 +943,49 @@ function collectSprite(sp) {
   } else {
     UI.banner('BEEP-BOOP!', `You found a Scrap Sprite · ${3 - (G.spritesFound % 3)} more for a stamina vessel`, '#3aff9a', 2.4);
   }
-  UI.feed(`Scrap Sprite found (${left} left here)`, '#3aff9a');
+  UI.feed(`Scrap Sprite found (${left} left in the world)`, '#3aff9a');
+}
+
+// per-frame exploration: caves, secrets, sprites, the map's fog of war and autosaves
+function explore(dt) {
+  const p = G.player;
+  if (p.dead) return;
+  for (const sp of World.sprites) {
+    if (sp.found || Math.abs(sp.x - p.pos.x) > 3 || Math.abs(sp.z - p.pos.z) > 3) continue;
+    if (Math.hypot(sp.x - p.pos.x, sp.y - (p.pos.y + 0.8), sp.z - p.pos.z) < 1.7) collectSprite(sp);
+  }
+  for (const s of World.secrets) {
+    if (s.found || Math.abs(s.x - p.pos.x) > 3 || Math.abs(s.z - p.pos.z) > 3) continue;
+    if (Math.hypot(s.x - p.pos.x, s.y - (p.pos.y + 0.8), s.z - p.pos.z) < 1.8) collectSecret(s);
+  }
+  // caves: dim the daylight, switch on the headlamp, note the discovery
+  const cv = p.inCave ? World.caveAt(p.pos.x, p.pos.z, p.pos.y) : null;
+  const deep = cv ? clamp((World.heightAt(p.pos.x, p.pos.z) - p.pos.y - 2) / 6, 0, 1) : 0;
+  World.caveDim = lerp(World.caveDim, deep, 1 - Math.exp(-3 * dt));
+  World.headlamp.intensity = World.caveDim * 2.2;
+  World.headlamp.position.set(p.pos.x, p.pos.y + 1.6, p.pos.z);
+  if (cv && !cv.cave.found && deep > 0.3) {
+    cv.cave.found = true;
+    remember('caves', cv.cave.id);
+    UI.banner('CAVE DISCOVERED', 'Something glints in the dark at the far end…', '#b98cff', 2.6);
+  }
+  WorldMap.reveal(p.pos.x, p.pos.z, p.pos.y > World.heightAt(p.pos.x, p.pos.z) + 25 ? 150 : 95);
+  // remember a safe spot (to continue from) and autosave now and then while things are calm
+  if (p.grounded && !p.inCave && !World.domeTrap && G.where === 'biome') {
+    G.calmT = G.enemies.some((e) => e.aggro && !e.dead && Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) < 60) ? 0 : (G.calmT || 0) + dt;
+    if (G.calmT > 3) G.safeSpot = { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw };
+  }
+  G.saveT = (G.saveT || 0) + dt;
+  if (G.saveT > 90 && !World.domeTrap && (G.calmT || 0) > 5) saveGame();
+}
+
+// respawn after a defeat: back at home base with your last saved gear (the world remembers your progress)
+function respawnHome() {
+  restoreSnapshot();
+  G.savedPos = null;
+  if (G.fight) { World.openDome(G.fight); G.fight = null; }
+  enterWorld(false, true);
+  UI.banner('REBUILT AT HOME', 'Your workshop rebuilt you — everything you did in the world is kept', '#3cf2ff', 3.5);
 }
 
 // ═════════════════════════ Update ═════════════════════════
@@ -916,33 +1014,32 @@ function update(dt) {
       const it = nextInteractable();
       if (it) interact(it);
     }
-    walkThroughPortals();
-    // Scrap Sprites (hidden collectibles)
-    for (const sp of World.sprites) {
-      if (sp.found) continue;
-      if (Math.hypot(sp.x - p.pos.x, sp.y - (p.pos.y + 0.8), sp.z - p.pos.z) < 1.7) collectSprite(sp);
-    }
+    if (Input.hit('KeyM')) { WorldMap.open(); return; }
+    explore(dt);
   }
 
+  updateRegion(dt);
+  streamCamps(dt);
   updateObjectives(dt);
+  G.vacuumT = Math.max(0, (G.vacuumT || 0) - dt);
 
   // spawn telegraphs
   for (let i = G.spawns.length - 1; i >= 0; i--) {
     const s = G.spawns[i];
     s.t -= dt;
     s.beam.material.opacity = 0.2 + 0.6 * (1 - s.t / s.max);
-    if (Math.random() < dt * 30) Fx.glowBurst(s.x + rand(-1, 1), s.y + rand(0, 3), s.z + rand(-1, 1), s.type === 'boss' ? ZONES[G.level].boss.color : ENEMY_TYPES[s.type].color, 0.6, 0.4, 2);
+    if (Math.random() < dt * 30) Fx.glowBurst(s.x + rand(-1, 1), s.y + rand(0, 3), s.z + rand(-1, 1), s.color, 0.6, 0.4, 2);
     if (s.t <= 0) {
       G.spawns.splice(i, 1);
       scene.remove(s.beam);
       if (s.type === 'boss') {
-        const b = new Boss(G.level, s.x, s.z);
+        const b = new Boss(s.boss, s.x, s.z);
         G.boss = b; G.enemies.push(b);
         Fx.explosion(s.x, s.y + 4, s.z, b.color, 3);
         Fx.addShake(0.8);
         Sound.play('explode', true);
       } else {
-        const e = new Enemy(s.type, s.x, s.z, s.elite, s.aggro);
+        const e = new Enemy(s.type, s.x, s.z, s.elite, s.aggro, null, s.island, s.tier);
         if (World.beacons.some((b) => b.state === 'charging')) e.hunter = true;
         G.enemies.push(e);
         Fx.shockRing(s.x, s.y + 0.5, s.z, ENEMY_TYPES[s.type].color, 1.5, 20);
@@ -1167,7 +1264,7 @@ function updateEnemyBullets(dt) {
     if (b.dead) continue;
     if (b.grav) b.vel.y -= b.grav * dt;
     b.pos.addScaledVector(b.vel, dt);
-    if (b.hugH) b.pos.y = World.floorAt(b.pos.x, b.pos.z) + b.hugH;
+    if (b.hugH) b.pos.y = (b.fromBoss ? World.arenaFloor(b.pos.x, b.pos.z) : World.floorAt(b.pos.x, b.pos.z, b.pos.y - b.hugH)) + b.hugH;
     b.mesh.position.copy(b.pos);
     if (b.grav) { b.mesh.rotation.x += dt * 3; b.mesh.rotation.z += dt * 2; if (b.meteor) Fx.trail(b.pos.x, b.pos.y, b.pos.z, '#ff8a3a', 1.6, 0.4, 3); }
     b.life -= dt;
@@ -1178,10 +1275,10 @@ function updateEnemyBullets(dt) {
       continue;
     }
     if (World.domeTrap && !b.fromBoss && World.insideDome(b.pos.x, b.pos.y, b.pos.z)) {
-      b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, ZONES[G.level].boss.color, 1.2, 0.3, 2);
+      b.dead = true; Fx.glowBurst(b.pos.x, b.pos.y, b.pos.z, World.arena.color, 1.2, 0.3, 2);
       continue;
     }
-    const ground = b.grav ? World.floorAt(b.pos.x, b.pos.z) : -1e9;
+    const ground = b.grav ? (b.fromBoss ? World.arenaFloor(b.pos.x, b.pos.z) : World.floorAt(b.pos.x, b.pos.z, b.pos.y)) : -1e9;
     if (World.solidAt(b.pos.x, b.pos.y, b.pos.z) || (b.grav && b.pos.y <= ground + 0.2)) {
       b.dead = true;
       if (b.marker) scene.remove(b.marker);
@@ -1224,7 +1321,7 @@ function updateEnemyBullets(dt) {
 function updatePickups(dt) {
   const p = G.player;
   const mag = p.magnet;
-  const vacuum = G.objective === 'extract';
+  const vacuum = G.vacuumT > 0;
   for (const k of G.pickups) {
     k.t += dt;
     const needsSlot = k.type !== 'health' && k.type !== 'bucks';
@@ -1243,7 +1340,6 @@ function updatePickups(dt) {
       k.pos.addScaledVector(k.vel, dt);
       const gy = Math.max(World.groundAt(k.pos.x, k.pos.z, k.pos.y), World.hazardLevel) + 0.45;
       if (k.pos.y < gy) { k.pos.y = gy; k.vel.y = Math.abs(k.vel.y) * 0.3; k.vel.x *= 0.7; k.vel.z *= 0.7; }
-      if (World.sky && k.pos.y < World.hazardLevel + 1) { k.dead = true; scene.remove(k.model); continue; }
     }
     k.model.position.set(k.pos.x, k.pos.y + Math.sin(G.time * 3 + k.bob) * 0.1, k.pos.z);
     k.model.rotation.y += dt * 2;
@@ -1541,14 +1637,18 @@ function frame(now) {
     menuT += dt;
     G.time += dt;
     const a = menuT * 0.05;
-    camera.position.set(Math.sin(a) * 62, World.arena.y + 20 + Math.sin(menuT * 0.2) * 4, Math.cos(a) * 62);
-    camera.lookAt(0, World.arena.y + 3, 0);
-    World.followSun(0, World.arena.y, 0);
+    const hy = World.home.y;
+    camera.position.set(Math.sin(a) * 70, hy + 24 + Math.sin(menuT * 0.2) * 4, Math.cos(a) * 70);
+    camera.lookAt(0, hy + 3, 0);
+    World.followSun(0, hy, 0);
     Fx.update(dt, (x, z) => World.heightAt(x, z));
   } else if (G.state === 'workshop' || G.state === 'paused') {
     if (Input.hit('Escape') || ((Input.hit('Tab') || Input.hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
+  } else if (G.state === 'map') {
+    if (Input.hit('Escape') || Input.hit('KeyM') || Input.hit('Tab')) WorldMap.close();
+    else WorldMap.draw();
   }
-  if (Input.hit('KeyM')) UI.toggleMute();
+  if (Input.hit('KeyN')) UI.toggleMute();
   document.body.classList.toggle('playing', G.state === 'playing');
   Touch.refresh();
 
@@ -1562,6 +1662,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// the menu backdrop shows the world with its domes up (no save progress applied)
+function applyWorldProgressMenu() { World.domeTrap = false; }
+
 function initMenuScene() {
   G.focus = false;
   if (G.avatar) G.avatar.visible = false;
@@ -1571,7 +1674,12 @@ function initMenuScene() {
   G.level = 0; G.where = 'hub';
   G.up = NEW_UP();
   G.player = new Player(); G.player.dead = true;
-  World.build(scene, HUB, 99);
+  // the menu shows the saved world (so Continue is instant) or the one a new game will use
+  const seed = savedSeed() || (World.pristine && World.seed) || newSeed();
+  if (!G.progress.world) G.progress = NEW_PROGRESS(seed);
+  buildWorld(seed);
+  applyWorldProgressMenu();
+  World.envBlend(0, 0, World.home.y, 1);
   Weather.init(scene, HUB.ambient, HUB.ambientColor);
   G.vm.visible = false;
   camera.rotation.set(0, 0, 0);
@@ -1590,6 +1698,7 @@ if (Touch.enabled) {
   G.settings.sens = 1.1;
 }
 UI.init();
+WorldMap.init();
 resize();
 initMenuScene();
 requestAnimationFrame(frame);

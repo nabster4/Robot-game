@@ -11,7 +11,7 @@ const UI = {
   init() {
     $('btn-start').onclick = () => {
       Sound.init(); Sound.play('click'); Touch.goFullscreen();
-      if (hasSave() && !confirm('Start a new expedition? Your saved progress will be replaced when you get home.')) return;
+      if (hasSave() && !confirm('Start a new expedition? Your saved game will be replaced.')) return;
       newRun(); Input.lock(canvas);
     };
     $('btn-continue').onclick = () => { Sound.init(); Sound.play('click'); Touch.goFullscreen(); continueGame(); Input.lock(canvas); };
@@ -19,12 +19,11 @@ const UI = {
     $('btn-howto').onclick = () => { Sound.init(); Sound.play('click'); $('howto').classList.toggle('hidden'); };
     $('btn-resume').onclick = () => this.closeOverlay();
     $('btn-p-workshop').onclick = () => this.openStation('field');
-    $('btn-restart').onclick = () => this.retry();
+    $('btn-p-map').onclick = () => { G.state = 'playing'; this.hideAll(); WorldMap.open(); };
     $('btn-mute').onclick = () => this.toggleMute();
     $('btn-quit').onclick = () => this.toMenu();
     $('ws-continue').onclick = () => { Sound.play('click'); this.closeOverlay(); };
     $('btn-retry').onclick = () => this.retry();
-    $('btn-go-home').onclick = () => { Sound.play('click'); restoreSnapshot(); startHub(false); Input.lock(canvas); };
     $('btn-go-menu').onclick = () => this.toMenu();
     $('btn-again').onclick = () => { Sound.play('click'); this.closeVictory(); };
     $('btn-v-menu').onclick = () => this.toMenu();
@@ -74,7 +73,6 @@ const UI = {
     Input.mouse.down = false;
     Input.unlock();
     $('btn-mute').textContent = Sound.muted ? 'Sound: Off' : 'Sound: On';
-    $('btn-restart').textContent = G.where === 'hub' ? 'Reload Home Base' : 'Restart Biome';
     this.show('pause');
   },
 
@@ -96,8 +94,7 @@ const UI = {
 
   retry() {
     Sound.play('click');
-    restoreSnapshot();
-    if (G.where === 'hub') startHub(false); else startZone(G.level);
+    respawnHome();
     Input.lock(canvas);
   },
 
@@ -137,10 +134,8 @@ const UI = {
   },
 
   showGameOver() {
-    $('go-sector').textContent = G.where === 'hub' ? 'Home Base' : ZONES[G.level].name;
+    $('go-sector').textContent = G.region ? G.region.name : 'The Outlands';
     $('go-stats').innerHTML = this.statsHTML(G.stats);
-    $('btn-retry').textContent = G.where === 'hub' ? 'Try Again' : 'Retry Biome';
-    $('btn-go-home').style.display = G.where === 'hub' ? 'none' : '';
     this.show('gameover');
     $('hud').classList.remove('show');
   },
@@ -160,15 +155,16 @@ const UI = {
   keyItem(key) { const [t, id] = key.split(':'); return { t, id }; },
 
   // ═════════════════════════ Stations: field kit · Mechanic · Charging · Storage · Shop ═════════════════════════
-  openStation(mode) {
+  openStation(mode, shopSpot) {
     this.mode = mode;
+    if (shopSpot) this.shopDef = ZONES[shopSpot.biome].shop;
     const tabs = { field: ['bots'], mechanic: ['bots', 'base'], charging: ['charging'], storage: ['storage'], shop: ['sell', 'gear', 'bots', 'upgrades', 'supplies'] }[mode];
     if (!tabs.includes(this.tab)) this.tab = tabs[0];
     this.tabs = tabs;
     G.state = 'workshop';
     Input.mouse.down = false;
     Input.unlock();
-    const shop = G.where === 'biome' ? ZONES[G.level].shop : null;
+    const shop = this.shopDef || null;
     const T = {
       field: ['FIELD KIT', 'Time is frozen. Build simple bots from the scrap in your hotbar.'],
       mechanic: ['MECHANIC ROOM', 'Build bots and base systems from your storage and hotbar.'],
@@ -415,7 +411,7 @@ const UI = {
             <div class="inv-desc">⚡ ${Math.floor(c.battery)}% · Hull ${Math.ceil(c.hp)}/${Math.round(c.maxHp)} · ${c.statusText}</div></div>
           ${c.active && c.battery < 100 ? `<button class="btn tiny" data-recall="${c.id}">Charge</button>` : ''}
         </div>`).join('') : '<div class="ws-note">No bots yet — build one in the Mechanic Room.</div>'}</div>
-        <div class="ws-note">Bots drain their battery while they follow you out in the biomes. Below 15% they fly home, charge on these pads, and come back to you by themselves.
+        <div class="ws-note">Bots drain their battery while they follow you out in the world. Below 15% they fly all the way home, charge on these pads, and fly back to you by themselves.
         A drained bot is fragile and its aim gets sloppy — so stay sharp: you do most of the fighting.<br><br>Charge speed: <b>${Math.round(100 / (100 / 32 * (1 + 0.6 * G.base.charger)))} s</b> for a full battery${G.base.charger < 2 ? ' — build Fast Chargers in the Mechanic Room' : ''}.</div>`;
     } else if (m === 'storage') {
       const keys = Object.keys(G.storage).filter((k) => G.storage[k] > 0).sort();
@@ -425,7 +421,7 @@ const UI = {
           <div class="wd-btns"><button class="btn tiny" data-wd="${k}" data-n="1">Take 1</button>${it.t !== 'weapon' ? `<button class="btn tiny" data-wd="${k}" data-n="20">Take 20</button>` : ''}</div></div>`;
       }).join('') : '<div class="ws-note">Storage is empty. Deposit materials from your hotbar — there is no limit.</div>'}</div><div class="ws-note">Take items back into your hotbar one at a time or a full stack of 20.</div>`;
     } else if (m === 'shop') {
-      const shop = G.where === 'biome' ? ZONES[G.level].shop : null;
+      const shop = this.shopDef || null;
       if (this.tab === 'sell') {
         const parts = G.bar.filter((it) => it && it.t === 'part');
         const total = parts.reduce((n, it) => n + this.itemValue(it) * (it.n || 1), 0);
@@ -590,8 +586,7 @@ const UI = {
   refreshHUD(force) {
     if (G.state !== 'playing' && !force) return;
     const p = G.player;
-    const hub = G.where === 'hub';
-    const Z = hub ? HUB : ZONES[G.level];
+    const R = G.region || REGIONS.hub;
     const hk = p.hp / p.maxHp;
     $('bar-hull').style.width = (hk * 100).toFixed(1) + '%';
     $('bar-hull').style.setProperty('--c', hk < 0.3 ? '#ff3b5c' : hk < 0.6 ? '#ffc23c' : '#3cf2ff');
@@ -642,26 +637,24 @@ const UI = {
     }
 
     // objective
-    const done = World.beacons.filter((b) => b.state === 'done').length;
     const charging = World.beacons.find((b) => b.state === 'charging');
     let obj = '', prog = -1;
-    if (hub) {
-      const next = ZONES.findIndex((z, i) => !G.progress.beaten[i]);
-      obj = G.raid ? 'Fight off the raiders!' : next < 0 ? 'Every biome is free — explore at will' : G.portalLock(next) ? G.portalLock(next) : `Enter the ${ZONES[next].name} portal`;
-    } else if (G.objective === 'beacons') {
-      obj = charging ? (charging.inside ? `Defend the uplink — ${Math.floor(charging.progress * 100)}%` : 'Return to the uplink ring!') : `Activate signal beacons (${done}/${World.beacons.length})`;
-      if (charging) prog = charging.progress;
-    } else if (G.objective === 'arena') obj = 'Enter the dome — there is no way out until the boss falls';
-    else if (G.objective === 'boss') obj = G.boss ? `Destroy ${G.boss.name}` : 'Something is coming…';
-    else if (G.objective === 'extract') obj = World.portal ? 'Step into the portal home' : 'Portal incoming…';
-    else obj = 'Heading home…';
-    $('obj-zone').textContent = hub ? 'HOME BASE' : `BIOME ${G.level + 1} · ${Z.name.toUpperCase()}`;
-    $('obj-zone').style.color = hub ? '' : Z.accent;
+    if (G.raid) obj = 'Fight off the raiders!';
+    else if (charging) {
+      obj = charging.inside ? `Defend the uplink — ${Math.floor(charging.progress * 100)}%` : 'Return to the uplink ring!';
+      prog = charging.progress;
+    } else if (G.objective === 'boss') obj = G.boss ? `Destroy ${G.boss.name}` : 'Something is coming…';
+    else obj = this.goal().text;
+    $('obj-zone').textContent = R.name.toUpperCase();
+    $('obj-zone').style.color = R === REGIONS.hub ? '' : R.accent;
     $('obj-text').textContent = obj;
     $('obj-text').classList.toggle('warn', (!!charging && !charging.inside) || !!G.raid);
     $('obj-prog').style.display = prog >= 0 ? '' : 'none';
     $('obj-prog-fill').style.width = (prog * 100).toFixed(1) + '%';
-    $('obj-kills').textContent = hub ? `BIOMES CLEARED ${G.progress.beaten.filter(Boolean).length}/5  ·  STORED ${Object.values(G.storage).reduce((a, b) => a + b, 0)}` : `KILLS ${G.stats.kills}  ·  CACHES ${World.caches.filter((c) => c.opened).length}/${World.caches.length}  ·  SPRITES ${World.sprites.filter((s) => s.found).length}/${World.sprites.length}`;
+    if (!this.objT || G.time - this.objT > 1) {
+      this.objT = G.time;
+      $('obj-kills').textContent = `WARDENS ${G.progress.beaten.filter(Boolean).length}/5  ·  EXPLORED ${Math.round(WorldMap.explored() * 100)}%  ·  SECRETS ${World.secrets.filter((s) => s.found).length}/${World.secrets.length}`;
+    }
 
     // boss bar
     const b = G.boss;
@@ -678,10 +671,10 @@ const UI = {
     if (it) {
       const key = Touch.enabled ? '<kbd>USE</kbd>' : '<kbd>E</kbd>';
       const txt = {
-        cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward', beacon: 'Start beacon uplink',
-        mechanic: 'Use the <b>Mechanic Room</b>', charging: 'Open the <b>Charging Room</b>', storage: 'Open <b>Storage</b>', shop: 'Trade at the <b>shop</b>',
-        home: 'Return to <b>home base</b>',
-        portal: it.kind === 'portal' ? (G.portalLock(it.obj.i) ? `<span class="locked">Locked — ${G.portalLock(it.obj.i)}</span>` : `Travel to <b>${ZONES[it.obj.i].name}</b>`) : '',
+        cache: `Open ${it.obj.golden ? '<b class="gold">golden</b> ' : ''}salvage cache`, launch: 'Launch skyward',
+        beacon: it.kind === 'beacon' && it.obj.biome === 4 && skyLocked() ? '<span class="locked">Beacon sealed by the Static</span>' : 'Start beacon uplink',
+        mechanic: 'Use the <b>Mechanic Room</b>', charging: 'Open the <b>Charging Room</b>', storage: 'Open <b>Storage</b>',
+        shop: it.kind === 'shop' ? `Trade at <b>${ZONES[it.obj.biome].shop.name}</b>` : '',
       }[it.kind];
       pr.innerHTML = `${key} ${txt}`;
       pr.classList.add('show');
@@ -691,25 +684,58 @@ const UI = {
     this.drawRadar();
   },
 
+  // what to do next: the nearest Warden that is still under the Static's control
+  goal() {
+    const p = G.player, beaten = G.progress.beaten;
+    let best = null, bd = 1e9;
+    for (const A of World.arenas) {
+      if (beaten[A.i] || (A.i === 4 && skyLocked())) continue;
+      // suggest the nearest Warden, nudged toward the gentler regions first
+      const d = Math.hypot(A.x - p.pos.x, A.z - p.pos.z) + A.i * 250;
+      if (d < bd) { bd = d; best = A; }
+    }
+    if (!best) return { text: beaten[4] ? 'The Outlands are free — explore, find every secret' : 'Explore the Outlands' };
+    const Z = ZONES[best.i], done = best.beacons.filter((b) => b.state === 'done').length;
+    if (!best.sealed) return { A: best, text: `Enter ${Z.boss.name}'s dome (${Z.short})` };
+    return { A: best, text: `${Z.boss.name}: power the ${Z.short.toLowerCase()} beacons (${done}/${best.beacons.length})` };
+  },
+
   markers() {
     const M = [];
-    if (G.where === 'hub') {
-      for (const P of World.hubPortals) M.push({ x: P.x, z: P.z, color: P.open ? ZONES[P.i].accent : '#6a7080', shape: 'ring', label: true, big: P.open });
-      for (const t of World.terminals) M.push({ x: t.x, z: t.z, color: t.color, shape: 'square', range: 60 });
-      return M;
+    const p = G.player;
+    const near = (x, z, R) => Math.abs(x - p.pos.x) < R && Math.abs(z - p.pos.z) < R;
+    const home = World.home;
+    M.push({ x: home.x, z: home.z, color: '#3cf2ff', shape: 'ring', label: true, big: Math.hypot(home.x - p.pos.x, home.z - p.pos.z) > 120 });
+    if (G.where === 'hub') for (const t of World.terminals) M.push({ x: t.x, z: t.z, color: t.color, shape: 'square', range: 60 });
+    const goal = this.goal().A;
+    for (const A of World.arenas) {
+      if (G.progress.beaten[A.i]) continue;
+      M.push({ x: A.x, z: A.z, color: A.color, shape: 'skull', label: A === goal, big: A === goal, range: A === goal ? 0 : 450 });
     }
-    const Z = ZONES[G.level];
     for (const b of World.beacons) {
-      M.push({ x: b.x, z: b.z, color: b.state === 'done' ? '#6bff9e' : b.state === 'charging' ? Z.accent : '#ffb347', shape: 'diamond', label: true, big: b.state !== 'done' });
+      if (b.state === 'done' && !near(b.x, b.z, 120)) continue;
+      const mine = goal && b.arena === goal && goal.sealed;
+      if (!mine && !near(b.x, b.z, 300)) continue;
+      M.push({ x: b.x, z: b.z, color: b.state === 'done' ? '#6bff9e' : b.state === 'charging' ? ZONES[b.biome].accent : '#ffb347', shape: 'diamond', label: mine || b.state === 'charging', big: b.state !== 'done' });
     }
-    for (const c of World.caches) if (!c.opened) M.push({ x: c.x, z: c.z, color: c.golden ? '#ffd23f' : '#3cf2ff', shape: 'square', range: c.revealed ? 0 : 70 });
+    for (const c of World.caches) if (!c.opened && (c.revealed || near(c.x, c.z, 70))) M.push({ x: c.x, z: c.z, color: c.golden ? '#ffd23f' : '#3cf2ff', shape: 'square', range: c.revealed ? 0 : 70 });
     for (const sp of World.sprites) if (!sp.found && sp.revealed) M.push({ x: sp.x, z: sp.z, color: '#3aff9a', shape: 'diamond', range: 0 });
-    if (!World.sky) for (const is of World.islands) M.push({ x: is.x, z: is.z, color: '#dff6ff', shape: 'cloud', range: 160 });
-    if (G.objective === 'arena' || G.objective === 'boss') M.push({ x: World.arena.x, z: World.arena.z, color: Z.boss.color, shape: 'skull', label: true, big: true });
-    if (World.portal) M.push({ x: World.portal.x, z: World.portal.z, color: '#6bff9e', shape: 'ring', label: true, big: true });
-    if (World.homePortal) M.push({ x: World.homePortal.x, z: World.homePortal.z, color: '#3cf2ff', shape: 'ring', range: 0 });
-    if (World.shop) M.push({ x: World.shop.x, z: World.shop.z, color: '#ffd23f', shape: 'square', range: 0 });
+    for (const is of World.islands) if (near(is.x, is.z, 160) && is.kind !== 'step') M.push({ x: is.x, z: is.z, color: '#dff6ff', shape: 'cloud', range: 160 });
+    for (const S of World.shops) if (near(S.x, S.z, 260)) M.push({ x: S.x, z: S.z, color: '#ffd23f', shape: 'square', range: 260 });
+    for (const c of World.caves) if (c.found || near(c.mouth.x, c.mouth.z, 60)) { if (near(c.mouth.x, c.mouth.z, 140)) M.push({ x: c.mouth.x, z: c.mouth.z, color: '#b98cff', shape: 'cave', range: 140 }); }
+    for (const pin of G.progress.world.pins) M.push({ x: pin.x, z: pin.z, color: pin.c, shape: 'pin', label: true });
     return M;
+  },
+
+  // a memory fragment / story log found in a cave
+  showLore(L, n, total) {
+    let el = $('lore');
+    if (!el) { el = document.createElement('div'); el.id = 'lore'; $('hud').appendChild(el); }
+    el.innerHTML = `<span class="lore-n">MEMORY ${n} / ${total}</span><div class="lore-from">${L.from}</div><div class="lore-text">${L.text}</div>`;
+    el.classList.add('show');
+    Sound.play('uplink', null, 0.5);
+    clearTimeout(this._loreT);
+    this._loreT = setTimeout(() => el.classList.remove('show'), 11000);
   },
 
   drawCompass() {
@@ -746,6 +772,8 @@ const UI = {
       if (m.shape === 'diamond') { g.moveTo(x, y - s); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x - s, y); g.closePath(); g.fill(); }
       else if (m.shape === 'square') { g.fillRect(x - s / 2 - 1, y - s / 2 - 1, s + 2, s + 2); }
       else if (m.shape === 'ring') { g.arc(x, y, s, 0, TAU); g.stroke(); }
+      else if (m.shape === 'pin') { g.arc(x, y - 2, s, 0, TAU); g.fill(); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y - 2, 1.6, 0, TAU); g.fill(); }
+      else if (m.shape === 'cave') { g.arc(x, y + 2, s, Math.PI, 0); g.closePath(); g.fill(); }
       else if (m.shape === 'cloud') { g.arc(x - 3, y + 1, 3, 0, TAU); g.arc(x + 3, y + 1, 3, 0, TAU); g.arc(x, y - 1.5, 3.6, 0, TAU); g.fill(); }
       else { g.arc(x, y - 1, s, 0, TAU); g.fill(); g.fillStyle = '#05060a'; g.fillRect(x - 3, y - 2, 2, 2); g.fillRect(x + 1, y - 2, 2, 2); }
       if (m.label && !clampd) {
@@ -789,12 +817,11 @@ const UI = {
     };
     for (const k of G.pickups) dot(k.pos.x, k.pos.z, k.type === 'health' ? '#6bff9e' : k.type === 'bucks' ? '#ffd23f' : k.type === 'item' ? '#ffffff' : PARTS[k.type].color, 1.5);
     for (const c of World.caches) if (!c.opened) dot(c.x, c.z, c.golden ? '#ffd23f' : '#3cf2ff', 2.5);
-    for (const b of World.beacons) dot(b.x, b.z, b.state === 'done' ? '#6bff9e' : '#ffb347', 4, true);
+    for (const b of World.beacons) dot(b.x, b.z, b.state === 'done' ? '#6bff9e' : '#ffb347', 4);
     for (const is of World.islands) dot(is.x, is.z, 'rgba(223,246,255,0.5)', Math.min(10, is.r * (R - 6) / 70));
-    for (const P of World.hubPortals) dot(P.x, P.z, P.open ? ZONES[P.i].accent : '#6a7080', 4, true);
     for (const t of World.terminals) dot(t.x, t.z, t.color, 2.5);
-    if (World.homePortal) dot(World.homePortal.x, World.homePortal.z, '#3cf2ff', 3.5, true);
-    if (World.shop) dot(World.shop.x, World.shop.z, '#ffd23f', 3.5, true);
+    dot(World.home.x, World.home.z, '#3cf2ff', 3.5, true);
+    for (const S of World.shops) dot(S.x, S.z, '#ffd23f', 3.5);
     for (const b of World.braziers) dot(b.x, b.z, b.alerted ? '#ff3b5c' : '#ffb347', 1.5);
     for (const s of G.spawns) dot(s.x, s.z, '#ffffff', 2);
     for (const e of G.enemies) if (!e.hidden) dot(e.pos.x, e.pos.z, e.isBoss ? e.color : e.elite ? '#ffd700' : e.aggro ? '#ff3b5c' : '#ff8a6a', e.isBoss ? 5 : e.r > 1.5 ? 3.5 : 2.5, e.isBoss);

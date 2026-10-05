@@ -265,7 +265,7 @@ const Fx = {
 // ═════════════════════════ Ambient weather around the camera ═════════════════════════
 const Weather = {
   init(scene, type, hex) {
-    if (this.points) { scene.remove(this.points); this.points.geometry.dispose(); }
+    if (this.points) { scene.remove(this.points); this.points.geometry.dispose(); this.points.material.dispose(); }
     this.type = type;
     const n = Math.round((type === 'data' ? 300 : type === 'pollen' ? 220 : 700) * (G.settings.quality === 'low' ? 0.45 : 1));
     this.n = n; this.box = 60;

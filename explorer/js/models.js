@@ -690,3 +690,26 @@ function buildSpriteModel() {
   void stem;
   return g;
 }
+
+// Secrets hidden in caves: a floating memory shard, plating, a bot part or a treasure chest.
+function buildSecretModel(type) {
+  const S = SECRETS[type];
+  const g = new THREE.Group();
+  if (type === 'log') {
+    const c = mesh(Geo.oct(0.32), Mat.glow(S.color, 2.6), 0, 0, 0, g); c.scale.y = 1.8;
+    const ring = new THREE.Mesh(Geo.torus(0.55, 0.03, 24), Mat.glow('#ffffff', 2)); ring.rotation.x = Math.PI / 2; g.add(ring);
+  } else if (type === 'plating') {
+    mesh(Geo.box(0.8, 0.5, 0.12), Mat.std('#c8a040', { metal: 0.9, rough: 0.25 }), 0, 0, 0, g);
+    mesh(Geo.box(0.5, 0.06, 0.14), Mat.glow(S.color, 3), 0, 0, 0, g);
+  } else if (type === 'botpart') {
+    mesh(Geo.sphere(0.3, 1), Mat.std('#2a3444', { metal: 0.8, rough: 0.3 }), 0, 0, 0, g);
+    mesh(Geo.box(0.42, 0.1, 0.1), Mat.glow(S.color, 3), 0, 0, 0.28, g);
+    for (const s of [-1, 1]) mesh(Geo.box(0.12, 0.12, 0.4), Mat.std('#8aa0b8', { metal: 0.8 }), s * 0.38, 0, 0, g);
+  } else {
+    mesh(Geo.box(0.9, 0.55, 0.6), Mat.std('#6a3a1a', { rough: 0.7 }), 0, 0, 0, g);
+    mesh(Geo.box(0.94, 0.12, 0.64), Mat.std('#ffd23f', { metal: 0.9, rough: 0.2 }), 0, 0.2, 0, g);
+    mesh(Geo.sphere(0.18, 1), Mat.glow('#ffd23f', 3), 0, 0.42, 0, g);
+  }
+  g.add(glowSprite(S.color, 2.2, 1.4));
+  return g;
+}

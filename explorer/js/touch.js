@@ -145,6 +145,7 @@ const Touch = {
   press(k) {
     if (k === 'pause') { UI.pause(); return; }
     if (k === 'view') { UI.toggleView(); return; }
+    if (k === 'map') { WorldMap.open(); return; }
     const map = { jump: 'Space', dash: 'KeyQ', grenade: 'KeyG', use: 'KeyE', repair: 'KeyR', workshop: 'Tab' };
     if (map[k]) Input.pressed[map[k]] = true;
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) { /* ignore */ }
@@ -163,7 +164,7 @@ const Touch = {
     const it = !p.dead ? nextInteractable() : null;
     const use = document.getElementById('tb-use');
     use.classList.toggle('avail', !!it);
-    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP', home: 'HOME', portal: 'ENTER' })[it.kind] : 'USE';
+    use.querySelector('span').textContent = it ? ({ cache: 'OPEN', beacon: 'UPLINK', launch: 'LAUNCH', mechanic: 'BUILD', charging: 'BOTS', storage: 'STORE', shop: 'SHOP' })[it.kind] : 'USE';
     document.getElementById('tb-jump').querySelector('span').textContent = p.grounded || p.climbing ? 'JUMP' : p.jetting ? 'FLY' : p.gliding ? 'DROP' : 'GLIDE';
   },
 };

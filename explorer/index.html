@@ -64,7 +64,7 @@
   </div>
 
   <canvas id="radar" width="180" height="180"></canvas>
-  <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · Q dash · RMB bomb · hold SPACE jetpack</div>
+  <div id="keys-hint">1-9 / wheel hotbar · X drop · TAB field kit · E interact · M map · Q dash · RMB bomb · hold SPACE jetpack</div>
 </div>
 
 
@@ -76,6 +76,9 @@
   </div>
   <div class="tbtn small" data-tbtn="view" id="tb-view" role="button" aria-label="Switch camera view">
     <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>VIEW</span>
+  </div>
+  <div class="tbtn small" data-tbtn="map" id="tb-map" role="button" aria-label="World map">
+    <svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg><span>MAP</span>
   </div>
   <div class="tbtn small" data-tbtn="pause" id="tb-pause" role="button" aria-label="Pause">
     <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
@@ -112,7 +115,7 @@
       <span class="logo-top">SCRAP</span><span class="logo-bot">FORGE</span>
       <span class="logo-sub">O U T L A N D S</span>
     </div>
-    <div class="tagline">Five wild biomes surround your home base. Salvage the machines, trade for Botbucks, and build a robot squad of your own.</div>
+    <div class="tagline">One wild, connected world surrounds your home base. Climb its cliffs, explore its caves, free the five Wardens and build a robot squad of your own.</div>
     <div class="menu-buttons">
       <button class="btn primary big" id="btn-continue">Continue</button>
       <button class="btn big" id="btn-start">New Expedition</button>
@@ -125,39 +128,43 @@
         <div><kbd>FIRE</kbd><span>Hold to shoot · drag it to aim</span></div>
         <div><kbd>JUMP</kbd><span>Jump · tap mid-air to glide · hold for jetpack</span></div>
         <div><kbd>Hotbar</kbd><span>Tap a slot to hold that item / weapon</span></div>
-        <div><kbd>Walk into rocks</kbd><span>Climb them (uses stamina)</span></div>
+        <div><kbd>Walk into cliffs</kbd><span>Climb them (uses stamina)</span></div>
         <div><kbd>VIEW</kbd><span>First / third person</span></div>
         <div><kbd>DASH</kbd><span>Burst with brief invulnerability</span></div>
         <div><kbd>BOMB</kbd><span>Plasma grenade</span></div>
-        <div><kbd>USE</kbd><span>Rooms · shops · caches · uplinks (walk into portals)</span></div>
+        <div><kbd>USE</kbd><span>Rooms · shops · caches · beacon uplinks</span></div>
         <div><kbd>CRAFT</kbd><span>Field kit — build simple bots</span></div>
+        <div><kbd>MAP</kbd><span>World map · tap to place markers</span></div>
       </div>
       <div class="howto-grid desk-only">
         <div><kbd>W A S D</kbd><span>Move · <b>Shift</b> sprint</span></div>
         <div><kbd>Mouse</kbd><span>Look · left-click to fire</span></div>
         <div><kbd>Space</kbd><span>Jump · tap mid-air to glide · hold for jetpack</span></div>
         <div><kbd>1–9 / wheel</kbd><span>Select hotbar slot · <b>X</b> drop it</span></div>
-        <div><kbd>Walk into rocks</kbd><span>Climb (uses stamina)</span></div>
+        <div><kbd>Walk into cliffs</kbd><span>Climb rocks and cliffs (uses stamina)</span></div>
         <div><kbd>V</kbd><span>First / third person</span></div>
         <div><kbd>Q</kbd><span>Dash — brief invulnerability</span></div>
         <div><kbd>Right-click / G</kbd><span>Plasma grenade</span></div>
-        <div><kbd>E</kbd><span>Rooms · shops · caches · beacons (walk into portals)</span></div>
+        <div><kbd>E</kbd><span>Rooms · shops · caches · beacons</span></div>
+        <div><kbd>M</kbd><span>World map · click to place markers</span></div>
         <div><kbd>R</kbd><span>Use repair kit</span></div>
         <div><kbd>Tab / I</kbd><span>Field kit — build simple bots</span></div>
         <div><kbd>Esc / P</kbd><span>Pause &amp; settings</span></div>
-        <div><kbd>M</kbd><span>Mute</span></div>
+        <div><kbd>N</kbd><span>Mute</span></div>
       </div>
       <p><b>Home base</b> is a house with three rooms: the <b>Mechanic Room</b> (build bots and a shield
         generator), the <b>Charging Room</b> (bots recharge here) and <b>Storage</b> (unlimited).
-        Five portals ring the house: <b>Plains → Snowy Plains → Mountains → Volcano → Sky Islands</b>.
-        Beat a biome's boss to open the next portal.</p>
+        Around it lies one connected world: the <b>Green Plains</b> to the south, <b>Snowy Plains</b> to the north,
+        <b>Mountains</b> to the east, the <b>Fiery Volcano</b> to the west, the <b>Saltglass Coast</b> to the south-east,
+        and the <b>Sky Islands</b> floating high above the north-east. Power a Warden's beacons to open its dome,
+        in any order — the Sky Islands open last. Caves hide treasure, memory fragments and lost bot parts.</p>
       <p>Your <b>hotbar</b> stacks parts and supplies up to 20 per slot. Sell salvage at each biome's
         <b>shop</b> for <b>Botbucks</b> and buy weapons, gear (jetpack, fire boots), premium bots and upgrades.
-        Bot batteries drain; low bots fly back through the portal to recharge and return on their own, and you can swap squad bots with ones waiting at home. Watch out for
+        Bot batteries drain; low bots fly all the way home to recharge and fly back on their own, and you can swap squad bots with ones waiting at home. Watch out for
         <b>fall damage</b> and your own <b>bomb blasts</b>. Once you enter a boss dome, there is no way out
         until the boss falls.</p>
     </div>
-    <div class="menu-foot">5 biomes · 6 theme songs · 5 bosses · 9 companion bots · 4 weapons · a home to come back to</div>
+    <div class="menu-foot">one connected world · caves &amp; waterfalls · 6 theme songs · 5 Wardens · 9 companion bots · a home to come back to</div>
     <a class="menu-link" href="../index.html">Play the original top-down Scrapforge ▸</a>
   </div>
 </div>
@@ -174,7 +181,7 @@
       <label class="check"><input type="checkbox" id="opt-invert"> Invert mouse Y</label>
       <label class="check"><input type="checkbox" id="opt-quality"> Performance mode (no shadows, lower resolution)</label>
     </div>
-    <button class="btn" id="btn-restart">Restart Biome</button>
+    <button class="btn" id="btn-p-map">World Map (M)</button>
     <button class="btn" id="btn-mute">Sound: On</button>
     <button class="btn ghost" id="btn-quit">Quit to Menu</button>
   </div>
@@ -211,16 +218,32 @@
   </div>
 </div>
 
+<!-- ═══════ World map ═══════ -->
+<div id="mapview" class="overlay">
+  <div class="map-wrap">
+    <header class="map-head">
+      <h1>WORLD MAP</h1>
+      <div class="muted" id="map-info"></div>
+      <button class="btn primary" id="map-close">Close ▸</button>
+    </header>
+    <canvas id="map-canvas"></canvas>
+    <div class="map-legend">
+      <span><i class="lg home"></i>Home</span><span><i class="lg skull"></i>Warden dome</span><span><i class="lg beacon"></i>Beacon</span>
+      <span><i class="lg shop"></i>Shop</span><span><i class="lg cave"></i>Cave</span><span><i class="lg star"></i>Secret found</span><span><i class="lg pin"></i>Your marker</span>
+      <em class="desk-only">Click to place a marker · click it again to remove · M / Esc to close</em>
+      <em class="touch-only">Tap to place a marker · tap it again to remove</em>
+    </div>
+  </div>
+</div>
 <!-- ═══════ Game over ═══════ -->
 <div id="gameover" class="overlay">
   <div class="panel">
     <h2 class="danger">SYSTEM FAILURE</h2>
     <div class="muted" id="go-sector"></div>
     <div class="stats" id="go-stats"></div>
-    <p class="muted small-text">Retrying restores your hotbar, Botbucks, upgrades and squad from when you arrived.</p>
+    <p class="muted small-text">You'll be rebuilt at home base with your hotbar, Botbucks and squad from your last save. Beacons, bosses, caches and secrets stay done.</p>
     <div class="row">
-      <button class="btn primary" id="btn-retry">Retry Biome</button>
-      <button class="btn" id="btn-go-home">Return Home</button>
+      <button class="btn primary" id="btn-retry">Rebuild at Home Base</button>
       <button class="btn ghost" id="btn-go-menu">Main Menu</button>
     </div>
   </div>
@@ -247,7 +270,9 @@
 <script src="js/post.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/models.js"></script>
+<script src="js/terrain.js"></script>
 <script src="js/world.js"></script>
+<script src="js/worldmap.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/touch.js"></script>
 <script src="js/ui.js"></script>
