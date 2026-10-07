@@ -127,6 +127,7 @@
     <div class="menu-buttons">
       <button class="btn primary big" id="btn-continue">Continue</button>
       <button class="btn big" id="btn-start">New Expedition</button>
+      <button class="btn desk-only" id="btn-split">Split Screen · 2 Players</button>
       <button class="btn" id="btn-howto">How to Play</button>
     </div>
     <div class="howto hidden" id="howto">
@@ -176,6 +177,7 @@
         <div><kbd>View / Menu</kbd><span>World map · pause</span></div>
         <div><kbd>Menus</kbd><span>Stick or D-pad moves the cursor · <b>A</b> select · <b>B</b> back · right stick scrolls · <b>LB/RB</b> tabs</span></div>
       </div>
+      <p class="desk-only"><b>Split screen:</b> two players on one screen, with two controllers or a controller plus the keyboard &amp; mouse. You share the world and home base, but each of you has your own hotbar, Botbucks, gear and bots.</p>
       <p><b>Halloway Works</b>, your home base: Wren's <b>Workshop</b> (build bots, base systems and new rooms),
         the <b>Charging Bay</b> (bots recharge here) and <b>Storage</b> (unlimited). Build the <b>Garage</b> (gear),
         <b>Lab</b> (research, memories) and <b>Command Room</b> (quick travel, recall) to open them up.
@@ -190,6 +192,28 @@
         until the boss falls.</p>
     </div>
     <div class="menu-foot">one connected world · caves &amp; waterfalls · robot villages · an underwater realm · 7 theme songs · 5 Wardens · a home to come back to</div>
+  </div>
+</div>
+
+<!-- ═══════ Split screen: who plays with what ═══════ -->
+<div id="split" class="overlay">
+  <div class="panel">
+    <h2>SPLIT SCREEN</h2>
+    <div class="muted small-text">Two players, one screen, one world. Each player joins with a controller — or one of you with the keyboard &amp; mouse.</div>
+    <div class="split-slots">
+      <div class="split-slot" id="ss-0"></div>
+      <div class="split-slot" id="ss-1"></div>
+    </div>
+    <p class="muted small-text">Controller: <b>A</b> join · <b>B</b> leave · <b>X</b> swap · <b>Start</b> begin<br>Keyboard: <b>Enter</b> join / begin · <b>Esc</b> back</p>
+    <div class="row">
+      <button class="btn" id="split-kbm">Join with Keyboard &amp; Mouse</button>
+      <button class="btn" id="split-swap">Swap Players</button>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="split-go" disabled>Start</button>
+      <button class="btn ghost" id="split-back">Back</button>
+    </div>
+    <p class="muted small-text">Plays your saved world (or starts a new one). The world, home storage and base are shared; each player has their own hotbar, Botbucks, gear, upgrades and bots.</p>
   </div>
 </div>
 
@@ -307,6 +331,7 @@
 <script src="js/gamepad.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/story.js"></script>
+<script src="js/split.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

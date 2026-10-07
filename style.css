@@ -584,8 +584,8 @@ body.touch #stamina { left: calc(50% + 36px); width: 36px; height: 36px; top: ca
 #frost-overlay, #burn-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s; }
 #frost-overlay { background: radial-gradient(ellipse at center, transparent 35%, rgba(170,230,255,0.55) 100%); box-shadow: inset 0 0 120px rgba(200,240,255,0.7); }
 #burn-overlay { background: radial-gradient(ellipse at center, transparent 50%, rgba(255,90,20,0.35) 100%); }
-body.frozen #frost-overlay { opacity: 1; }
-body.burning #burn-overlay { opacity: 1; animation: burnflick .25s infinite alternate; }
+#hud.frozen #frost-overlay { opacity: 1; }
+#hud.burning #burn-overlay { opacity: 1; animation: burnflick .25s infinite alternate; }
 @keyframes burnflick { from { opacity: .7; } to { opacity: 1; } }
 .sq i.bt { bottom: 8px; }
 .sq i.bt u { background: #ffd23f; }
@@ -746,3 +746,33 @@ body.talking #pad-hint { opacity: 0; }
   background: rgba(10,18,30,0.88); border: 1px solid rgba(60,242,255,0.5); color: #dff6ff; font-size: 14px; letter-spacing: 0.5px;
   pointer-events: none; z-index: 9999; opacity: 0; transition: opacity 0.25s, transform 0.25s; }
 #pad-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ═════════════════════════ SPLIT SCREEN ═════════════════════════ */
+.split-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: min(560px, 80vw); margin: 6px 0; }
+.split-slot { --c: #3cf2ff; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 12px; border: 2px dashed rgba(255,255,255,0.18);
+  background: rgba(10,18,30,0.6); text-align: center; min-height: 92px; justify-content: center; }
+.split-slot b { font-family: Orbitron, sans-serif; letter-spacing: 2px; color: var(--c); }
+.split-slot span { color: #b9c9df; font-size: 15px; }
+.split-slot.ready { border: 2px solid var(--c); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 35%, transparent); }
+.split-slot.ready span { color: #fff; font-weight: 600; }
+/* the two halves: compass top-centre, quest panel under it on the left, radar top-right,
+   hull bottom-left, hotbar bottom-right */
+body.split #hud.p1 { right: 50%; }
+body.split #hud.p2 { left: 50%; }
+body.split::after { content: ''; position: fixed; top: 0; bottom: 0; left: 50%; width: 3px; transform: translateX(-50%); background: #05060a; z-index: 7; pointer-events: none; }
+body.split #keys-hint, body.split #pad-hint { display: none !important; }
+body.split #compass-wrap { width: min(300px, 44vw); height: 38px; top: 8px; }
+body.split #compass { width: 100%; height: 100%; }
+body.split #objective { top: 56px; left: 12px; width: 230px; padding: 8px 12px; }
+body.split #objective #obj-text { font-size: 15px; }
+body.split #bossbar { top: 54px; width: 40%; left: auto; right: 132px; transform: none; }
+body.split #radar { width: 110px; height: 110px; top: 56px; right: 12px; bottom: auto; }
+body.split #vitals { left: 12px; bottom: 12px; width: 218px; padding: 8px 10px; }
+body.split #bottom-center { left: auto; right: 12px; bottom: 12px; transform: scale(0.78); transform-origin: bottom right; align-items: flex-end; }
+body.split #feed { top: 180px; right: 12px; }
+body.split #banner { width: 45vw; top: 30%; }
+body.split #hint { bottom: 120px; max-width: 42vw; white-space: normal; text-align: center; }
+body.split #prompt { max-width: 42vw; white-space: normal; text-align: center; }
+body.split > #dialog { position: fixed; z-index: 7; bottom: 140px; width: min(600px, 60vw); }
+.split-tag { position: absolute; top: 12px; left: 12px; font-family: Orbitron, sans-serif; font-weight: 900; font-size: 13px;
+  letter-spacing: 3px; color: var(--c); padding: 2px 10px; border-radius: 8px; background: rgba(5,6,10,0.55); }

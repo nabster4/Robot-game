@@ -136,7 +136,8 @@ const Story = {
     fade.style.transition = 'none'; fade.style.opacity = 1;
     setTimeout(() => { fade.style.transition = 'opacity 2.5s'; fade.style.opacity = 0; }, 400);
     Dialog.clear();
-    setTimeout(() => Dialog.say(STORY.opening, () => { if (G.cine) G.cine.phase = 'sit'; }), 1200);
+    // (only if the opening is still playing: skipping it straight away shouldn't leave its lines behind)
+    setTimeout(() => { if (G.cine) Dialog.say(STORY.opening, () => { if (G.cine) G.cine.phase = 'sit'; }); }, 1200);
   },
   endOpening() {
     const p = G.player, W = World.wakeSpot;

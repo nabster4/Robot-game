@@ -1,5 +1,11 @@
 'use strict';
-const $ = (id) => document.getElementById(id);
+// In split screen player 2 has a copy of the HUD (same ids, inside a second #hud root); while it's player 2's
+// turn, UI.root points at that copy and lookups find the copy first.
+const $ = (id) => {
+  const r = UI.root;
+  if (r) { if (r.id === id) return r; const e = r.querySelector('#' + id); if (e) return e; }
+  return document.getElementById(id);
+};
 
 const UI = {
   tab: 'companion',
@@ -65,17 +71,20 @@ const UI = {
     this.radar = $('radar').getContext('2d');
   },
 
+  // every HUD on screen (two in split screen)
+  huds(fn) { document.querySelectorAll('#hud').forEach(fn); },
+
   hideAll() {
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
-    $('hud').classList.toggle('show', G.state === 'playing');
+    this.huds((h) => h.classList.toggle('show', G.state === 'playing'));
   },
   show(id) {
     Touch.reset();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
     $(id).classList.add('show');
-    $('hud').classList.toggle('show', id === 'workshop' || id === 'pause');
-    $('hud').classList.toggle('dim', id === 'workshop' || id === 'pause');
+    this.huds((h) => h.classList.toggle('show', id === 'workshop' || id === 'pause'));
+    this.huds((h) => h.classList.toggle('dim', id === 'workshop' || id === 'pause'));
   },
 
   pause() {
@@ -92,7 +101,7 @@ const UI = {
     if (G.state === 'paused' || G.state === 'workshop') {
       G.state = 'playing';
       Input.mouse.down = false;
-      $('hud').classList.remove('dim');
+      this.huds((h) => h.classList.remove('dim'));
       this.hideAll();
       Input.lock(canvas);
     }
@@ -112,6 +121,7 @@ const UI = {
 
   toMenu() {
     Sound.play('click');
+    if (Split.on) { saveGame(); Split.stop(); }
     G.state = 'menu';
     G.companions.forEach((c) => c.destroy());
     G.companions = [];
@@ -120,7 +130,7 @@ const UI = {
     Input.unlock();
     $('btn-continue').style.display = hasSave() ? '' : 'none';
     this.show('menu');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   saveSettings() { try { localStorage.setItem('sf-view', G.settings.view); } catch (e) { /* storage unavailable */ } },
@@ -149,7 +159,7 @@ const UI = {
     $('go-sector').textContent = G.region ? G.region.name : 'The Outlands';
     $('go-stats').innerHTML = this.statsHTML(G.stats);
     this.show('gameover');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   showVictory() {
@@ -157,7 +167,7 @@ const UI = {
     $('v-stats').innerHTML = this.statsHTML(G.total) + `<div class="stat"><b>${G.total.crafted || 0}</b><span>Items crafted</span></div>`;
     Sound.setIntensity(0);
     this.show('victory');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   // ═════════════════════════ Items ═════════════════════════
@@ -194,7 +204,7 @@ const UI = {
       command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
       journal: ['JOURNAL', 'Your quests and the memories you have recovered. Time is paused.'],
     }[mode];
-    $('ws-title').textContent = T[0];
+    $('ws-title').textContent = (Split.on ? `P${Split.idx + 1} · ` : '') + T[0];   // whose menu this is
     $('ws-sub').textContent = T[1];
     $('ws-title').style.color = mode === 'shop' && shop ? shop.color : '';
     $('ws-continue').textContent = mode === 'field' || mode === 'journal' ? 'Resume ▸' : 'Leave ▸';
@@ -630,6 +640,7 @@ const UI = {
 
   // ═════════════════════════ HUD messages ═════════════════════════
   banner(text, sub, color, dur = 3) {
+    if (Split.broadcast(() => this.banner(text, sub, color, dur))) return;   // news for both players
     const b = $('banner');
     $('banner-title').textContent = text;
     $('banner-sub').textContent = sub || '';
@@ -640,9 +651,10 @@ const UI = {
   },
 
   hint(text) {
-    const now = performance.now();
-    if (this.hintLast[text] && now - this.hintLast[text] < 25000) return;
-    this.hintLast[text] = now;
+    if (Split.broadcast(() => this.hint(text))) return;
+    const now = performance.now(), key = (this.root ? 'p2|' : '') + text;
+    if (this.hintLast[key] && now - this.hintLast[key] < 25000) return;
+    this.hintLast[key] = now;
     const h = $('hint');
     h.textContent = text;
     h.classList.remove('show'); void h.offsetWidth; h.classList.add('show');
@@ -651,6 +663,7 @@ const UI = {
   },
 
   feed(text, color, part) {
+    if (Split.broadcast(() => this.feed(text, color, part))) return;
     const f = $('feed');
     const el = document.createElement('div');
     el.className = 'feed-item';
@@ -717,8 +730,8 @@ const UI = {
     $('fuel-row').classList.toggle('show', !!G.gear.jetpack);
     if (G.gear.jetpack) { $('bar-fuel').style.width = p.fuel + '%'; $('val-fuel').textContent = p.jetting ? 'BURN' : p.fuel >= 100 ? 'FULL' : ''; }
     $('hud-bucks').textContent = G.bucks;
-    document.body.classList.toggle('frozen', p.frozenT > 0 && !p.dead);
-    document.body.classList.toggle('burning', p.burnT > 0 && !p.dead);
+    $('hud').classList.toggle('frozen', p.frozenT > 0 && !p.dead);
+    $('hud').classList.toggle('burning', p.burnT > 0 && !p.dead);
     // depth gauge while swimming
     const dEl = $('depth');
     dEl.classList.toggle('show', !!p.swim && !p.dead);
@@ -861,11 +874,14 @@ const UI = {
     for (const S of World.shops) if (near(S.x, S.z, 260)) M.push({ x: S.x, z: S.z, color: '#ffd23f', shape: 'square', range: 260 });
     for (const c of World.caves) if (c.found || near(c.mouth.x, c.mouth.z, 60)) { if (near(c.mouth.x, c.mouth.z, 140)) M.push({ x: c.mouth.x, z: c.mouth.z, color: '#b98cff', shape: 'cave', range: 140 }); }
     for (const pin of G.progress.world.pins) M.push({ x: pin.x, z: pin.z, color: pin.c, shape: 'pin', label: true });
+    // split screen: where your partner is
+    if (Split.on) Split.ctxs.forEach((c, i) => { const q = Split.pl(c); if (q !== p) M.push({ x: q.pos.x, z: q.pos.z, color: SPLIT_COLORS[i], shape: 'ring', label: true, big: true }); });
     return M;
   },
 
   // a memory fragment / story log found in a cave
   showLore(L, n, total) {
+    if (Split.broadcast(() => this.showLore(L, n, total))) return;
     let el = $('lore');
     if (!el) { el = document.createElement('div'); el.id = 'lore'; $('hud').appendChild(el); }
     el.innerHTML = `<span class="lore-n">MEMORY ${n} / ${total}</span><div class="lore-from">${L.from}</div><div class="lore-text">${L.text}</div>`;
@@ -964,6 +980,7 @@ const UI = {
     for (const s of G.spawns) dot(s.x, s.z, '#ffffff', 2);
     for (const e of G.enemies) if (!e.hidden) dot(e.pos.x, e.pos.z, e.isBoss ? e.color : e.elite ? '#ffd700' : e.aggro ? '#ff3b5c' : '#ff8a6a', e.isBoss ? 5 : e.r > 1.5 ? 3.5 : 2.5, e.isBoss);
     for (const c of G.companions) if (c.inScene) dot(c.pos.x, c.pos.z, c.d.color, 2);
+    if (Split.on) Split.ctxs.forEach((c, i) => { const q = Split.pl(c); if (q !== p && !q.dead) dot(q.pos.x, q.pos.z, SPLIT_COLORS[i], 4, true); });
     g.restore();
     g.strokeStyle = 'rgba(60,242,255,0.4)'; g.lineWidth = 1.5;
     g.beginPath(); g.arc(R, R, R - 2, 0, TAU); g.stroke();

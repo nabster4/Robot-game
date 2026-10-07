@@ -6,7 +6,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NoToneMapping;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 750);
+// `let`: in split screen each player has a camera, swapped in for their turn (see split.js)
+let camera = new THREE.PerspectiveCamera(75, 1, 0.05, 750);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const post = new PostFX(renderer);
@@ -24,6 +25,7 @@ function resize() {
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   camera.aspect = W / H; camera.updateProjectionMatrix();
   post.setSize(W, H, DPR);
+  if (Split.on) Split.resize();
 }
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c3 = new THREE.Vector3(), _cv = new THREE.Vector3();
@@ -231,8 +233,9 @@ const G = {
   hint(text) { UI.hint(text); },
 
   vol(pos) {
-    const p = this.player.pos;
-    return 1 / (1 + Math.hypot(pos.x - p.x, pos.z - p.z) / 18);
+    let d = 1e9;
+    for (const q of Split.players()) d = Math.min(d, Math.hypot(pos.x - q.pos.x, pos.z - q.pos.z));
+    return 1 / (1 + d / 18);
   },
 
   nearestEnemy(x, z, maxD, exclude, aggroOnly) {
@@ -324,21 +327,21 @@ const G = {
     if (speed > 300) m.scale.set(0.7, 0.7, 2.6);
     _a.set(x + dir.x, y + dir.y, z + dir.z); m.lookAt(_a);
     scene.add(m);
-    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life, mesh: m, fromPlayer, home });
+    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life, mesh: m, fromPlayer, home, owner: Split.idx });
   },
 
   // player rocket: flies straight (aim assist nudges it), big splash that hurts you too
   spawnRocket(x, y, z, dir, speed, dmg, splash, home) {
     const m = new THREE.Mesh(missileGeo, Mat.glow('#c6ff4d', 3));
     m.scale.setScalar(1.8); m.position.set(x, y, z); scene.add(m);
-    this.bullets.push({ kind: 'rocket', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color: '#c6ff4d', life: 3, mesh: m, splash, fromPlayer: true, home });
+    this.bullets.push({ kind: 'rocket', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color: '#c6ff4d', life: 3, mesh: m, splash, fromPlayer: true, home, owner: Split.idx });
   },
 
   // Bomber Bot payload
   spawnBomb(pos, vel, dmg) {
     const m = new THREE.Mesh(bulletGeo, Mat.glow('#ff7a3d', 4));
     m.scale.setScalar(0.25); m.position.copy(pos); scene.add(m);
-    this.bullets.push({ kind: 'grenade', bomb: true, pos: pos.clone(), vel, dmg, color: '#ff7a3d', life: 4, mesh: m });
+    this.bullets.push({ kind: 'grenade', bomb: true, pos: pos.clone(), vel, dmg, color: '#ff7a3d', life: 4, mesh: m, owner: Split.idx });
   },
 
   spawnMissile(x, y, z, vel, dmg, target) {
@@ -350,7 +353,7 @@ const G = {
   spawnGrenade(pos, vel) {
     const m = new THREE.Mesh(bulletGeo, Mat.glow('#b98cff', 5));
     m.scale.setScalar(0.18); m.position.copy(pos); scene.add(m);
-    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 40 + this.level * 8, color: '#b98cff', life: 4, mesh: m });
+    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 40 + this.level * 8, color: '#b98cff', life: 4, mesh: m, owner: Split.idx });
   },
 
   // opts: { effect: 'frost'|'fire'|'freeze', grav, splash, life, marker, big }
@@ -391,8 +394,9 @@ const G = {
     Fx.explosion(p.pos.x, p.pos.y + 1, p.pos.z, '#3cf2ff', 2);
     Fx.addShake(1);
     Sound.play('explode', true); Sound.play('lose');
-    this.dying = 2.4; this.timeScale = 0.35;
-    Sound.setIntensity(0);
+    this.dying = 2.4;
+    // split screen: no slow motion (the other player is still fighting); you're rebuilt at home
+    if (!Split.on) { this.timeScale = 0.35; Sound.setIntensity(0); }
     Input.mouse.down = false;
   },
 
@@ -492,13 +496,16 @@ function newRun() {
 const SAVE_VERSION = 3;
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
+  // the save is written from player 1's point of view (player 2's character is added as `p2`)
+  if (Split.on && Split.idx !== 0) return Split.as(Split.ctxs[0], stateJSON, false);
   const p = G.player;
   const W = G.progress.world;
   W.fog = WorldMap.packFog();
   return JSON.stringify({ v: SAVE_VERSION, bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
     up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: p.hp, total: G.total,
     reserve: G.reserve.map((e) => ({ kind: e.kind, battery: G.reserveBattery(e), hp: e.hp })), vessels: G.vessels, spritesFound: G.spritesFound,
-    pos: G.safeSpot ? [G.safeSpot.x, G.safeSpot.y, G.safeSpot.z, G.safeSpot.yaw] : null });
+    pos: G.safeSpot ? [G.safeSpot.x, G.safeSpot.y, G.safeSpot.z, G.safeSpot.yaw] : null,
+    p2: Split.on ? Split.charJSON(1) : G.p2Data || undefined });
 }
 function applyState(json) {
   const s = JSON.parse(json);
@@ -533,6 +540,7 @@ function applyState(json) {
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
   G.weapon = s.weapon || 'blaster';
   G.savedPos = s.pos;
+  G.p2Data = s.p2 || null;
   G.checkWeapon();
   setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
   UI.hotbarDirty = true;
@@ -663,8 +671,7 @@ function updateRegion(dt, force) {
   G.region = R; G.regionT = 0;
   G.where = R === REGIONS.hub ? 'hub' : 'biome';
   G.level = R.tier;
-  Weather.init(scene, R.ambient, R.ambientColor || R.accent);
-  Sound.setZone(R.zone);
+  if (Split.idx === 0) { Weather.init(scene, R.ambient, R.ambientColor || R.accent); Sound.setZone(R.zone); }
   if (G.where === 'hub') arriveHome(first);
   else if (!first) UI.banner(R.name.toUpperCase(), regionIntro(R), R.accent, 3);
   void was;
@@ -736,10 +743,9 @@ function streamCamps(dt) {
   G.campT -= dt;
   if (G.campT > 0) return;
   G.campT = 0.5;
-  const p = G.player;
   let live = G.enemies.length;
   for (const c of World.campSites) {
-    const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
+    const d = Split.nearestDist(c.x, c.z);   // camps wake around either player
     if (!c.live) {
       if (d < CAMP_WAKE && d > 40 && G.time > (c.respawnAt || 0) && live < 46 && !World.domeTrap) {
         c.live = true; c.alerted = false;
@@ -864,9 +870,11 @@ function updateObjectives(dt) {
   for (const b of World.beacons) {
     if (b.state !== 'charging') continue;
     const Z = ZONES[b.biome], tier = b.biome;
-    const dist = Math.hypot(p.pos.x - b.x, p.pos.z - b.z);
-    const inside = dist < 14 && Math.abs(p.pos.y - b.y) < 12;
-    if (dist > 140 || p.dead) {
+    // any living player keeps the uplink going
+    const alive = Split.players().filter((q) => !q.dead);
+    const dist = alive.reduce((m, q) => Math.min(m, Math.hypot(q.pos.x - b.x, q.pos.z - b.z)), 1e9);
+    const inside = alive.some((q) => Math.hypot(q.pos.x - b.x, q.pos.z - b.z) < 14 && Math.abs(q.pos.y - b.y) < 12);
+    if (dist > 140) {
       // walked away: the uplink drops
       b.state = 'idle'; b.progress = 0; World.setBeaconColor(b, '#ffb347');
       for (const e of G.enemies) e.hunter = false;
@@ -892,10 +900,11 @@ function updateObjectives(dt) {
     if (b.progress >= 1) beaconOnline(b);
   }
   // walking into an open dome starts the fight
-  if (!World.domeTrap && !p.dead) {
-    for (const A of World.arenas) {
-      if (A.sealed || G.progress.beaten[A.i]) continue;
-      if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r - 6 && Math.abs(p.pos.y - A.y) < 12) { startBossFight(A); break; }
+  if (!World.domeTrap) {
+    for (const { ctx, p: q } of Split.targets()) {
+      if (q.dead) continue;
+      const A = World.arenas.find((a) => !a.sealed && !G.progress.beaten[a.i] && Math.hypot(q.pos.x - a.x, q.pos.z - a.z) < a.r - 6 && Math.abs(q.pos.y - a.y) < 12);
+      if (A) { Split.as(ctx, () => startBossFight(A)); break; }
     }
   }
 }
@@ -944,6 +953,7 @@ function startBossFight(A) {
   Sound.play('warn');
   Sound.play('slam');
   Sound.setIntensity(2);
+  if (Split.on) Split.joinFight(A);
 }
 
 // ─────────── Secrets, Scrap Sprites & the map ───────────
@@ -1047,11 +1057,26 @@ function respawnHome() {
 function update(dt) {
   G.time += dt;
   G.stats.time += dt;
-  const p = G.player;
+  // each player's own turn (in split screen, both players, one after the other)
+  if (Split.on) {
+    for (const c of Split.ctxs) {
+      Split.as(c, () => updatePlayer(dt));
+      if (G.state !== 'playing') { Split.menuCtx = c; return; }
+    }
+  } else {
+    updatePlayer(dt);
+    if (G.state !== 'playing') return;
+  }
+  updateWorld(dt);
+}
 
+// one player's input, movement, interactions, exploring and region
+function updatePlayer(dt) {
+  const p = G.player;
   if (G.dying > 0) {
     G.dying -= dt / Math.max(0.1, G.timeScale);
     if (G.dying <= 0) {
+      if (Split.on) { Split.respawn(); return; }
       Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
       G.state = 'gameover';
       Input.unlock();
@@ -1059,6 +1084,9 @@ function update(dt) {
       return;
     }
   } else if (!p.dead && !G.levelDone && !G.cine) {
+    // in split screen each player opens their own field kit and pause menu
+    if (Split.on && (Input.hit('Tab') || Input.hit('KeyI'))) { UI.openStation('field'); return; }
+    if (Split.on && (Input.hit('Escape') || Input.hit('KeyP'))) { UI.pause(); return; }
     if (Input.hit('KeyV')) UI.toggleView();
     if (Input.hit('KeyJ')) { UI.openStation('journal'); return; }
     // hotbar: number keys / mouse wheel select a slot, X drops the selected item
@@ -1073,12 +1101,16 @@ function update(dt) {
     if (Input.hit('KeyM')) { WorldMap.open(); return; }
     explore(dt);
   }
-
-  Story.update(dt);
   Wardens.update(dt, G.time);
   if (G.recallT > 0) { G.recallT -= dt; if (Math.random() < dt * 30) Fx.glowBurst(p.pos.x + rand(-1, 1), p.pos.y + rand(0, 2), p.pos.z + rand(-1, 1), '#3cf2ff', 0.6, 0.4, 2); if (G.recallT <= 0 && !p.dead && !World.domeTrap) G.travelTo(World.spawn.x, World.spawn.z, undefined, 'Home Base'); }
   if (Input.hit('Enter')) Dialog.skip();
   updateRegion(dt);
+}
+
+// everything shared: the story, camps, objectives, robots, bots, shots and pickups
+function updateWorld(dt) {
+  const p = G.player;
+  Story.update(dt);
   streamCamps(dt);
   updateObjectives(dt);
   G.vacuumT = Math.max(0, (G.vacuumT || 0) - dt);
@@ -1094,6 +1126,7 @@ function update(dt) {
       scene.remove(s.beam);
       if (s.type === 'boss') {
         const b = new Boss(s.boss, s.x, s.z);
+        if (Split.on) b.maxHp = b.hp = Math.round(b.maxHp * Split.bossHpScale());   // tougher with two in the dome
         G.boss = b; G.enemies.push(b);
         Fx.explosion(s.x, s.y + 4, s.z, b.color, 3);
         Fx.addShake(0.8);
@@ -1111,7 +1144,8 @@ function update(dt) {
   for (const e of G.enemies) {
     if (e.dead) continue;
     if (e.doomT !== undefined) { e.doomT -= dt; if (e.doomT <= 0) G.killEnemy(e, true); continue; }
-    e.update(dt);
+    if (Split.on) Split.as(Split.targetOf(e), () => e.update(dt), false);
+    else e.update(dt);
   }
   const E = G.enemies;
   for (let i = 0; i < E.length; i++) {
@@ -1132,7 +1166,7 @@ function update(dt) {
     }
   }
 
-  if (!p.dead) G.companions.forEach((c, i) => c.update(dt, i, G.companions.length));
+  Split.each(() => { if (!G.player.dead) G.companions.forEach((c, i) => c.update(dt, i, G.companions.length)); });
 
   updateBullets(dt);
   updateEnemyBullets(dt);
@@ -1164,7 +1198,7 @@ function update(dt) {
   if (G.musicT <= 0) {
     G.musicT = 1;
     if (G.objective !== 'boss') {
-      const hunted = G.enemies.some((e) => e.aggro && Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) < 55) || World.beacons.some((b) => b.state === 'charging');
+      const hunted = Split.players().some((q) => G.enemies.some((e) => e.aggro && Math.hypot(e.pos.x - q.pos.x, e.pos.z - q.pos.z) < 55)) || World.beacons.some((b) => b.state === 'charging');
       Sound.setIntensity(hunted ? 1 : 0);
     }
   }
@@ -1222,7 +1256,7 @@ function updateBullets(dt) {
         b.dead = true;
         const gy = Math.max(b.pos.y, World.heightAt(b.pos.x, b.pos.z) + 0.3);
         const R = b.bomb ? 5 : 5.5;
-        explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 1.8, b.bomb ? 12 : 25);
+        Split.asIdx(b.owner, () => explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 1.8, b.bomb ? 12 : 25));
         Fx.shockRing(b.pos.x, gy, b.pos.z, b.bomb ? '#ffb38a' : '#e0ccff', R * 0.5, 50);
         if (!b.bomb) for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 6) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
         Fx.addShake(0.5 * G.vol(b.pos) * 2);
@@ -1281,7 +1315,7 @@ function updateBullets(dt) {
     }
     const boom = () => {
       const selfDmg = b.kind === 'rocket' ? 35 : 0;
-      explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, b.kind === 'rocket' ? 1.4 : 0.7, selfDmg);
+      Split.asIdx(b.owner, () => explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, b.kind === 'rocket' ? 1.4 : 0.7, selfDmg));
       if (b.kind === 'rocket') { Fx.shockRing(b.pos.x, b.pos.y, b.pos.z, '#e8ffb0', 3, 40); Fx.addShake(0.4 * G.vol(b.pos) * 2); Sound.play('bomb', null, Math.min(1, G.vol(b.pos) * 2)); }
       else Sound.play('explode', false, G.vol(b.pos));
     };
@@ -1291,13 +1325,13 @@ function updateBullets(dt) {
         Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 8, '#ffd1f2', 8);
         Sound.play('block', null, G.vol(hit.pos));
         hit.flash = Math.max(hit.flash, 0.3);
-        if (b.fromPlayer) UI.hitmarker(false, true);
+        if (b.fromPlayer) Split.asIdx(b.owner, () => UI.hitmarker(false, true));
         continue;
       }
       if (b.kind === 'missile' || b.kind === 'rocket') boom();
       else {
         G.damageEnemy(hit, b.dmg, b.pos.x, b.pos.y, b.pos.z, b.color);
-        if (b.fromPlayer) UI.hitmarker(false);
+        if (b.fromPlayer) Split.asIdx(b.owner, () => UI.hitmarker(false));
       }
       continue;
     }
@@ -1318,7 +1352,7 @@ function applyShotEffect(p, eff) {
 }
 
 function updateEnemyBullets(dt) {
-  const p = G.player;
+  const PL = Split.targets();   // [{ ctx, p }] — just the one player outside split screen
   const HD = World.homeDome;
   for (const b of G.ebullets) {
     if (b.dead) continue;
@@ -1348,13 +1382,15 @@ function updateEnemyBullets(dt) {
         Fx.explosion(b.pos.x, b.pos.y, b.pos.z, b.color, 1.3);
         Fx.shockRing(b.pos.x, Math.max(b.pos.y, ground) + 0.2, b.pos.z, b.color, b.splash * 0.6, 30);
         Sound.play('explode', false, G.vol(b.pos));
-        const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
-        if (pd < b.splash && !p.dead) { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); }
+        for (const { ctx, p } of PL) {
+          const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
+          if (pd < b.splash && !p.dead) Split.as(ctx, () => { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); });
+        }
         if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3, fromBoss: b.fromBoss });
       } else Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4);
       continue;
     }
-    for (const c of G.companions) {
+    for (const c of Split.allCompanions()) {
       if (!c.active) continue;
       const pad = c.kind === 'shield' ? 0.5 : 0;
       if (b.pos.distanceToSquared(c.pos) < (c.r + b.r + pad) ** 2) {
@@ -1365,32 +1401,46 @@ function updateEnemyBullets(dt) {
         break;
       }
     }
-    if (b.dead || p.dead) continue;
-    // swept test: fast shots must not skip through you between frames
-    let touch = false;
-    const steps = Math.min(8, Math.ceil(Math.hypot(b.pos.x - px0, b.pos.y - py0, b.pos.z - pz0) / 0.5));
-    for (let k = 1; k <= steps && !touch; k++) {
-      const f = k / steps;
-      touch = segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, lerp(px0, b.pos.x, f), lerp(py0, b.pos.y, f), lerp(pz0, b.pos.z, f)) < 0.45 + b.r;
-    }
-    if (touch) {
+    if (b.dead) continue;
+    for (const { ctx, p } of PL) {
+      if (p.dead) continue;
+      // swept test: fast shots must not skip through you between frames
+      let touch = false;
+      const steps = Math.min(8, Math.ceil(Math.hypot(b.pos.x - px0, b.pos.y - py0, b.pos.z - pz0) / 0.5));
+      for (let k = 1; k <= steps && !touch; k++) {
+        const f = k / steps;
+        touch = segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, lerp(px0, b.pos.x, f), lerp(py0, b.pos.y, f), lerp(pz0, b.pos.z, f)) < 0.45 + b.r;
+      }
+      if (!touch) continue;
       if (b.hugH && b.life > 1 && b.vel.lengthSq() < 1) {
         // lingering fire patch: burns while you stand in it
-        if (p.invuln <= 0) { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); }
+        if (p.invuln <= 0) Split.as(ctx, () => { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); });
         continue;
       }
       b.dead = true;
       if (b.marker) scene.remove(b.marker);
-      if (p.dashT <= 0) { p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); applyShotEffect(p, b.effect); }
+      if (p.dashT <= 0) Split.as(ctx, () => { p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); applyShotEffect(p, b.effect); });
+      break;
     }
   }
 }
 
 function updatePickups(dt) {
+  if (!Split.on) pickupsFor(dt, G.pickups);
+  else {
+    const groups = Split.ctxs.map(() => []);
+    for (const k of G.pickups) groups[Split.nearestIdx(k.pos)].push(k);
+    Split.ctxs.forEach((c, i) => { if (groups[i].length) Split.as(c, () => pickupsFor(dt, groups[i])); });
+  }
+  G.pickups = G.pickups.filter((k) => !k.dead);
+}
+
+// pickups pulled toward and collected by the current player
+function pickupsFor(dt, list) {
   const p = G.player;
   const mag = p.magnet;
   const vacuum = G.vacuumT > 0;
-  for (const k of G.pickups) {
+  for (const k of list) {
     k.t += dt;
     const needsSlot = k.type !== 'health' && k.type !== 'bucks';
     const full = needsSlot && !G.canAdd(k.item || { t: 'part', id: k.type });
@@ -1429,7 +1479,6 @@ function updatePickups(dt) {
     }
     if (k.t > 90 && !k.pulled) { k.dead = true; scene.remove(k.model); }
   }
-  G.pickups = G.pickups.filter((k) => !k.dead);
 }
 
 // ═════════════════════════ Camera, view model & avatar ═════════════════════════
@@ -1484,7 +1533,8 @@ function updateAvatar(dt) {
     Fx.smoke(p.pos.x + rx * side * 0.14, p.pos.y + 0.05, p.pos.z + rz * side * 0.14, 0.35, 0.6, rand(-0.3, 0.3), 0.4, rand(-0.3, 0.3), '#6a5a50');
   }
 
-  const show = G.thirdPerson && !p.dead && G.state !== 'menu';
+  // in split screen the robot is always animated: the other player sees it
+  const show = (G.thirdPerson || Split.on) && !p.dead && G.state !== 'menu';
   a.visible = show;
   if (!show) return;
 
@@ -1699,21 +1749,27 @@ function frame(now) {
   const dt = clamp((now - lastT) / 1000, 0, 0.05);
   lastT = Math.max(lastT, now);
   Pad.poll(dt);
+  if (Split.on) Split.rest();
+  const hit = (c) => (Split.on ? Split.anyHit(c) : Input.hit(c));
 
   if (G.state === 'playing') {
-    if (Input.hit('Tab') || Input.hit('KeyI')) UI.openStation('field');
-    else if (Input.hit('Escape') || Input.hit('KeyP')) UI.pause();
+    if (!Split.on && (Input.hit('Tab') || Input.hit('KeyI'))) UI.openStation('field');
+    else if (!Split.on && (Input.hit('Escape') || Input.hit('KeyP'))) UI.pause();
     else {
-      const tsTarget = G.focus && G.dying <= 0 ? 0.4 : 1;
+      const tsTarget = G.focus && G.dying <= 0 && !Split.on ? 0.4 : 1;
       G.timeScale += (tsTarget - G.timeScale) * (1 - Math.exp(-(G.dying > 0 ? 0.5 : G.focus ? 8 : 2) * dt));
       const sdt = dt * G.timeScale;
       update(sdt);
-      if (G.state === 'playing' || G.state === 'gameover') updateCamera(sdt);
+      if (Split.on) Split.each(() => updateCamera(sdt));
+      else if (G.state === 'playing' || G.state === 'gameover') updateCamera(sdt);
       Fx.update(sdt, (x, z) => World.heightAt(x, z));
-      World.followSun(G.player.pos.x, G.player.pos.y, G.player.pos.z);
+      if (Split.on) Split.decayScreens(sdt);
+      else World.followSun(G.player.pos.x, G.player.pos.y, G.player.pos.z);
     }
-    UI.refreshHUD();
+    if (Split.on) Split.each(() => UI.refreshHUD());
+    else UI.refreshHUD();
   } else if (G.state === 'menu') {
+    if (Split.lobby) Split.lobbyKeys();
     menuT += dt;
     G.time += dt;
     const a = menuT * 0.05;
@@ -1723,22 +1779,26 @@ function frame(now) {
     World.followSun(0, hy, 0);
     Fx.update(dt, (x, z) => World.heightAt(x, z));
   } else if (G.state === 'workshop' || G.state === 'paused') {
-    if (Input.hit('Escape') || ((Input.hit('Tab') || Input.hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
+    if (hit('Escape') || ((hit('Tab') || hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
   } else if (G.state === 'map') {
-    if (Input.hit('Escape') || Input.hit('KeyM') || Input.hit('Tab')) WorldMap.close();
+    if (hit('Escape') || hit('KeyM') || hit('Tab')) WorldMap.close();
     else WorldMap.draw();
   }
-  if (Input.hit('KeyN')) UI.toggleMute();
+  if (hit('KeyN')) UI.toggleMute();
   document.body.classList.toggle('playing', G.state === 'playing');
   Touch.refresh();
 
-  World.update(dt, G.time, camera);
-  Weather.update(dt, camera.position, G.time);
-  const u = post.compMat.uniforms;
-  u.damage.value = Fx.damage;
-  u.tint.value.copy(Fx.tint); u.tintAmt.value = Fx.tintAmt;
-  post.render(scene, camera, G.time);
+  if (Split.on) Split.render(dt);
+  else {
+    World.update(dt, G.time, camera);
+    Weather.update(dt, camera.position, G.time);
+    const u = post.compMat.uniforms;
+    u.damage.value = Fx.damage;
+    u.tint.value.copy(Fx.tint); u.tintAmt.value = Fx.tintAmt;
+    post.render(scene, camera, G.time);
+  }
   Input.endFrame();
+  if (Split.on) Split.endFrame();
   requestAnimationFrame(frame);
 }
 
@@ -1772,6 +1832,7 @@ Input.onLockChange = (locked) => { if (!locked && G.state === 'playing' && !Inpu
 canvas.addEventListener('click', () => { if (G.state === 'playing' && !Input.locked) Input.lock(canvas); });
 Touch.init();
 Pad.init();
+Split.init();
 if (Touch.enabled) {
   // phones: performance mode by default (no shadows, reduced resolution, no MSAA)
   G.settings.quality = 'low';

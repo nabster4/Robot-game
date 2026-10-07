@@ -2,6 +2,8 @@
 
 Status: **planning only**. No game code has been changed. Line numbers refer to commit `c544663`.
 
+> **Update:** local **split-screen co-op** (two players on one screen) is now in the game (`js/split.js`). Instead of the full Phase 1 refactor, it swaps each player's state in and out of the existing globals around their turn. It already settles several of this plan's design questions for local play: rally into domes, boss health ×1.65, pausing menus, respawning at home with your inventory, and player 2's character in the save. Online co-op would still need the Phase 0–7 work below, but can reuse that per-player swapping as a starting point.
+
 ---
 
 ## Summary

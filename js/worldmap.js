@@ -99,7 +99,7 @@ const WorldMap = {
     Input.unlock();
     Touch.reset();
     this.el.classList.add('show');
-    $('hud').classList.remove('show');
+    UI.huds((h) => h.classList.remove('show'));
     Sound.play('click');
     this.resize();
     this.draw();

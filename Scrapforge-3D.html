@@ -601,8 +601,8 @@ body.touch #stamina { left: calc(50% + 36px); width: 36px; height: 36px; top: ca
 #frost-overlay, #burn-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .2s; }
 #frost-overlay { background: radial-gradient(ellipse at center, transparent 35%, rgba(170,230,255,0.55) 100%); box-shadow: inset 0 0 120px rgba(200,240,255,0.7); }
 #burn-overlay { background: radial-gradient(ellipse at center, transparent 50%, rgba(255,90,20,0.35) 100%); }
-body.frozen #frost-overlay { opacity: 1; }
-body.burning #burn-overlay { opacity: 1; animation: burnflick .25s infinite alternate; }
+#hud.frozen #frost-overlay { opacity: 1; }
+#hud.burning #burn-overlay { opacity: 1; animation: burnflick .25s infinite alternate; }
 @keyframes burnflick { from { opacity: .7; } to { opacity: 1; } }
 .sq i.bt { bottom: 8px; }
 .sq i.bt u { background: #ffd23f; }
@@ -764,6 +764,36 @@ body.talking #pad-hint { opacity: 0; }
   pointer-events: none; z-index: 9999; opacity: 0; transition: opacity 0.25s, transform 0.25s; }
 #pad-toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ═════════════════════════ SPLIT SCREEN ═════════════════════════ */
+.split-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: min(560px, 80vw); margin: 6px 0; }
+.split-slot { --c: #3cf2ff; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 12px; border: 2px dashed rgba(255,255,255,0.18);
+  background: rgba(10,18,30,0.6); text-align: center; min-height: 92px; justify-content: center; }
+.split-slot b { font-family: Orbitron, sans-serif; letter-spacing: 2px; color: var(--c); }
+.split-slot span { color: #b9c9df; font-size: 15px; }
+.split-slot.ready { border: 2px solid var(--c); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 35%, transparent); }
+.split-slot.ready span { color: #fff; font-weight: 600; }
+/* the two halves: compass top-centre, quest panel under it on the left, radar top-right,
+   hull bottom-left, hotbar bottom-right */
+body.split #hud.p1 { right: 50%; }
+body.split #hud.p2 { left: 50%; }
+body.split::after { content: ''; position: fixed; top: 0; bottom: 0; left: 50%; width: 3px; transform: translateX(-50%); background: #05060a; z-index: 7; pointer-events: none; }
+body.split #keys-hint, body.split #pad-hint { display: none !important; }
+body.split #compass-wrap { width: min(300px, 44vw); height: 38px; top: 8px; }
+body.split #compass { width: 100%; height: 100%; }
+body.split #objective { top: 56px; left: 12px; width: 230px; padding: 8px 12px; }
+body.split #objective #obj-text { font-size: 15px; }
+body.split #bossbar { top: 54px; width: 40%; left: auto; right: 132px; transform: none; }
+body.split #radar { width: 110px; height: 110px; top: 56px; right: 12px; bottom: auto; }
+body.split #vitals { left: 12px; bottom: 12px; width: 218px; padding: 8px 10px; }
+body.split #bottom-center { left: auto; right: 12px; bottom: 12px; transform: scale(0.78); transform-origin: bottom right; align-items: flex-end; }
+body.split #feed { top: 180px; right: 12px; }
+body.split #banner { width: 45vw; top: 30%; }
+body.split #hint { bottom: 120px; max-width: 42vw; white-space: normal; text-align: center; }
+body.split #prompt { max-width: 42vw; white-space: normal; text-align: center; }
+body.split > #dialog { position: fixed; z-index: 7; bottom: 140px; width: min(600px, 60vw); }
+.split-tag { position: absolute; top: 12px; left: 12px; font-family: Orbitron, sans-serif; font-weight: 900; font-size: 13px;
+  letter-spacing: 3px; color: var(--c); padding: 2px 10px; border-radius: 8px; background: rgba(5,6,10,0.55); }
+
 </style>
 </head>
 <body>
@@ -878,6 +908,7 @@ body.talking #pad-hint { opacity: 0; }
     <div class="menu-buttons">
       <button class="btn primary big" id="btn-continue">Continue</button>
       <button class="btn big" id="btn-start">New Expedition</button>
+      <button class="btn desk-only" id="btn-split">Split Screen · 2 Players</button>
       <button class="btn" id="btn-howto">How to Play</button>
     </div>
     <div class="howto hidden" id="howto">
@@ -927,6 +958,7 @@ body.talking #pad-hint { opacity: 0; }
         <div><kbd>View / Menu</kbd><span>World map · pause</span></div>
         <div><kbd>Menus</kbd><span>Stick or D-pad moves the cursor · <b>A</b> select · <b>B</b> back · right stick scrolls · <b>LB/RB</b> tabs</span></div>
       </div>
+      <p class="desk-only"><b>Split screen:</b> two players on one screen, with two controllers or a controller plus the keyboard &amp; mouse. You share the world and home base, but each of you has your own hotbar, Botbucks, gear and bots.</p>
       <p><b>Halloway Works</b>, your home base: Wren's <b>Workshop</b> (build bots, base systems and new rooms),
         the <b>Charging Bay</b> (bots recharge here) and <b>Storage</b> (unlimited). Build the <b>Garage</b> (gear),
         <b>Lab</b> (research, memories) and <b>Command Room</b> (quick travel, recall) to open them up.
@@ -941,6 +973,28 @@ body.talking #pad-hint { opacity: 0; }
         until the boss falls.</p>
     </div>
     <div class="menu-foot">one connected world · caves &amp; waterfalls · robot villages · an underwater realm · 7 theme songs · 5 Wardens · a home to come back to</div>
+  </div>
+</div>
+
+<!-- ═══════ Split screen: who plays with what ═══════ -->
+<div id="split" class="overlay">
+  <div class="panel">
+    <h2>SPLIT SCREEN</h2>
+    <div class="muted small-text">Two players, one screen, one world. Each player joins with a controller — or one of you with the keyboard &amp; mouse.</div>
+    <div class="split-slots">
+      <div class="split-slot" id="ss-0"></div>
+      <div class="split-slot" id="ss-1"></div>
+    </div>
+    <p class="muted small-text">Controller: <b>A</b> join · <b>B</b> leave · <b>X</b> swap · <b>Start</b> begin<br>Keyboard: <b>Enter</b> join / begin · <b>Esc</b> back</p>
+    <div class="row">
+      <button class="btn" id="split-kbm">Join with Keyboard &amp; Mouse</button>
+      <button class="btn" id="split-swap">Swap Players</button>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="split-go" disabled>Start</button>
+      <button class="btn ghost" id="split-back">Back</button>
+    </div>
+    <p class="muted small-text">Plays your saved world (or starts a new one). The world, home storage and base are shared; each player has their own hotbar, Botbucks, gear, upgrades and bots.</p>
   </div>
 </div>
 
@@ -1140,7 +1194,8 @@ function makePerlin(seed) {
 }
 
 // ───────────────────────── Input (pointer-lock FPS) ─────────────────────────
-const Input = {
+// `let` so split screen can point it at the player whose turn it is (see split.js)
+let Input = {
   keys: {},
   pressed: {},
   mouse: { down: false, right: false, rightPressed: false, dx: 0, dy: 0 },
@@ -2522,7 +2577,8 @@ class PostFX {
     this.r.render(this.quadScene, this.quadCam);
   }
 
-  render(scene, camera, time) {
+  // vp: [x, y, w, h] in CSS pixels to draw into part of the screen (split screen)
+  render(scene, camera, time, vp) {
     const r = this.r;
     r.setRenderTarget(this.rtScene);
     r.render(scene, camera);
@@ -2544,7 +2600,9 @@ class PostFX {
     u.tB2.value = this.levels[2].a.texture;
     u.tB3.value = this.levels[3].a.texture;
     u.time.value = time % 100;
+    if (vp) { r.setViewport(vp[0], vp[1], vp[2], vp[3]); r.setScissor(vp[0], vp[1], vp[2], vp[3]); r.setScissorTest(true); }
     this.pass(this.compMat, null);
+    if (vp) { const s = r.getSize(this._sz || (this._sz = new THREE.Vector2())); r.setScissorTest(false); r.setViewport(0, 0, s.x, s.y); }
   }
 }
 
@@ -3487,12 +3545,13 @@ function buildGliderModel(scale = 1) {
 //   root ─ pelvis ─┬─ hip ─ knee ─ ankle ─ toe            (×2)
 //                  └─ spine ─ chest ─┬─ neck ─ head
 //                                    └─ shoulder ─ elbow ─ wrist (×2, gun in right hand)
-function buildAvatarModel() {
+// colours: player 2 in split screen gets a different paint job
+function buildAvatarModel(paint = { shell: '#3a7c98', shellE: '#0e3a4c', dark: '#1a3242', darkE: '#081a24', glow: '#3cf2ff' }) {
   const g = new THREE.Group();
-  const shell = Mat.std('#3a7c98', { metal: 0.55, rough: 0.4, emissive: '#0e3a4c', ei: 0.5 });
-  const dark = Mat.std('#1a3242', { metal: 0.5, rough: 0.5, emissive: '#081a24', ei: 0.5 });
+  const shell = Mat.std(paint.shell, { metal: 0.55, rough: 0.4, emissive: paint.shellE, ei: 0.5 });
+  const dark = Mat.std(paint.dark, { metal: 0.5, rough: 0.5, emissive: paint.darkE, ei: 0.5 });
   const joint = Mat.std('#0e1a22', { metal: 0.85, rough: 0.25, flat: false });
-  const cyan = Mat.glow('#3cf2ff', 4);
+  const cyan = Mat.glow(paint.glow, 4);
   const node = (parent, x, y, z) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
   const J = {};
   J.root = node(g, 0, 0, 0);
@@ -5593,16 +5652,21 @@ const World = {
 
   // ═════════════════════ Per-frame ═════════════════════
   update(dt, time, cam) {
-    if (this.skyMesh) this.skyMesh.position.copy(cam.position);
-    // environment follows the camera's biome (and dives with it)
-    const ud = camUnderwater(cam);
-    this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
-    this.skyMesh.visible = ud <= 0;
+    // split screen: the sky and environment are set per view (Split.prepView); things are shown near either camera
+    const cams = this.viewCams;
+    if (!cams) {
+      if (this.skyMesh) this.skyMesh.position.copy(cam.position);
+      // environment follows the camera's biome (and dives with it)
+      const ud = camUnderwater(cam);
+      this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
+      this.skyMesh.visible = ud <= 0;
+    }
     Sea.update(dt, time, cam);
-    this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
+    if (!cams) this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
     this.lavaMat.emissiveIntensity = 1.3 + Math.sin(time * 2) * 0.25;
     if (this.fallTex) this.fallTex.offset.y -= dt * 1.6;
-    const near = (x, z, R) => Math.abs(x - cam.position.x) < R && Math.abs(z - cam.position.z) < R;
+    const near = cams ? (x, z, R) => cams.some((c) => Math.abs(x - c.position.x) < R && Math.abs(z - c.position.z) < R)
+      : (x, z, R) => Math.abs(x - cam.position.x) < R && Math.abs(z - cam.position.z) < R;
     for (const b of this.beacons) {
       if (!near(b.x, b.z, 300)) continue;
       b.rings.forEach((r, i) => (r.rotation.z += dt * (i % 2 ? -1 : 1) * (b.state === 'charging' ? 4 : b.state === 'done' ? 1.2 : 0.4)));
@@ -5803,7 +5867,7 @@ const WorldMap = {
     Input.unlock();
     Touch.reset();
     this.el.classList.add('show');
-    $('hud').classList.remove('show');
+    UI.huds((h) => h.classList.remove('show'));
     Sound.play('click');
     this.resize();
     this.draw();
@@ -6413,9 +6477,12 @@ const Villages = {
 
   // ═════════════════════════ Per-frame ═════════════════════════
   update(dt, time) {
-    const p = G.player;
     if (!World.npcs) return;
+    const PS = Split.players();
     for (const n of World.npcs) {
+      // villagers notice whichever player is closest (split screen has two)
+      let p = PS[0];
+      for (const q of PS) if (Math.hypot(q.pos.x - n.x, q.pos.z - n.z) < Math.hypot(p.pos.x - n.x, p.pos.z - n.z)) p = q;
       const near = Math.abs(n.x - p.pos.x) < 160 && Math.abs(n.z - p.pos.z) < 160;
       n.model.visible = near;
       if (!near) continue;
@@ -6446,7 +6513,7 @@ const Villages = {
     }
     for (const c of World.chargePosts) c.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + c.x));
     for (const f of World.finds) if (f.glow.visible) f.glow.material.opacity = 0.6 + 0.4 * Math.sin(time * 3);
-    if (G.state === 'playing') this.updatePresence(dt);
+    if (G.state === 'playing') Split.each(() => this.updatePresence(dt));
   },
   // robots that are not yours stay out of the villages
   keepOut(e) {
@@ -7298,7 +7365,9 @@ class Player {
 
     }
 
-    World.keepInside(this.pos, this.r);
+    // split screen: only players in the fight are kept in the sealed dome; everyone else is kept out
+    if (!Split.on || this.inFight) World.keepInside(this.pos, this.r);
+    else if (World.domeTrap) Split.keepOut(this.pos, this.r);
     if (this.swim) Sea.pressure(this, dt); else { this.depth = 0; this.crush = Math.max(0, (this.crush || 0) - dt * 2); }
     const gy = World.groundAt(this.pos.x, this.pos.z, this.pos.y);
     // fall damage: measured from the highest point of a free fall (gliding / jetpack reset it)
@@ -8671,7 +8740,7 @@ class Companion {
 
   pad() {
     const pads = World.chargePads;
-    const i = G.companions.indexOf(this);
+    const i = G.companions.indexOf(this) + Split.idx * 3;   // player 2's bots use the next pads along
     return pads.length ? pads[Math.max(0, i) % pads.length] : { x: G.player.pos.x, y: G.player.pos.y + 2, z: G.player.pos.z };
   }
 
@@ -9118,8 +9187,12 @@ function touchAimAssist(p, dt) {
 // standard-layout button indices
 const PB = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 
-// Pick the right words for a prompt: controller, touch or keyboard.
-function ctl(kb, touch, pad) { return Pad.active ? pad : Touch.enabled ? touch : kb; }
+// Pick the right words for a prompt: controller, touch or keyboard (in split screen: whatever the
+// player whose turn it is plays with).
+function ctl(kb, touch, pad) {
+  if (Split.on) return Split.usesPad() ? pad : kb;
+  return Pad.active ? pad : Touch.enabled ? touch : kb;
+}
 
 const Pad = {
   connected: false,
@@ -9127,10 +9200,7 @@ const Pad = {
   DEAD: 0.18,               // stick dead zone
   LOOK_SPEED: 1500,         // right-stick turn rate at full tilt, in "mouse pixels" per second (× look sensitivity)
   CURSOR_SPEED: 1100,       // menu cursor speed at full tilt, px/s
-  prev: [],
-  held: new Set(),          // keys the pad is holding down in Input.keys
-  firing: false,
-  sprint: false,
+  states: new Map(),        // per controller: buttons last frame, keys it holds down, trigger & sprint state
   cx: 0, cy: 0,
   lastState: '',
   hoverEl: null,
@@ -9141,7 +9211,15 @@ const Pad = {
     this.toast = document.getElementById('pad-toast');
     this.cx = window.innerWidth / 2; this.cy = window.innerHeight / 2;
     window.addEventListener('gamepadconnected', (e) => this.say(`Controller connected — ${this.shortName(e.gamepad.id)}`));
-    window.addEventListener('gamepaddisconnected', () => {
+    window.addEventListener('gamepaddisconnected', (e) => {
+      if (Split.lobby) { Split.padGone(e.gamepad.index); return; }
+      const c = Split.on && Split.ctxForPad(e.gamepad.index);
+      if (c) {
+        this.release();
+        this.say(`Player ${Split.ctxs.indexOf(c) + 1}'s controller disconnected — reconnect it to carry on`);
+        if (G.state === 'playing') UI.pause();
+        return;
+      }
       if (this.pad()) return;
       this.release();
       this.connected = false;
@@ -9180,18 +9258,29 @@ const Pad = {
     return best;
   },
 
-  // let go of everything the pad is holding (disconnect, or switching between play and menus)
-  release() {
-    for (const k of this.held) Input.keys[k] = false;
-    this.held.clear();
-    if (this.firing) { Input.mouse.down = false; this.firing = false; }
-    this.sprint = false;
-    Input.pad = null;
+  st(key) {
+    let s = this.states.get(key);
+    if (!s) { s = { prev: [], held: new Set(), firing: false, sprint: false, I: null }; this.states.set(key, s); }
+    return s;
   },
 
-  hold(code, on) {
-    if (on && !this.held.has(code)) { this.held.add(code); Input.keys[code] = true; Input.pressed[code] = true; }
-    else if (!on && this.held.has(code)) { this.held.delete(code); Input.keys[code] = false; }
+  // let go of everything the pads are holding (disconnect, or switching between play and menus)
+  release() {
+    for (const s of this.states.values()) {
+      const I = s.I;
+      if (!I) continue;
+      for (const k of s.held) I.keys[k] = false;
+      s.held.clear();
+      if (s.firing) { I.mouse.down = false; s.firing = false; }
+      s.sprint = false;
+      I.pad = null;
+    }
+  },
+
+  hold(s, code, on) {
+    const I = s.I;
+    if (on && !s.held.has(code)) { s.held.add(code); I.keys[code] = true; I.pressed[code] = true; }
+    else if (!on && s.held.has(code)) { s.held.delete(code); I.keys[code] = false; }
   },
 
   stick(x, y) {
@@ -9202,8 +9291,10 @@ const Pad = {
   },
 
   rumble(strong, weak, ms) {
-    if (!this.active || this.rumbleCd > 0) return;
-    const g = this.pad();
+    if (this.rumbleCd > 0) return;
+    let g;
+    if (Split.on) g = Split.padOf(Split.idx);   // the controller of the player who was hit
+    else { if (!this.active) return; g = this.pad(); }
     const a = g && g.vibrationActuator;
     if (!a || !a.playEffect) return;
     this.rumbleCd = 0.08;
@@ -9213,21 +9304,11 @@ const Pad = {
   // called once per frame, before the game reads Input
   poll(dt) {
     this.rumbleCd -= dt;
-    const g = this.pad();
-    if (!g) { if (this.connected) { this.connected = false; this.release(); } return; }
-    if (!this.connected) { this.connected = true; this.prev = []; }
-
-    const bv = (i) => { const b = g.buttons[i]; return b ? (typeof b === 'object' ? b.value : b) : 0; };
-    const down = (i) => { const b = g.buttons[i]; return !!b && (b.pressed || bv(i) > 0.35); };
-    const now = []; for (let i = 0; i < g.buttons.length; i++) now[i] = down(i);
-    const hit = (i) => now[i] && !this.prev[i];
-    const ax = (i) => g.axes[i] || 0;
-    const L = this.stick(ax(0), ax(1)), R = this.stick(ax(2), ax(3));
-
-    if (now.some((b, i) => b && !this.prev[i]) || L[2] > 0 || R[2] > 0) {
-      this.setActive(true);
-      if (now.some(Boolean)) Sound.init();
-    }
+    // one pad normally; in split screen (and its lobby) every pad, each feeding its own player
+    const multi = Split.on || Split.lobby;
+    const list = multi ? this.pads() : [this.pad()].filter(Boolean);
+    if (!list.length) { if (this.connected) { this.connected = false; this.release(); } return; }
+    this.connected = true;
 
     const state = G.state;
     if (state !== this.lastState) {
@@ -9236,41 +9317,66 @@ const Pad = {
       if (state !== 'playing' && this.active) this.snapToFirst();
     }
 
-    if (state === 'playing') this.play(g, now, hit, L, R, dt);
-    else if (this.active) this.menu(g, now, hit, L, R, dt);
-    this.prev = now;
+    for (const g of list) {
+      const s = this.st(multi ? g.index : 'main');
+      const bv = (i) => { const b = g.buttons[i]; return b ? (typeof b === 'object' ? b.value : b) : 0; };
+      const down = (i) => { const b = g.buttons[i]; return !!b && (b.pressed || bv(i) > 0.35); };
+      const now = []; for (let i = 0; i < g.buttons.length; i++) now[i] = down(i);
+      const hit = (i) => now[i] && !s.prev[i];
+      const ax = (i) => g.axes[i] || 0;
+      const L = this.stick(ax(0), ax(1)), R = this.stick(ax(2), ax(3));
+
+      if (now.some((b, i) => b && !s.prev[i]) || L[2] > 0 || R[2] > 0) {
+        this.setActive(true);
+        if (now.some(Boolean)) Sound.init();
+      }
+
+      if (Split.lobby) Split.lobbyPad(g.index, hit);
+      else if (state === 'playing') {
+        const c = multi ? Split.ctxForPad(g.index) : null;
+        if (!multi) { s.I = Input; this.play(s, G.player, now, hit, L, R, dt); }
+        else if (c) { s.I = c.input; this.play(s, c.player, now, hit, L, R, dt); }
+      } else if (this.active) this.menu(g, now, hit, L, R, dt);
+      s.prev = now;
+    }
   },
 
-  play(g, now, hit, L, R, dt) {
-    const p = G.player;
+  // every connected controller
+  pads() {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    return [...list].filter((g) => g && g.connected);
+  },
+
+  play(s, p, now, hit, L, R, dt) {
+    const I = s.I;
     this.showCursor(false);
     // left stick moves; click it to sprint until you let the stick go
-    if (hit(PB.L3)) this.sprint = !this.sprint;
-    if (L[2] < 0.25) this.sprint = false;
-    Input.pad = { mx: L[0], my: L[1], sprint: this.sprint };
+    if (hit(PB.L3)) s.sprint = !s.sprint;
+    if (L[2] < 0.25) s.sprint = false;
+    I.pad = { mx: L[0], my: L[1], sprint: s.sprint };
     // right stick looks: a curve gives fine aim near the centre and fast turns at full tilt
     if (R[2] > 0) {
       const c = Math.pow(R[2], 1.8) / R[2];
-      Input.mouse.dx += R[0] * c * this.LOOK_SPEED * dt;
-      Input.mouse.dy += R[1] * c * this.LOOK_SPEED * 0.7 * dt;
+      I.mouse.dx += R[0] * c * this.LOOK_SPEED * dt;
+      I.mouse.dy += R[1] * c * this.LOOK_SPEED * 0.7 * dt;
     }
     // fire with the right trigger
     const fire = now[PB.RT];
-    if (fire !== this.firing) { this.firing = fire; Input.mouse.down = fire; }
+    if (fire !== s.firing) { s.firing = fire; I.mouse.down = fire; }
     const swimming = p && p.swim;
-    this.hold('Space', now[PB.A]);
-    this.hold('KeyC', swimming && now[PB.B]);
-    if (hit(PB.B) && !swimming) Input.pressed.KeyQ = true;
-    if (hit(PB.X)) Input.pressed[document.getElementById('dialog').classList.contains('show') ? 'Enter' : 'KeyE'] = true;
-    if (hit(PB.Y)) Input.pressed.KeyR = true;
-    if (hit(PB.LT)) Input.pressed.KeyG = true;
-    if (hit(PB.LB) || hit(PB.RB)) Input.wheel += hit(PB.RB) ? 1 : -1;
-    if (hit(PB.R3) || hit(PB.RIGHT)) Input.pressed.KeyV = true;
-    if (hit(PB.LEFT)) Input.pressed.KeyX = true;
-    if (hit(PB.UP)) Input.pressed.KeyJ = true;
-    if (hit(PB.DOWN)) Input.pressed.Tab = true;
-    if (hit(PB.BACK)) Input.pressed.KeyM = true;
-    if (hit(PB.START)) Input.pressed.Escape = true;
+    this.hold(s, 'Space', now[PB.A]);
+    this.hold(s, 'KeyC', swimming && now[PB.B]);
+    if (hit(PB.B) && !swimming) I.pressed.KeyQ = true;
+    if (hit(PB.X)) I.pressed[document.getElementById('dialog').classList.contains('show') ? 'Enter' : 'KeyE'] = true;
+    if (hit(PB.Y)) I.pressed.KeyR = true;
+    if (hit(PB.LT)) I.pressed.KeyG = true;
+    if (hit(PB.LB) || hit(PB.RB)) I.wheel += hit(PB.RB) ? 1 : -1;
+    if (hit(PB.R3) || hit(PB.RIGHT)) I.pressed.KeyV = true;
+    if (hit(PB.LEFT)) I.pressed.KeyX = true;
+    if (hit(PB.UP)) I.pressed.KeyJ = true;
+    if (hit(PB.DOWN)) I.pressed.Tab = true;
+    if (hit(PB.BACK)) I.pressed.KeyM = true;
+    if (hit(PB.START)) I.pressed.Escape = true;
   },
 
   // ───────── menus: on-screen cursor ─────────
@@ -9397,7 +9503,13 @@ const Pad = {
 </script>
 <script>
 'use strict';
-const $ = (id) => document.getElementById(id);
+// In split screen player 2 has a copy of the HUD (same ids, inside a second #hud root); while it's player 2's
+// turn, UI.root points at that copy and lookups find the copy first.
+const $ = (id) => {
+  const r = UI.root;
+  if (r) { if (r.id === id) return r; const e = r.querySelector('#' + id); if (e) return e; }
+  return document.getElementById(id);
+};
 
 const UI = {
   tab: 'companion',
@@ -9463,17 +9575,20 @@ const UI = {
     this.radar = $('radar').getContext('2d');
   },
 
+  // every HUD on screen (two in split screen)
+  huds(fn) { document.querySelectorAll('#hud').forEach(fn); },
+
   hideAll() {
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
-    $('hud').classList.toggle('show', G.state === 'playing');
+    this.huds((h) => h.classList.toggle('show', G.state === 'playing'));
   },
   show(id) {
     Touch.reset();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.remove('show'));
     $(id).classList.add('show');
-    $('hud').classList.toggle('show', id === 'workshop' || id === 'pause');
-    $('hud').classList.toggle('dim', id === 'workshop' || id === 'pause');
+    this.huds((h) => h.classList.toggle('show', id === 'workshop' || id === 'pause'));
+    this.huds((h) => h.classList.toggle('dim', id === 'workshop' || id === 'pause'));
   },
 
   pause() {
@@ -9490,7 +9605,7 @@ const UI = {
     if (G.state === 'paused' || G.state === 'workshop') {
       G.state = 'playing';
       Input.mouse.down = false;
-      $('hud').classList.remove('dim');
+      this.huds((h) => h.classList.remove('dim'));
       this.hideAll();
       Input.lock(canvas);
     }
@@ -9510,6 +9625,7 @@ const UI = {
 
   toMenu() {
     Sound.play('click');
+    if (Split.on) { saveGame(); Split.stop(); }
     G.state = 'menu';
     G.companions.forEach((c) => c.destroy());
     G.companions = [];
@@ -9518,7 +9634,7 @@ const UI = {
     Input.unlock();
     $('btn-continue').style.display = hasSave() ? '' : 'none';
     this.show('menu');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   saveSettings() { try { localStorage.setItem('sf-view', G.settings.view); } catch (e) { /* storage unavailable */ } },
@@ -9547,7 +9663,7 @@ const UI = {
     $('go-sector').textContent = G.region ? G.region.name : 'The Outlands';
     $('go-stats').innerHTML = this.statsHTML(G.stats);
     this.show('gameover');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   showVictory() {
@@ -9555,7 +9671,7 @@ const UI = {
     $('v-stats').innerHTML = this.statsHTML(G.total) + `<div class="stat"><b>${G.total.crafted || 0}</b><span>Items crafted</span></div>`;
     Sound.setIntensity(0);
     this.show('victory');
-    $('hud').classList.remove('show');
+    this.huds((h) => h.classList.remove('show'));
   },
 
   // ═════════════════════════ Items ═════════════════════════
@@ -9592,7 +9708,7 @@ const UI = {
       command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
       journal: ['JOURNAL', 'Your quests and the memories you have recovered. Time is paused.'],
     }[mode];
-    $('ws-title').textContent = T[0];
+    $('ws-title').textContent = (Split.on ? `P${Split.idx + 1} · ` : '') + T[0];   // whose menu this is
     $('ws-sub').textContent = T[1];
     $('ws-title').style.color = mode === 'shop' && shop ? shop.color : '';
     $('ws-continue').textContent = mode === 'field' || mode === 'journal' ? 'Resume ▸' : 'Leave ▸';
@@ -10028,6 +10144,7 @@ const UI = {
 
   // ═════════════════════════ HUD messages ═════════════════════════
   banner(text, sub, color, dur = 3) {
+    if (Split.broadcast(() => this.banner(text, sub, color, dur))) return;   // news for both players
     const b = $('banner');
     $('banner-title').textContent = text;
     $('banner-sub').textContent = sub || '';
@@ -10038,9 +10155,10 @@ const UI = {
   },
 
   hint(text) {
-    const now = performance.now();
-    if (this.hintLast[text] && now - this.hintLast[text] < 25000) return;
-    this.hintLast[text] = now;
+    if (Split.broadcast(() => this.hint(text))) return;
+    const now = performance.now(), key = (this.root ? 'p2|' : '') + text;
+    if (this.hintLast[key] && now - this.hintLast[key] < 25000) return;
+    this.hintLast[key] = now;
     const h = $('hint');
     h.textContent = text;
     h.classList.remove('show'); void h.offsetWidth; h.classList.add('show');
@@ -10049,6 +10167,7 @@ const UI = {
   },
 
   feed(text, color, part) {
+    if (Split.broadcast(() => this.feed(text, color, part))) return;
     const f = $('feed');
     const el = document.createElement('div');
     el.className = 'feed-item';
@@ -10115,8 +10234,8 @@ const UI = {
     $('fuel-row').classList.toggle('show', !!G.gear.jetpack);
     if (G.gear.jetpack) { $('bar-fuel').style.width = p.fuel + '%'; $('val-fuel').textContent = p.jetting ? 'BURN' : p.fuel >= 100 ? 'FULL' : ''; }
     $('hud-bucks').textContent = G.bucks;
-    document.body.classList.toggle('frozen', p.frozenT > 0 && !p.dead);
-    document.body.classList.toggle('burning', p.burnT > 0 && !p.dead);
+    $('hud').classList.toggle('frozen', p.frozenT > 0 && !p.dead);
+    $('hud').classList.toggle('burning', p.burnT > 0 && !p.dead);
     // depth gauge while swimming
     const dEl = $('depth');
     dEl.classList.toggle('show', !!p.swim && !p.dead);
@@ -10259,11 +10378,14 @@ const UI = {
     for (const S of World.shops) if (near(S.x, S.z, 260)) M.push({ x: S.x, z: S.z, color: '#ffd23f', shape: 'square', range: 260 });
     for (const c of World.caves) if (c.found || near(c.mouth.x, c.mouth.z, 60)) { if (near(c.mouth.x, c.mouth.z, 140)) M.push({ x: c.mouth.x, z: c.mouth.z, color: '#b98cff', shape: 'cave', range: 140 }); }
     for (const pin of G.progress.world.pins) M.push({ x: pin.x, z: pin.z, color: pin.c, shape: 'pin', label: true });
+    // split screen: where your partner is
+    if (Split.on) Split.ctxs.forEach((c, i) => { const q = Split.pl(c); if (q !== p) M.push({ x: q.pos.x, z: q.pos.z, color: SPLIT_COLORS[i], shape: 'ring', label: true, big: true }); });
     return M;
   },
 
   // a memory fragment / story log found in a cave
   showLore(L, n, total) {
+    if (Split.broadcast(() => this.showLore(L, n, total))) return;
     let el = $('lore');
     if (!el) { el = document.createElement('div'); el.id = 'lore'; $('hud').appendChild(el); }
     el.innerHTML = `<span class="lore-n">MEMORY ${n} / ${total}</span><div class="lore-from">${L.from}</div><div class="lore-text">${L.text}</div>`;
@@ -10362,6 +10484,7 @@ const UI = {
     for (const s of G.spawns) dot(s.x, s.z, '#ffffff', 2);
     for (const e of G.enemies) if (!e.hidden) dot(e.pos.x, e.pos.z, e.isBoss ? e.color : e.elite ? '#ffd700' : e.aggro ? '#ff3b5c' : '#ff8a6a', e.isBoss ? 5 : e.r > 1.5 ? 3.5 : 2.5, e.isBoss);
     for (const c of G.companions) if (c.inScene) dot(c.pos.x, c.pos.z, c.d.color, 2);
+    if (Split.on) Split.ctxs.forEach((c, i) => { const q = Split.pl(c); if (q !== p && !q.dead) dot(q.pos.x, q.pos.z, SPLIT_COLORS[i], 4, true); });
     g.restore();
     g.strokeStyle = 'rgba(60,242,255,0.4)'; g.lineWidth = 1.5;
     g.beginPath(); g.arc(R, R, R - 2, 0, TAU); g.stroke();
@@ -10510,7 +10633,8 @@ const Story = {
     fade.style.transition = 'none'; fade.style.opacity = 1;
     setTimeout(() => { fade.style.transition = 'opacity 2.5s'; fade.style.opacity = 0; }, 400);
     Dialog.clear();
-    setTimeout(() => Dialog.say(STORY.opening, () => { if (G.cine) G.cine.phase = 'sit'; }), 1200);
+    // (only if the opening is still playing: skipping it straight away shouldn't leave its lines behind)
+    setTimeout(() => { if (G.cine) Dialog.say(STORY.opening, () => { if (G.cine) G.cine.phase = 'sit'; }); }, 1200);
   },
   endOpening() {
     const p = G.player, W = World.wakeSpot;
@@ -10732,6 +10856,482 @@ const Story = {
 </script>
 <script>
 'use strict';
+// Split screen: two players on one screen, in one world. Player 1 plays on the left, player 2 on the right.
+// Each player uses a controller, or one of them the keyboard & mouse.
+//
+// The game was written for one player, so rather than rewriting every system, each player has a
+// *context*: their robot, camera, hotbar, Botbucks, gear, upgrades, bots, input, HUD and screen effects.
+// Before a player's turn (their movement, their half of the HUD, their view) their context is swapped
+// into the usual globals (G.player, G.bar, camera, Input, …), and swapped back out afterwards. The world
+// itself (robots, camps, bosses, quests, storage at home, the base) is shared and simulated once; each
+// robot fights the player it's targeting, inside that player's context.
+//
+// Shared between the players: the world and its progress, home storage, bots waiting at home, the base.
+// Each player's own: hotbar, Botbucks, gear, upgrades, squad, view setting. Player 2's character is
+// saved in the same save file (as `p2`).
+
+// player 2's paint job and colour
+const SPLIT_PAINT = { shell: '#b8662a', shellE: '#4a1e08', dark: '#3a2418', darkE: '#140804', glow: '#ffb347' };
+const SPLIT_COLORS = ['#3cf2ff', '#ffb347'];
+
+// what makes up "a player" in the globals
+const SPLIT_G = ['player', 'bar', 'sel', 'weapon', 'bucks', 'gear', 'up', 'companions', 'vessels', 'spritesFound',
+  'vm', 'avatar', 'fpGlider', 'bubble', 'iceBlock', 'fov', 'region', 'regionT', 'where', 'level', 'safeSpot',
+  'calmT', 'dying', 'recallT', 'focus'];
+const SPLIT_UI = ['root', 'compass', 'radar', 'hotbarDirty', 'hotbarSig', 'squadSig', 'stShowT', 'questT', 'quest',
+  'vquests', 'objT', '_bannerT', '_hintT', '_loreT'];
+
+// an input object for a controller player (same shape as Input; the controller fills it in)
+function makePadInput() {
+  return {
+    keys: {}, pressed: {}, mouse: { down: false, right: false, rightPressed: false, dx: 0, dy: 0 }, wheel: 0,
+    pad: null, touch: null, touchMode: false, fallback: false,
+    get locked() { return Split.kbm.locked; },
+    key(c) { return !!this.keys[c]; },
+    hit(c) { return !!this.pressed[c]; },
+    endFrame() { this.pressed = {}; this.mouse.rightPressed = false; this.mouse.dx = 0; this.mouse.dy = 0; this.wheel = 0; },
+    lock(cv) { Split.kbm.lock(cv); },
+    unlock() { Split.kbm.unlock(); },
+  };
+}
+
+const Split = {
+  on: false,
+  lobby: false,
+  ctxs: [],
+  cur: null,          // the context swapped into the globals right now
+  idx: 0,             // its index (0 when split screen is off)
+  menuCtx: null,      // the player who opened the menu that's showing
+  depth: 0,           // >0 while running code that belongs to one player
+  slots: [null, null],
+
+  init() {
+    this.kbm = Input;
+    const $$ = (id) => document.getElementById(id);
+    $$('btn-split').onclick = () => { Sound.init(); Sound.play('click'); this.openLobby(); };
+    $$('split-kbm').onclick = () => { Sound.play('click'); if (!this.slots.includes('kbm')) this.join('kbm'); };
+    $$('split-swap').onclick = () => { Sound.play('click'); this.swap(); };
+    $$('split-go').onclick = () => this.begin();
+    $$('split-back').onclick = () => { Sound.play('click'); this.closeLobby(); };
+  },
+
+  // ═════════════════════════ The lobby: who plays with what ═════════════════════════
+  openLobby() {
+    this.lobby = true;
+    this.slots = [null, null];
+    UI.show('split');
+    this.renderLobby();
+  },
+  closeLobby() {
+    this.lobby = false;
+    UI.show('menu');
+    document.getElementById('btn-continue').style.display = hasSave() ? '' : 'none';
+  },
+  full() { return this.slots[0] !== null && this.slots[1] !== null; },
+  join(dev) {
+    const i = this.slots.indexOf(null);
+    if (i < 0) return;
+    this.slots[i] = dev;
+    Sound.play('online', null, 0.6);
+    this.renderLobby();
+  },
+  leave(dev) { const i = this.slots.indexOf(dev); if (i >= 0) { this.slots[i] = null; Sound.play('click'); this.renderLobby(); } },
+  padGone(index) { this.leave(index); },
+  swap() { this.slots.reverse(); this.renderLobby(); },
+  devName(dev) {
+    if (dev === 'kbm') return 'Keyboard & mouse';
+    const g = Pad.pads().find((q) => q.index === dev);
+    return `Controller ${dev + 1}${g ? ' · ' + Pad.shortName(g.id) : ''}`;
+  },
+  renderLobby() {
+    this.slots.forEach((d, i) => {
+      const el = document.getElementById('ss-' + i);
+      el.style.setProperty('--c', SPLIT_COLORS[i]);
+      el.classList.toggle('ready', d !== null);
+      el.innerHTML = '';
+      const b = document.createElement('b'); b.textContent = `PLAYER ${i + 1}`;
+      const s = document.createElement('span');
+      s.textContent = d === null ? 'Press A on a controller — or join with the keyboard & mouse' : this.devName(d);
+      el.append(b, s);
+    });
+    document.getElementById('split-kbm').disabled = this.slots.includes('kbm') || this.full();
+    document.getElementById('split-go').disabled = !this.full();
+  },
+  // a controller in the lobby: A joins, B leaves (or goes back), X swaps, Start begins
+  lobbyPad(index, hit) {
+    const joined = this.slots.includes(index);
+    if (hit(PB.A)) { if (!joined) this.join(index); else if (this.full()) this.begin(); }
+    else if (hit(PB.START)) { if (this.full()) this.begin(); else if (!joined) this.join(index); }
+    else if (hit(PB.B)) { if (joined) this.leave(index); else this.closeLobby(); }
+    else if (hit(PB.X)) this.swap();
+  },
+  lobbyKeys() {
+    if (Input.hit('Enter')) { if (!this.slots.includes('kbm') && !this.full()) this.join('kbm'); else if (this.full()) this.begin(); }
+    if (Input.hit('Escape')) this.closeLobby();
+  },
+  begin() {
+    if (!this.full()) return;
+    const slots = this.slots.slice();
+    this.lobby = false;
+    Sound.play('click');
+    if (hasSave()) continueGame(); else newRun();
+    this.start(slots);
+    if (!Story.tutorialDone) Story.skip();   // the tutorial is a one-player affair
+    if (slots.includes('kbm')) this.kbm.lock(canvas);
+  },
+
+  // ═════════════════════════ Starting & stopping ═════════════════════════
+  start(slots) {
+    this.on = true;
+    document.body.classList.add('split');
+    // two views cost twice as much: performance mode on (switch it off in the pause menu if you like)
+    const q = document.getElementById('opt-quality');
+    this.prevQuality = G.settings.quality;
+    if (!q.checked) { q.checked = true; q.onchange({ target: q }); }
+
+    // player 1: what's already in the globals
+    const c0 = this.newCtx(0, slots[0]);
+    c0.camera = camera;
+    this.cur = c0; this.idx = 0;
+    Input = c0.input;
+    this.save(c0);
+    this.ctxs = [c0];
+
+    // player 2's HUD: a copy of the HUD (same ids, looked up inside this root on player 2's turn)
+    const h1 = document.getElementById('hud');
+    const h2 = h1.cloneNode(true);
+    h2.classList.add('p2'); h1.classList.add('p1');
+    for (const id of ['dialog', 'keys-hint', 'pad-hint', 'lore']) { const e = h2.querySelector('#' + id); if (e) e.remove(); }
+    h2.querySelector('#feed').innerHTML = ''; h2.querySelector('#dmgdir').innerHTML = '';
+    h1.after(h2);
+    for (const [h, i] of [[h1, 0], [h2, 1]]) {
+      const tag = document.createElement('div'); tag.className = 'split-tag'; tag.textContent = `P${i + 1}`; tag.style.setProperty('--c', SPLIT_COLORS[i]);
+      h.appendChild(tag);
+    }
+    this.hud2 = h2;
+    // one dialogue box for both, in the middle of the screen
+    document.body.appendChild(document.getElementById('dialog'));
+
+    // player 2: camera, first-person weapon & glider, robot, bubble and ice block
+    const cam = new THREE.PerspectiveCamera(75, 1, 0.05, camera.far);
+    cam.rotation.order = 'YXZ'; scene.add(cam);
+    const vm = buildViewModel(); cam.add(vm); vm.position.set(0.2, -0.19, -0.46); vm.scale.setScalar(0.7);
+    const gl = buildGliderModel(0.75); gl.rotation.set(0.12, Math.PI, 0); gl.position.set(0, 0.95, -0.35); gl.visible = false; cam.add(gl);
+    const av = buildAvatarModel(SPLIT_PAINT); av.visible = false; scene.add(av);
+    const bub = G.bubble.clone(); bub.visible = false; scene.add(bub);
+    const ice = G.iceBlock.clone(); ice.visible = false; scene.add(ice);
+    const ch = this.loadChar(G.p2Data);
+    const c1 = this.newCtx(1, slots[1]);
+    c1.camera = cam;
+    Object.assign(c1.g, {
+      player: new Player(), bar: ch.bar, sel: ch.sel, weapon: ch.weapon, bucks: ch.bucks, gear: ch.gear, up: ch.up, companions: [],
+      vessels: ch.vessels, spritesFound: ch.spritesFound, vm, avatar: av, fpGlider: gl, bubble: bub, iceBlock: ice,
+      fov: { base: 75, cur: 75, kick: 0 }, region: null, regionT: 0, where: 'hub', level: 0, safeSpot: null, calmT: 0, dying: 0, recallT: 0, focus: false,
+    });
+    c1.view = ch.view;
+    c1.u = { root: h2, compass: h2.querySelector('#compass').getContext('2d'), radar: h2.querySelector('#radar').getContext('2d'), hotbarDirty: true };
+    this.ctxs.push(c1);
+    // name tags over each robot (seen by the other player)
+    this.tags = this.ctxs.map((c, i) => { const t = World.makeLabel(`PLAYER ${i + 1}`, SPLIT_COLORS[i], 384, 80); t.scale.set(1.6, 0.34, 1); scene.add(t); return t; });
+
+    // player 2 steps out next to player 1
+    const p1 = G.player;
+    this.as(c1, () => {
+      const p = G.player;
+      const rx = Math.cos(p1.yaw), rz = -Math.sin(p1.yaw);
+      p.pos.set(p1.pos.x + rx * 2.2, 0, p1.pos.z + rz * 2.2);
+      p.pos.y = Math.max(World.groundAt(p.pos.x, p.pos.z, p1.pos.y + 1), p1.pos.y);
+      p.yaw = p1.yaw; p.pitch = -0.05; p.fallTop = p.pos.y; p.invuln = 2;
+      p.hp = ch.hp ? Math.min(ch.hp, p.maxHp) : p.maxHp;
+      p.stamina = p.maxStamina;
+      G.region = World.regionAt(p.pos.x, p.pos.z, p.pos.y);
+      G.where = G.region === REGIONS.hub ? 'hub' : 'biome'; G.level = G.region.tier;
+      setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
+      G.avatar.userData.flash.material.color.set(WEAPONS[G.weapon].color).multiplyScalar(4);
+      for (const d of ch.comps) {
+        const c = new Companion(d.kind, d.battery);
+        c.hp = Math.min(c.maxHp, d.hp ?? c.maxHp);
+        if (d.away) c.state = 'charging';
+        G.companions.push(c);
+      }
+      G.companions.forEach((c) => c.onTravel());
+    });
+
+    this.post2 = this.post2 || new PostFX(renderer);
+    World.viewCams = this.ctxs.map((c) => c.camera);
+    resize();
+    UI.hotbarDirty = true;
+    UI.banner('SPLIT SCREEN', 'Player 1 on the left · Player 2 on the right — free the Wardens together', '#3cf2ff', 4);
+  },
+
+  stop() {
+    if (!this.on) return;
+    G.p2Data = this.charJSON(1);
+    this.switchTo(this.ctxs[0]);
+    const c1 = this.ctxs[1];
+    for (const c of c1.g.companions) c.destroy();
+    scene.remove(c1.camera, c1.g.avatar, c1.g.bubble, c1.g.iceBlock);
+    for (const t of this.tags || []) scene.remove(t);
+    this.tags = null;
+    const h1 = document.getElementById('hud');
+    h1.classList.remove('p1');
+    h1.querySelectorAll('.split-tag').forEach((e) => e.remove());
+    h1.appendChild(document.getElementById('dialog'));
+    this.hud2.remove(); this.hud2 = null;
+    Input = this.kbm;
+    this.on = false; this.ctxs = []; this.cur = null; this.idx = 0; this.menuCtx = null; this.depth = 0;
+    World.viewCams = null;
+    document.body.classList.remove('split');
+    const q = document.getElementById('opt-quality');
+    if (this.prevQuality !== 'low' && q.checked) { q.checked = false; q.onchange({ target: q }); }
+    resize();
+  },
+
+  newCtx(i, dev) {
+    return { i, dev, input: dev === 'kbm' ? this.kbm : makePadInput(), g: {}, u: {}, fx: [0, 0, 0], tint: new THREE.Color(), lamp: [0, 26, 0, 0, 0], caveDim: 0, view: 'first', here: null, sway: [0, 0, 4.2] };
+  },
+
+  // ═════════════════════════ Player 2's character in the save ═════════════════════════
+  loadChar(d) {
+    const fresh = { bar: [{ t: 'weapon', id: 'blaster', n: 1 }, { t: 'supply', id: 'repair', n: 1 }], sel: 0, weapon: 'blaster', bucks: 40,
+      gear: { jetpack: false, fireboots: false, backpack: 0, hull: 0, prop: 0, lamp: 0 }, up: NEW_UP(), vessels: 0, spritesFound: 0, hp: null, comps: [], view: 'first' };
+    if (!d) return fresh;
+    return {
+      bar: (d.bar || fresh.bar).map((it) => (it ? Object.assign({ n: 1 }, it) : null)), sel: d.sel || 0, weapon: d.weapon || 'blaster', bucks: d.bucks || 0,
+      gear: Object.assign(fresh.gear, d.gear), up: Object.assign(NEW_UP(), d.up), vessels: d.vessels || 0, spritesFound: d.spritesFound || 0,
+      hp: d.hp || null, comps: d.comps || [], view: d.view === 'third' ? 'third' : 'first',
+    };
+  },
+  charJSON(i) {
+    const c = this.ctxs[i];
+    if (!c) return G.p2Data || undefined;
+    const g = c === this.cur ? G : c.g;
+    return { bar: g.bar, sel: g.sel, weapon: g.weapon, bucks: g.bucks, gear: g.gear, up: g.up, vessels: g.vessels, spritesFound: g.spritesFound,
+      hp: g.player.hp, comps: g.companions.map((b) => ({ kind: b.kind, battery: b.battery, hp: b.hp, away: !b.active })),
+      view: c === this.cur ? G.settings.view : c.view };
+  },
+
+  // ═════════════════════════ Swapping players in and out ═════════════════════════
+  save(c) {
+    for (const f of SPLIT_G) c.g[f] = G[f];
+    c.camera = camera; c.input = Input; c.view = G.settings.view;
+    c.sway[0] = swayX; c.sway[1] = swayY; c.sway[2] = camDist;
+    c.caveDim = World.caveDim;
+    const hl = World.headlamp;
+    if (hl) { c.lamp[0] = hl.intensity; c.lamp[1] = hl.distance; c.lamp[2] = hl.position.x; c.lamp[3] = hl.position.y; c.lamp[4] = hl.position.z; }
+    c.fx[0] = Fx.shake; c.fx[1] = Fx.damage; c.fx[2] = Fx.tintAmt; c.tint.copy(Fx.tint);
+    for (const f of SPLIT_UI) c.u[f] = UI[f];
+    c.here = Villages.here;
+  },
+  load(c) {
+    for (const f of SPLIT_G) G[f] = c.g[f];
+    camera = c.camera; Input = c.input; G.settings.view = c.view;
+    swayX = c.sway[0]; swayY = c.sway[1]; camDist = c.sway[2];
+    World.caveDim = c.caveDim;
+    const hl = World.headlamp;
+    if (hl) { hl.intensity = c.lamp[0]; hl.distance = c.lamp[1]; hl.position.set(c.lamp[2], c.lamp[3], c.lamp[4]); }
+    Fx.shake = c.fx[0]; Fx.damage = c.fx[1]; Fx.tintAmt = c.fx[2]; Fx.tint.copy(c.tint);
+    for (const f of SPLIT_UI) UI[f] = c.u[f];
+    Villages.here = c.here;
+  },
+  switchTo(c) {
+    if (!c || c === this.cur) return;
+    this.save(this.cur);
+    this.load(c);
+    this.cur = c; this.idx = c.i;
+  },
+  // run fn as player c (personal: UI messages go to that player's half only)
+  as(c, fn, personal = true) {
+    if (!this.on || !c) return fn();
+    const prev = this.cur;
+    if (personal) this.depth++;
+    if (c !== prev) this.switchTo(c);
+    try { return fn(); } finally { if (c !== prev) this.switchTo(prev); if (personal) this.depth--; }
+  },
+  asIdx(i, fn) { return !this.on || i === undefined || !this.ctxs[i] ? fn() : this.as(this.ctxs[i], fn); },
+  each(fn) { if (!this.on) return fn(); for (const c of this.ctxs) this.as(c, fn); },
+  // the context that should be active between turns: player 1, or whoever has a menu open
+  rest() {
+    if (G.state === 'playing') this.menuCtx = null;
+    this.switchTo(G.state === 'playing' ? this.ctxs[0] : this.menuCtx || this.ctxs[0]);
+    if (!World.domeTrap) for (const c of this.ctxs) this.pl(c).inFight = false;
+  },
+  // news that concerns both players goes to both halves of the screen
+  broadcast(fn) {
+    if (!this.on || this.depth > 0 || this._bc || G.state !== 'playing') return false;
+    this._bc = true;
+    try { this.each(fn); } finally { this._bc = false; }
+    return true;
+  },
+
+  // ═════════════════════════ Questions the shared world asks ═════════════════════════
+  pl(c) { return c === this.cur ? G.player : c.g.player; },
+  players() { return this.on ? this.ctxs.map((c) => this.pl(c)) : [G.player]; },
+  targets() { return this.on ? this.ctxs.map((c) => ({ ctx: c, p: this.pl(c) })) : [{ ctx: null, p: G.player }]; },
+  allCompanions() { return this.on ? this.ctxs.flatMap((c) => (c === this.cur ? G.companions : c.g.companions)) : G.companions; },
+  nearestDist(x, z) { let d = 1e9; for (const p of this.players()) d = Math.min(d, Math.hypot(p.pos.x - x, p.pos.z - z)); return d; },
+  nearestIdx(pos) {
+    let best = 0, bd = 1e9;
+    this.ctxs.forEach((c, i) => { const p = this.pl(c); const d = Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z) + (p.dead ? 1e6 : 0); if (d < bd) { bd = d; best = i; } });
+    return best;
+  },
+  // which player a robot goes after: the nearest one still standing (bosses: only players in the fight)
+  targetOf(e) {
+    const ok = this.ctxs.filter((c) => { const p = this.pl(c); return !p.dead && (!e.isBoss || !World.domeTrap || p.inFight); });
+    if (!ok.length) return e._tc || this.ctxs[0];
+    const d = (c) => { const p = this.pl(c); return Math.hypot(p.pos.x - e.pos.x, p.pos.z - e.pos.z); };
+    let best = ok.reduce((a, b) => (d(b) < d(a) ? b : a));
+    if (e._tc && ok.includes(e._tc) && d(e._tc) < d(best) * 1.25 + 4) best = e._tc;   // don't flip-flop
+    e._tc = best;
+    return best;
+  },
+  usesPad() { return !!this.cur && this.cur.dev !== 'kbm'; },
+  padOf(i) {
+    const c = this.ctxs[i];
+    if (!c || c.dev === 'kbm') return null;
+    return Pad.pads().find((g) => g.index === c.dev) || null;
+  },
+  ctxForPad(index) { return this.ctxs.find((c) => c.dev === index) || null; },
+  anyHit(code) { return this.ctxs.some((c) => c.input.hit(code)); },
+  endFrame() { for (const c of this.ctxs) if (c.input !== Input) c.input.endFrame(); },
+
+  // ═════════════════════════ Boss domes, death & respawn ═════════════════════════
+  fighters() { return this.ctxs.filter((c) => this.pl(c).inFight).length || 1; },
+  bossHpScale() { return 1 + 0.65 * (this.fighters() - 1); },
+  // the dome seals: a partner who is close enough (and can survive down there) is pulled in too
+  joinFight(A) {
+    const me = G.player;
+    me.inFight = true;
+    for (const c of this.ctxs) {
+      if (c === this.cur) continue;
+      const q = this.pl(c);
+      const hullOk = A.i !== 5 || ((c.g.gear && c.g.gear.hull) || 0) >= 3;
+      if (q.dead || !hullOk || Math.hypot(q.pos.x - A.x, q.pos.z - A.z) > 160) {
+        this.as(c, () => UI.banner('A WARDEN FIGHT BEGAN', `${ZONES[A.i].boss.name}'s dome sealed with your partner inside`, '#ff9f43', 3.5));
+        continue;
+      }
+      const a = Math.atan2(me.pos.x - A.x, me.pos.z - A.z) + 0.35, r = A.r - 9;
+      q.pos.set(A.x + Math.sin(a) * r, 0, A.z + Math.cos(a) * r);
+      q.pos.y = World.arenaFloor(q.pos.x, q.pos.z) + 0.1;
+      q.vel.set(0, 0, 0); q.gliding = false; q.climbing = null; q.jetting = false; q.fallTop = q.pos.y; q.invuln = 1.5;
+      q.inFight = true;
+      this.as(c, () => {
+        for (const b of G.companions) if (b.active) b.pos.set(q.pos.x, q.pos.y + 2, q.pos.z);
+        Fx.tintFlash('#ffffff', 0.8); Sound.play('portal');
+        UI.banner('PULLED INTO THE DOME', `Your partner woke ${ZONES[A.i].boss.name} — fight together!`, ZONES[A.i].boss.color, 3);
+      });
+    }
+  },
+  // players outside a sealed dome can't walk in
+  keepOut(pos, r) {
+    const A = World.arena;
+    const ax = pos.x - A.x, az = pos.z - A.z, ad = Math.hypot(ax, az) || 1, R = A.r + 2 + r;
+    if (ad < R && pos.y < A.y + A.r + 4) { pos.x = A.x + (ax / ad) * R; pos.z = A.z + (az / ad) * R; }
+  },
+  // rebuilt at home after a defeat, with everything you carry (the other player plays on)
+  respawn() {
+    const p = G.player;
+    G.dying = 0;
+    p.dead = false; p.inFight = false;
+    p.pos.set(World.spawn.x + (this.idx ? 2.5 : -2.5), 0, World.spawn.z);
+    p.pos.y = World.heightAt(p.pos.x, p.pos.z);
+    p.vel.set(0, 0, 0); p.yaw = 0; p.pitch = -0.05;
+    p.hp = p.maxHp; p.invuln = 2; p.energy = 100; p.dashCd = 0; p.shield = 0;
+    p.stamina = p.maxStamina; p.exhausted = false; p.gliding = false; p.climbing = null; p.jetting = false; p.fuel = 100;
+    p.fallTop = p.pos.y; p.safe = null; p.frozenT = 0; p.burnT = 0; p.slowT = 0;
+    for (const c of G.companions) if (c.active) c.pos.set(p.pos.x, p.pos.y + 2, p.pos.z);
+    UI.banner('REBUILT AT HOME', 'Wren patched you up — you kept everything you carry', '#3cf2ff', 3);
+    if (World.domeTrap && !this.ctxs.some((c) => { const q = this.pl(c); return q.inFight && !q.dead; })) this.failFight();
+  },
+  // everyone in the dome went down: the Warden waits, and the dome opens again
+  failFight() {
+    const A = G.fight;
+    if (G.boss) { G.boss.dead = true; G.boss.destroy(); G.boss = null; }
+    for (const b of G.ebullets) b.dead = true;
+    for (const s of G.spawns) scene.remove(s.beam);
+    G.spawns.length = 0;
+    if (A) World.openDome(A);
+    World.domeTrap = false;
+    G.fight = null; G.objective = 'explore';
+    for (const c of this.ctxs) this.pl(c).inFight = false;
+    Sound.setIntensity(0);
+    const name = A ? ZONES[A.i].boss.name : 'The Warden';
+    this.each(() => UI.banner('THE DOME REOPENS', `${name} waits — regroup and try again`, '#ff9f43', 4));
+  },
+
+  // ═════════════════════════ Drawing two views ═════════════════════════
+  resize() {
+    if (!this.post2 || this.ctxs.length < 2) return;
+    const w = W / 2;
+    for (const c of this.ctxs) { c.camera.aspect = w / H; c.camera.far = this.ctxs[0].camera.far; c.camera.updateProjectionMatrix(); }
+    const low = G.settings.quality === 'low';
+    post.setSize(w, H, DPR);
+    this.post2.setSamples(low ? 0 : 4);
+    this.post2.setSize(w, H, DPR);
+  },
+  // screen shake, damage flash and tint fade for the player who isn't swapped in (Fx.update does the other)
+  decayScreens(dt) {
+    for (const c of this.ctxs) {
+      if (c === this.cur) continue;
+      c.fx[0] = Math.max(0, c.fx[0] - dt * 2.2); c.fx[1] = Math.max(0, c.fx[1] - dt * 1.5); c.fx[2] = Math.max(0, c.fx[2] - dt * 2);
+    }
+  },
+  render(dt) {
+    this.dt = dt;
+    World.update(dt, G.time, this.ctxs[0].camera);
+    Weather.update(dt, this.ctxs[0].camera.position, G.time);
+    const w = Math.floor(W / 2);
+    this.ctxs.forEach((c, i) => this.as(c, () => this.drawView(c, i, w), false));
+  },
+  drawView(me, i, w) {
+    // what each player's robot shows in this view: your own robot only in third person, the other always
+    const inGame = G.state !== 'menu';
+    this.ctxs.forEach((c, j) => {
+      const g = c === me ? G : c.g, p = g.player, alive = !p.dead && inGame;
+      const third = (c === me ? G.settings.view : c.view) === 'third';
+      g.avatar.visible = alive && (c !== me || third);
+      g.vm.visible = c === me && alive && !third;
+      g.fpGlider.visible = c === me && alive && !third && p.gliding;
+      const t = this.tags[j];
+      t.visible = c !== me && alive;
+      if (t.visible) t.position.set(p.pos.x, p.pos.y + 2.6, p.pos.z);
+    });
+    // the sky, fog and light around this player
+    const cam = camera;
+    World.skyMesh.position.copy(cam.position);
+    const ud = camUnderwater(cam);
+    World.underK = ud > 0 ? 1 : 0; World.underDepth = ud;
+    World.skyMesh.visible = ud <= 0;
+    if (World.waterMat) World.waterMat.opacity = cam.position.y < WORLD.water ? 0.7 : 0.86;
+    if (me.env) this.envLoad(me.env);
+    World.envBlend(cam.position.x, cam.position.z, cam.position.y, me.env ? 1 - Math.exp(-1.6 * this.dt) : 1);
+    me.env = this.envSave(me.env);
+    World.followSun(G.player.pos.x, G.player.pos.y, G.player.pos.z);
+    const pf = i ? this.post2 : post;
+    const u = pf.compMat.uniforms;
+    u.damage.value = Fx.damage; u.tint.value.copy(Fx.tint); u.tintAmt.value = Fx.tintAmt;
+    pf.render(scene, cam, G.time, [i * w, 0, w, H]);
+  },
+  // each view keeps its own sky / fog / light blend
+  envSave(o) {
+    const u = World.skyMesh.material.uniforms, f = World.scene.fog, h = World.hemi, s = World.sun;
+    if (!o) { const C = () => new THREE.Color(); o = { top: C(), hor: C(), bot: C(), sunC: C(), sd: new THREE.Vector3(), wsd: new THREE.Vector3(), fog: C(), h0: C(), h1: C(), sun: C() }; }
+    o.top.copy(u.top.value); o.hor.copy(u.horizon.value); o.bot.copy(u.bottom.value); o.sunC.copy(u.sunColor.value); o.sd.copy(u.sunDir.value); o.stars = u.stars.value;
+    o.wsd.copy(World.sunDir); o.fog.copy(f.color); o.fd = f.density;
+    o.h0.copy(h.color); o.h1.copy(h.groundColor); o.hi = h.intensity; o.sun.copy(s.color); o.si = s.intensity;
+    return o;
+  },
+  envLoad(o) {
+    const u = World.skyMesh.material.uniforms, f = World.scene.fog, h = World.hemi, s = World.sun;
+    u.top.value.copy(o.top); u.horizon.value.copy(o.hor); u.bottom.value.copy(o.bot); u.sunColor.value.copy(o.sunC); u.sunDir.value.copy(o.sd); u.stars.value = o.stars;
+    World.sunDir.copy(o.wsd); f.color.copy(o.fog); f.density = o.fd;
+    h.color.copy(o.h0); h.groundColor.copy(o.h1); h.intensity = o.hi; s.color.copy(o.sun); s.intensity = o.si;
+  },
+};
+
+</script>
+<script>
+'use strict';
 // ═════════════════════════ Renderer & scene ═════════════════════════
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -10739,7 +11339,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NoToneMapping;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 750);
+// `let`: in split screen each player has a camera, swapped in for their turn (see split.js)
+let camera = new THREE.PerspectiveCamera(75, 1, 0.05, 750);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const post = new PostFX(renderer);
@@ -10757,6 +11358,7 @@ function resize() {
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   camera.aspect = W / H; camera.updateProjectionMatrix();
   post.setSize(W, H, DPR);
+  if (Split.on) Split.resize();
 }
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c3 = new THREE.Vector3(), _cv = new THREE.Vector3();
@@ -10964,8 +11566,9 @@ const G = {
   hint(text) { UI.hint(text); },
 
   vol(pos) {
-    const p = this.player.pos;
-    return 1 / (1 + Math.hypot(pos.x - p.x, pos.z - p.z) / 18);
+    let d = 1e9;
+    for (const q of Split.players()) d = Math.min(d, Math.hypot(pos.x - q.pos.x, pos.z - q.pos.z));
+    return 1 / (1 + d / 18);
   },
 
   nearestEnemy(x, z, maxD, exclude, aggroOnly) {
@@ -11057,21 +11660,21 @@ const G = {
     if (speed > 300) m.scale.set(0.7, 0.7, 2.6);
     _a.set(x + dir.x, y + dir.y, z + dir.z); m.lookAt(_a);
     scene.add(m);
-    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life, mesh: m, fromPlayer, home });
+    this.bullets.push({ kind: 'bolt', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color, life, mesh: m, fromPlayer, home, owner: Split.idx });
   },
 
   // player rocket: flies straight (aim assist nudges it), big splash that hurts you too
   spawnRocket(x, y, z, dir, speed, dmg, splash, home) {
     const m = new THREE.Mesh(missileGeo, Mat.glow('#c6ff4d', 3));
     m.scale.setScalar(1.8); m.position.set(x, y, z); scene.add(m);
-    this.bullets.push({ kind: 'rocket', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color: '#c6ff4d', life: 3, mesh: m, splash, fromPlayer: true, home });
+    this.bullets.push({ kind: 'rocket', pos: new THREE.Vector3(x, y, z), vel: dir.clone().multiplyScalar(speed), dmg, color: '#c6ff4d', life: 3, mesh: m, splash, fromPlayer: true, home, owner: Split.idx });
   },
 
   // Bomber Bot payload
   spawnBomb(pos, vel, dmg) {
     const m = new THREE.Mesh(bulletGeo, Mat.glow('#ff7a3d', 4));
     m.scale.setScalar(0.25); m.position.copy(pos); scene.add(m);
-    this.bullets.push({ kind: 'grenade', bomb: true, pos: pos.clone(), vel, dmg, color: '#ff7a3d', life: 4, mesh: m });
+    this.bullets.push({ kind: 'grenade', bomb: true, pos: pos.clone(), vel, dmg, color: '#ff7a3d', life: 4, mesh: m, owner: Split.idx });
   },
 
   spawnMissile(x, y, z, vel, dmg, target) {
@@ -11083,7 +11686,7 @@ const G = {
   spawnGrenade(pos, vel) {
     const m = new THREE.Mesh(bulletGeo, Mat.glow('#b98cff', 5));
     m.scale.setScalar(0.18); m.position.copy(pos); scene.add(m);
-    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 40 + this.level * 8, color: '#b98cff', life: 4, mesh: m });
+    this.bullets.push({ kind: 'grenade', pos: pos.clone(), vel, dmg: 40 + this.level * 8, color: '#b98cff', life: 4, mesh: m, owner: Split.idx });
   },
 
   // opts: { effect: 'frost'|'fire'|'freeze', grav, splash, life, marker, big }
@@ -11124,8 +11727,9 @@ const G = {
     Fx.explosion(p.pos.x, p.pos.y + 1, p.pos.z, '#3cf2ff', 2);
     Fx.addShake(1);
     Sound.play('explode', true); Sound.play('lose');
-    this.dying = 2.4; this.timeScale = 0.35;
-    Sound.setIntensity(0);
+    this.dying = 2.4;
+    // split screen: no slow motion (the other player is still fighting); you're rebuilt at home
+    if (!Split.on) { this.timeScale = 0.35; Sound.setIntensity(0); }
     Input.mouse.down = false;
   },
 
@@ -11225,13 +11829,16 @@ function newRun() {
 const SAVE_VERSION = 3;
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
+  // the save is written from player 1's point of view (player 2's character is added as `p2`)
+  if (Split.on && Split.idx !== 0) return Split.as(Split.ctxs[0], stateJSON, false);
   const p = G.player;
   const W = G.progress.world;
   W.fog = WorldMap.packFog();
   return JSON.stringify({ v: SAVE_VERSION, bar: G.bar, sel: G.sel, weapon: G.weapon, storage: G.storage, bucks: G.bucks, gear: G.gear, base: G.base, progress: G.progress,
     up: G.up, comps: G.companions.map((c) => ({ kind: c.kind, battery: c.battery, hp: c.hp, away: !c.active })), hp: p.hp, total: G.total,
     reserve: G.reserve.map((e) => ({ kind: e.kind, battery: G.reserveBattery(e), hp: e.hp })), vessels: G.vessels, spritesFound: G.spritesFound,
-    pos: G.safeSpot ? [G.safeSpot.x, G.safeSpot.y, G.safeSpot.z, G.safeSpot.yaw] : null });
+    pos: G.safeSpot ? [G.safeSpot.x, G.safeSpot.y, G.safeSpot.z, G.safeSpot.yaw] : null,
+    p2: Split.on ? Split.charJSON(1) : G.p2Data || undefined });
 }
 function applyState(json) {
   const s = JSON.parse(json);
@@ -11266,6 +11873,7 @@ function applyState(json) {
   G.vessels = s.vessels || 0; G.spritesFound = s.spritesFound || 0;
   G.weapon = s.weapon || 'blaster';
   G.savedPos = s.pos;
+  G.p2Data = s.p2 || null;
   G.checkWeapon();
   setViewModelWeapon(G.vm, G.weapon, 1 + G.up.split);
   UI.hotbarDirty = true;
@@ -11396,8 +12004,7 @@ function updateRegion(dt, force) {
   G.region = R; G.regionT = 0;
   G.where = R === REGIONS.hub ? 'hub' : 'biome';
   G.level = R.tier;
-  Weather.init(scene, R.ambient, R.ambientColor || R.accent);
-  Sound.setZone(R.zone);
+  if (Split.idx === 0) { Weather.init(scene, R.ambient, R.ambientColor || R.accent); Sound.setZone(R.zone); }
   if (G.where === 'hub') arriveHome(first);
   else if (!first) UI.banner(R.name.toUpperCase(), regionIntro(R), R.accent, 3);
   void was;
@@ -11469,10 +12076,9 @@ function streamCamps(dt) {
   G.campT -= dt;
   if (G.campT > 0) return;
   G.campT = 0.5;
-  const p = G.player;
   let live = G.enemies.length;
   for (const c of World.campSites) {
-    const d = Math.hypot(c.x - p.pos.x, c.z - p.pos.z);
+    const d = Split.nearestDist(c.x, c.z);   // camps wake around either player
     if (!c.live) {
       if (d < CAMP_WAKE && d > 40 && G.time > (c.respawnAt || 0) && live < 46 && !World.domeTrap) {
         c.live = true; c.alerted = false;
@@ -11597,9 +12203,11 @@ function updateObjectives(dt) {
   for (const b of World.beacons) {
     if (b.state !== 'charging') continue;
     const Z = ZONES[b.biome], tier = b.biome;
-    const dist = Math.hypot(p.pos.x - b.x, p.pos.z - b.z);
-    const inside = dist < 14 && Math.abs(p.pos.y - b.y) < 12;
-    if (dist > 140 || p.dead) {
+    // any living player keeps the uplink going
+    const alive = Split.players().filter((q) => !q.dead);
+    const dist = alive.reduce((m, q) => Math.min(m, Math.hypot(q.pos.x - b.x, q.pos.z - b.z)), 1e9);
+    const inside = alive.some((q) => Math.hypot(q.pos.x - b.x, q.pos.z - b.z) < 14 && Math.abs(q.pos.y - b.y) < 12);
+    if (dist > 140) {
       // walked away: the uplink drops
       b.state = 'idle'; b.progress = 0; World.setBeaconColor(b, '#ffb347');
       for (const e of G.enemies) e.hunter = false;
@@ -11625,10 +12233,11 @@ function updateObjectives(dt) {
     if (b.progress >= 1) beaconOnline(b);
   }
   // walking into an open dome starts the fight
-  if (!World.domeTrap && !p.dead) {
-    for (const A of World.arenas) {
-      if (A.sealed || G.progress.beaten[A.i]) continue;
-      if (Math.hypot(p.pos.x - A.x, p.pos.z - A.z) < A.r - 6 && Math.abs(p.pos.y - A.y) < 12) { startBossFight(A); break; }
+  if (!World.domeTrap) {
+    for (const { ctx, p: q } of Split.targets()) {
+      if (q.dead) continue;
+      const A = World.arenas.find((a) => !a.sealed && !G.progress.beaten[a.i] && Math.hypot(q.pos.x - a.x, q.pos.z - a.z) < a.r - 6 && Math.abs(q.pos.y - a.y) < 12);
+      if (A) { Split.as(ctx, () => startBossFight(A)); break; }
     }
   }
 }
@@ -11677,6 +12286,7 @@ function startBossFight(A) {
   Sound.play('warn');
   Sound.play('slam');
   Sound.setIntensity(2);
+  if (Split.on) Split.joinFight(A);
 }
 
 // ─────────── Secrets, Scrap Sprites & the map ───────────
@@ -11780,11 +12390,26 @@ function respawnHome() {
 function update(dt) {
   G.time += dt;
   G.stats.time += dt;
-  const p = G.player;
+  // each player's own turn (in split screen, both players, one after the other)
+  if (Split.on) {
+    for (const c of Split.ctxs) {
+      Split.as(c, () => updatePlayer(dt));
+      if (G.state !== 'playing') { Split.menuCtx = c; return; }
+    }
+  } else {
+    updatePlayer(dt);
+    if (G.state !== 'playing') return;
+  }
+  updateWorld(dt);
+}
 
+// one player's input, movement, interactions, exploring and region
+function updatePlayer(dt) {
+  const p = G.player;
   if (G.dying > 0) {
     G.dying -= dt / Math.max(0.1, G.timeScale);
     if (G.dying <= 0) {
+      if (Split.on) { Split.respawn(); return; }
       Object.keys(G.stats).forEach((k) => (G.total[k] = (G.total[k] || 0) + G.stats[k]));
       G.state = 'gameover';
       Input.unlock();
@@ -11792,6 +12417,9 @@ function update(dt) {
       return;
     }
   } else if (!p.dead && !G.levelDone && !G.cine) {
+    // in split screen each player opens their own field kit and pause menu
+    if (Split.on && (Input.hit('Tab') || Input.hit('KeyI'))) { UI.openStation('field'); return; }
+    if (Split.on && (Input.hit('Escape') || Input.hit('KeyP'))) { UI.pause(); return; }
     if (Input.hit('KeyV')) UI.toggleView();
     if (Input.hit('KeyJ')) { UI.openStation('journal'); return; }
     // hotbar: number keys / mouse wheel select a slot, X drops the selected item
@@ -11806,12 +12434,16 @@ function update(dt) {
     if (Input.hit('KeyM')) { WorldMap.open(); return; }
     explore(dt);
   }
-
-  Story.update(dt);
   Wardens.update(dt, G.time);
   if (G.recallT > 0) { G.recallT -= dt; if (Math.random() < dt * 30) Fx.glowBurst(p.pos.x + rand(-1, 1), p.pos.y + rand(0, 2), p.pos.z + rand(-1, 1), '#3cf2ff', 0.6, 0.4, 2); if (G.recallT <= 0 && !p.dead && !World.domeTrap) G.travelTo(World.spawn.x, World.spawn.z, undefined, 'Home Base'); }
   if (Input.hit('Enter')) Dialog.skip();
   updateRegion(dt);
+}
+
+// everything shared: the story, camps, objectives, robots, bots, shots and pickups
+function updateWorld(dt) {
+  const p = G.player;
+  Story.update(dt);
   streamCamps(dt);
   updateObjectives(dt);
   G.vacuumT = Math.max(0, (G.vacuumT || 0) - dt);
@@ -11827,6 +12459,7 @@ function update(dt) {
       scene.remove(s.beam);
       if (s.type === 'boss') {
         const b = new Boss(s.boss, s.x, s.z);
+        if (Split.on) b.maxHp = b.hp = Math.round(b.maxHp * Split.bossHpScale());   // tougher with two in the dome
         G.boss = b; G.enemies.push(b);
         Fx.explosion(s.x, s.y + 4, s.z, b.color, 3);
         Fx.addShake(0.8);
@@ -11844,7 +12477,8 @@ function update(dt) {
   for (const e of G.enemies) {
     if (e.dead) continue;
     if (e.doomT !== undefined) { e.doomT -= dt; if (e.doomT <= 0) G.killEnemy(e, true); continue; }
-    e.update(dt);
+    if (Split.on) Split.as(Split.targetOf(e), () => e.update(dt), false);
+    else e.update(dt);
   }
   const E = G.enemies;
   for (let i = 0; i < E.length; i++) {
@@ -11865,7 +12499,7 @@ function update(dt) {
     }
   }
 
-  if (!p.dead) G.companions.forEach((c, i) => c.update(dt, i, G.companions.length));
+  Split.each(() => { if (!G.player.dead) G.companions.forEach((c, i) => c.update(dt, i, G.companions.length)); });
 
   updateBullets(dt);
   updateEnemyBullets(dt);
@@ -11897,7 +12531,7 @@ function update(dt) {
   if (G.musicT <= 0) {
     G.musicT = 1;
     if (G.objective !== 'boss') {
-      const hunted = G.enemies.some((e) => e.aggro && Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) < 55) || World.beacons.some((b) => b.state === 'charging');
+      const hunted = Split.players().some((q) => G.enemies.some((e) => e.aggro && Math.hypot(e.pos.x - q.pos.x, e.pos.z - q.pos.z) < 55)) || World.beacons.some((b) => b.state === 'charging');
       Sound.setIntensity(hunted ? 1 : 0);
     }
   }
@@ -11955,7 +12589,7 @@ function updateBullets(dt) {
         b.dead = true;
         const gy = Math.max(b.pos.y, World.heightAt(b.pos.x, b.pos.z) + 0.3);
         const R = b.bomb ? 5 : 5.5;
-        explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 1.8, b.bomb ? 12 : 25);
+        Split.asIdx(b.owner, () => explodeAt(b.pos.x, gy, b.pos.z, R, b.dmg, b.color, b.bomb ? 1.5 : 1.8, b.bomb ? 12 : 25));
         Fx.shockRing(b.pos.x, gy, b.pos.z, b.bomb ? '#ffb38a' : '#e0ccff', R * 0.5, 50);
         if (!b.bomb) for (const eb of G.ebullets) if (eb.pos.distanceTo(b.pos) < 6) { eb.dead = true; Fx.glowBurst(eb.pos.x, eb.pos.y, eb.pos.z, '#b98cff', 0.6, 0.3); }
         Fx.addShake(0.5 * G.vol(b.pos) * 2);
@@ -12014,7 +12648,7 @@ function updateBullets(dt) {
     }
     const boom = () => {
       const selfDmg = b.kind === 'rocket' ? 35 : 0;
-      explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, b.kind === 'rocket' ? 1.4 : 0.7, selfDmg);
+      Split.asIdx(b.owner, () => explodeAt(b.pos.x, b.pos.y, b.pos.z, b.splash, b.dmg, b.color, b.kind === 'rocket' ? 1.4 : 0.7, selfDmg));
       if (b.kind === 'rocket') { Fx.shockRing(b.pos.x, b.pos.y, b.pos.z, '#e8ffb0', 3, 40); Fx.addShake(0.4 * G.vol(b.pos) * 2); Sound.play('bomb', null, Math.min(1, G.vol(b.pos) * 2)); }
       else Sound.play('explode', false, G.vol(b.pos));
     };
@@ -12024,13 +12658,13 @@ function updateBullets(dt) {
         Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 8, '#ffd1f2', 8);
         Sound.play('block', null, G.vol(hit.pos));
         hit.flash = Math.max(hit.flash, 0.3);
-        if (b.fromPlayer) UI.hitmarker(false, true);
+        if (b.fromPlayer) Split.asIdx(b.owner, () => UI.hitmarker(false, true));
         continue;
       }
       if (b.kind === 'missile' || b.kind === 'rocket') boom();
       else {
         G.damageEnemy(hit, b.dmg, b.pos.x, b.pos.y, b.pos.z, b.color);
-        if (b.fromPlayer) UI.hitmarker(false);
+        if (b.fromPlayer) Split.asIdx(b.owner, () => UI.hitmarker(false));
       }
       continue;
     }
@@ -12051,7 +12685,7 @@ function applyShotEffect(p, eff) {
 }
 
 function updateEnemyBullets(dt) {
-  const p = G.player;
+  const PL = Split.targets();   // [{ ctx, p }] — just the one player outside split screen
   const HD = World.homeDome;
   for (const b of G.ebullets) {
     if (b.dead) continue;
@@ -12081,13 +12715,15 @@ function updateEnemyBullets(dt) {
         Fx.explosion(b.pos.x, b.pos.y, b.pos.z, b.color, 1.3);
         Fx.shockRing(b.pos.x, Math.max(b.pos.y, ground) + 0.2, b.pos.z, b.color, b.splash * 0.6, 30);
         Sound.play('explode', false, G.vol(b.pos));
-        const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
-        if (pd < b.splash && !p.dead) { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); }
+        for (const { ctx, p } of PL) {
+          const pd = Math.hypot(p.pos.x - b.pos.x, p.pos.y + 0.9 - b.pos.y, p.pos.z - b.pos.z);
+          if (pd < b.splash && !p.dead) Split.as(ctx, () => { p.hurt(b.dmg * (1 - 0.5 * pd / b.splash), { x: b.pos.x, z: b.pos.z }); applyShotEffect(p, b.effect); });
+        }
         if (b.effect === 'fire') G.spawnEnemyBullet(b.pos.x, ground + 0.8, b.pos.z, 0, 0, 0, b.dmg * 0.25, 1.2, '#ff6a1a', 0.8, { effect: 'fire', life: 3, fromBoss: b.fromBoss });
       } else Fx.sparks(b.pos.x, b.pos.y, b.pos.z, 4, b.color, 4);
       continue;
     }
-    for (const c of G.companions) {
+    for (const c of Split.allCompanions()) {
       if (!c.active) continue;
       const pad = c.kind === 'shield' ? 0.5 : 0;
       if (b.pos.distanceToSquared(c.pos) < (c.r + b.r + pad) ** 2) {
@@ -12098,32 +12734,46 @@ function updateEnemyBullets(dt) {
         break;
       }
     }
-    if (b.dead || p.dead) continue;
-    // swept test: fast shots must not skip through you between frames
-    let touch = false;
-    const steps = Math.min(8, Math.ceil(Math.hypot(b.pos.x - px0, b.pos.y - py0, b.pos.z - pz0) / 0.5));
-    for (let k = 1; k <= steps && !touch; k++) {
-      const f = k / steps;
-      touch = segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, lerp(px0, b.pos.x, f), lerp(py0, b.pos.y, f), lerp(pz0, b.pos.z, f)) < 0.45 + b.r;
-    }
-    if (touch) {
+    if (b.dead) continue;
+    for (const { ctx, p } of PL) {
+      if (p.dead) continue;
+      // swept test: fast shots must not skip through you between frames
+      let touch = false;
+      const steps = Math.min(8, Math.ceil(Math.hypot(b.pos.x - px0, b.pos.y - py0, b.pos.z - pz0) / 0.5));
+      for (let k = 1; k <= steps && !touch; k++) {
+        const f = k / steps;
+        touch = segPointDist(p.pos.x, p.pos.y + 0.3, p.pos.z, p.pos.x, p.pos.y + 1.6, p.pos.z, lerp(px0, b.pos.x, f), lerp(py0, b.pos.y, f), lerp(pz0, b.pos.z, f)) < 0.45 + b.r;
+      }
+      if (!touch) continue;
       if (b.hugH && b.life > 1 && b.vel.lengthSq() < 1) {
         // lingering fire patch: burns while you stand in it
-        if (p.invuln <= 0) { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); }
+        if (p.invuln <= 0) Split.as(ctx, () => { p.hurt(b.dmg, null); applyShotEffect(p, b.effect); });
         continue;
       }
       b.dead = true;
       if (b.marker) scene.remove(b.marker);
-      if (p.dashT <= 0) { p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); applyShotEffect(p, b.effect); }
+      if (p.dashT <= 0) Split.as(ctx, () => { p.hurt(b.dmg, { x: b.pos.x - b.vel.x, z: b.pos.z - b.vel.z }); applyShotEffect(p, b.effect); });
+      break;
     }
   }
 }
 
 function updatePickups(dt) {
+  if (!Split.on) pickupsFor(dt, G.pickups);
+  else {
+    const groups = Split.ctxs.map(() => []);
+    for (const k of G.pickups) groups[Split.nearestIdx(k.pos)].push(k);
+    Split.ctxs.forEach((c, i) => { if (groups[i].length) Split.as(c, () => pickupsFor(dt, groups[i])); });
+  }
+  G.pickups = G.pickups.filter((k) => !k.dead);
+}
+
+// pickups pulled toward and collected by the current player
+function pickupsFor(dt, list) {
   const p = G.player;
   const mag = p.magnet;
   const vacuum = G.vacuumT > 0;
-  for (const k of G.pickups) {
+  for (const k of list) {
     k.t += dt;
     const needsSlot = k.type !== 'health' && k.type !== 'bucks';
     const full = needsSlot && !G.canAdd(k.item || { t: 'part', id: k.type });
@@ -12162,7 +12812,6 @@ function updatePickups(dt) {
     }
     if (k.t > 90 && !k.pulled) { k.dead = true; scene.remove(k.model); }
   }
-  G.pickups = G.pickups.filter((k) => !k.dead);
 }
 
 // ═════════════════════════ Camera, view model & avatar ═════════════════════════
@@ -12217,7 +12866,8 @@ function updateAvatar(dt) {
     Fx.smoke(p.pos.x + rx * side * 0.14, p.pos.y + 0.05, p.pos.z + rz * side * 0.14, 0.35, 0.6, rand(-0.3, 0.3), 0.4, rand(-0.3, 0.3), '#6a5a50');
   }
 
-  const show = G.thirdPerson && !p.dead && G.state !== 'menu';
+  // in split screen the robot is always animated: the other player sees it
+  const show = (G.thirdPerson || Split.on) && !p.dead && G.state !== 'menu';
   a.visible = show;
   if (!show) return;
 
@@ -12432,21 +13082,27 @@ function frame(now) {
   const dt = clamp((now - lastT) / 1000, 0, 0.05);
   lastT = Math.max(lastT, now);
   Pad.poll(dt);
+  if (Split.on) Split.rest();
+  const hit = (c) => (Split.on ? Split.anyHit(c) : Input.hit(c));
 
   if (G.state === 'playing') {
-    if (Input.hit('Tab') || Input.hit('KeyI')) UI.openStation('field');
-    else if (Input.hit('Escape') || Input.hit('KeyP')) UI.pause();
+    if (!Split.on && (Input.hit('Tab') || Input.hit('KeyI'))) UI.openStation('field');
+    else if (!Split.on && (Input.hit('Escape') || Input.hit('KeyP'))) UI.pause();
     else {
-      const tsTarget = G.focus && G.dying <= 0 ? 0.4 : 1;
+      const tsTarget = G.focus && G.dying <= 0 && !Split.on ? 0.4 : 1;
       G.timeScale += (tsTarget - G.timeScale) * (1 - Math.exp(-(G.dying > 0 ? 0.5 : G.focus ? 8 : 2) * dt));
       const sdt = dt * G.timeScale;
       update(sdt);
-      if (G.state === 'playing' || G.state === 'gameover') updateCamera(sdt);
+      if (Split.on) Split.each(() => updateCamera(sdt));
+      else if (G.state === 'playing' || G.state === 'gameover') updateCamera(sdt);
       Fx.update(sdt, (x, z) => World.heightAt(x, z));
-      World.followSun(G.player.pos.x, G.player.pos.y, G.player.pos.z);
+      if (Split.on) Split.decayScreens(sdt);
+      else World.followSun(G.player.pos.x, G.player.pos.y, G.player.pos.z);
     }
-    UI.refreshHUD();
+    if (Split.on) Split.each(() => UI.refreshHUD());
+    else UI.refreshHUD();
   } else if (G.state === 'menu') {
+    if (Split.lobby) Split.lobbyKeys();
     menuT += dt;
     G.time += dt;
     const a = menuT * 0.05;
@@ -12456,22 +13112,26 @@ function frame(now) {
     World.followSun(0, hy, 0);
     Fx.update(dt, (x, z) => World.heightAt(x, z));
   } else if (G.state === 'workshop' || G.state === 'paused') {
-    if (Input.hit('Escape') || ((Input.hit('Tab') || Input.hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
+    if (hit('Escape') || ((hit('Tab') || hit('KeyI')) && G.state === 'workshop')) UI.closeOverlay();
   } else if (G.state === 'map') {
-    if (Input.hit('Escape') || Input.hit('KeyM') || Input.hit('Tab')) WorldMap.close();
+    if (hit('Escape') || hit('KeyM') || hit('Tab')) WorldMap.close();
     else WorldMap.draw();
   }
-  if (Input.hit('KeyN')) UI.toggleMute();
+  if (hit('KeyN')) UI.toggleMute();
   document.body.classList.toggle('playing', G.state === 'playing');
   Touch.refresh();
 
-  World.update(dt, G.time, camera);
-  Weather.update(dt, camera.position, G.time);
-  const u = post.compMat.uniforms;
-  u.damage.value = Fx.damage;
-  u.tint.value.copy(Fx.tint); u.tintAmt.value = Fx.tintAmt;
-  post.render(scene, camera, G.time);
+  if (Split.on) Split.render(dt);
+  else {
+    World.update(dt, G.time, camera);
+    Weather.update(dt, camera.position, G.time);
+    const u = post.compMat.uniforms;
+    u.damage.value = Fx.damage;
+    u.tint.value.copy(Fx.tint); u.tintAmt.value = Fx.tintAmt;
+    post.render(scene, camera, G.time);
+  }
   Input.endFrame();
+  if (Split.on) Split.endFrame();
   requestAnimationFrame(frame);
 }
 
@@ -12505,6 +13165,7 @@ Input.onLockChange = (locked) => { if (!locked && G.state === 'playing' && !Inpu
 canvas.addEventListener('click', () => { if (G.state === 'playing' && !Input.locked) Input.lock(canvas); });
 Touch.init();
 Pad.init();
+Split.init();
 if (Touch.enabled) {
   // phones: performance mode by default (no shadows, reduced resolution, no MSAA)
   G.settings.quality = 'low';

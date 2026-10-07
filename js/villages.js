@@ -458,9 +458,12 @@ const Villages = {
 
   // ═════════════════════════ Per-frame ═════════════════════════
   update(dt, time) {
-    const p = G.player;
     if (!World.npcs) return;
+    const PS = Split.players();
     for (const n of World.npcs) {
+      // villagers notice whichever player is closest (split screen has two)
+      let p = PS[0];
+      for (const q of PS) if (Math.hypot(q.pos.x - n.x, q.pos.z - n.z) < Math.hypot(p.pos.x - n.x, p.pos.z - n.z)) p = q;
       const near = Math.abs(n.x - p.pos.x) < 160 && Math.abs(n.z - p.pos.z) < 160;
       n.model.visible = near;
       if (!near) continue;
@@ -491,7 +494,7 @@ const Villages = {
     }
     for (const c of World.chargePosts) c.ring.scale.setScalar(1 + 0.06 * Math.sin(time * 4 + c.x));
     for (const f of World.finds) if (f.glow.visible) f.glow.material.opacity = 0.6 + 0.4 * Math.sin(time * 3);
-    if (G.state === 'playing') this.updatePresence(dt);
+    if (G.state === 'playing') Split.each(() => this.updatePresence(dt));
   },
   // robots that are not yours stay out of the villages
   keepOut(e) {

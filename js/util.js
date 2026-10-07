@@ -87,7 +87,8 @@ function makePerlin(seed) {
 }
 
 // ───────────────────────── Input (pointer-lock FPS) ─────────────────────────
-const Input = {
+// `let` so split screen can point it at the player whose turn it is (see split.js)
+let Input = {
   keys: {},
   pressed: {},
   mouse: { down: false, right: false, rightPressed: false, dx: 0, dy: 0 },

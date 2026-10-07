@@ -178,6 +178,18 @@ Plug in or pair an Xbox, PlayStation or other standard controller, then press an
 
 Browsers only report a controller after a button is pressed while the page has focus. If the game stays silent, click once; some browsers only allow sound after a mouse click or key press.
 
+### Split screen (2 players on one screen)
+
+Choose **Split Screen · 2 Players** on the main menu (desktop and laptop). Each player joins with a **controller** (press A) or, for one of you, the **keyboard & mouse** (Enter, or the Join button). Two controllers or one controller plus keyboard & mouse both work, and either player can be either. In the lobby, B leaves, X swaps the two players and Start begins.
+
+- Player 1 plays on the left half and player 2 on the right. Each half has its own HUD, compass, radar, hotbar and prompts (keyboard keys or controller buttons, whichever that player uses), and its own sky, fog and underwater light. Your partner's robot (player 2 is orange) carries a name tag, and they show as a coloured ring on your compass and radar.
+- **Shared:** the world and everything done in it (Wardens, beacons, caches, quests, villages), storage and bots waiting at home, and home base. **Each player's own:** hotbar, Botbucks, gear, upgrades, bot squad, and first/third-person view.
+- Opening a menu (pause, field kit, shop, workshop, map) pauses the game for both players, and the menu belongs to whoever opened it (the title says P1 or P2).
+- Robots go after whichever of you is nearest. If one player goes down, they're rebuilt at home base after a moment, keeping everything they carry, while the other plays on.
+- **Warden domes:** when one player walks into a dome, a partner within about 160 m is pulled in too (for Deepsong only if their hull can take the depth). The Warden has ×1.65 health with two of you. Players outside a sealed dome can't get in. If everyone inside goes down, the dome reopens and the Warden waits for another try.
+- It plays your saved world, or starts a new one, with the tutorial skipped. Player 2's character is kept in the same save, so it's still there next time. Single-player keeps working as before.
+- Split screen draws the world twice, so performance mode switches on while it runs; you can turn it off in the pause menu. Weather particles and music follow player 1.
+
 ### On a phone or tablet (landscape)
 
 Touch controls turn on automatically.
@@ -209,6 +221,7 @@ js/underwater.js the Sunken Reach: swimming, pressure, sea floor, wrecks, sea ca
 js/wardens.js   how each Warden is reached: ice grotto mirror puzzle, summit route, lava moat and bridge, Sky Lift
 js/worldmap.js  full-screen world map with fog of war and player markers
 js/models.js    low-poly robot, boss, companion, weapon, pickup and secret models
+js/split.js     split screen: two players' contexts swapped in and out of the shared world, two views and HUDs, the lobby
 js/gamepad.js   controller support: buttons and sticks feed the shared input, plus an on-screen cursor for menus
 js/entities.js  Player controller (cliff climbing, caves), Enemy AI, Boss patterns, Companions
 js/post.js      bloom and tone-mapping post-processing

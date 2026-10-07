@@ -619,12 +619,13 @@ function buildGliderModel(scale = 1) {
 //   root ─ pelvis ─┬─ hip ─ knee ─ ankle ─ toe            (×2)
 //                  └─ spine ─ chest ─┬─ neck ─ head
 //                                    └─ shoulder ─ elbow ─ wrist (×2, gun in right hand)
-function buildAvatarModel() {
+// colours: player 2 in split screen gets a different paint job
+function buildAvatarModel(paint = { shell: '#3a7c98', shellE: '#0e3a4c', dark: '#1a3242', darkE: '#081a24', glow: '#3cf2ff' }) {
   const g = new THREE.Group();
-  const shell = Mat.std('#3a7c98', { metal: 0.55, rough: 0.4, emissive: '#0e3a4c', ei: 0.5 });
-  const dark = Mat.std('#1a3242', { metal: 0.5, rough: 0.5, emissive: '#081a24', ei: 0.5 });
+  const shell = Mat.std(paint.shell, { metal: 0.55, rough: 0.4, emissive: paint.shellE, ei: 0.5 });
+  const dark = Mat.std(paint.dark, { metal: 0.5, rough: 0.5, emissive: paint.darkE, ei: 0.5 });
   const joint = Mat.std('#0e1a22', { metal: 0.85, rough: 0.25, flat: false });
-  const cyan = Mat.glow('#3cf2ff', 4);
+  const cyan = Mat.glow(paint.glow, 4);
   const node = (parent, x, y, z) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
   const J = {};
   J.root = node(g, 0, 0, 0);

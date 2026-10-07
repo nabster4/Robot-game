@@ -1761,16 +1761,21 @@ const World = {
 
   // ═════════════════════ Per-frame ═════════════════════
   update(dt, time, cam) {
-    if (this.skyMesh) this.skyMesh.position.copy(cam.position);
-    // environment follows the camera's biome (and dives with it)
-    const ud = camUnderwater(cam);
-    this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
-    this.skyMesh.visible = ud <= 0;
+    // split screen: the sky and environment are set per view (Split.prepView); things are shown near either camera
+    const cams = this.viewCams;
+    if (!cams) {
+      if (this.skyMesh) this.skyMesh.position.copy(cam.position);
+      // environment follows the camera's biome (and dives with it)
+      const ud = camUnderwater(cam);
+      this.underK = ud > 0 ? 1 : 0; this.underDepth = ud;
+      this.skyMesh.visible = ud <= 0;
+    }
     Sea.update(dt, time, cam);
-    this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
+    if (!cams) this.envBlend(cam.position.x, cam.position.z, cam.position.y, 1 - Math.exp(-1.6 * dt));
     this.lavaMat.emissiveIntensity = 1.3 + Math.sin(time * 2) * 0.25;
     if (this.fallTex) this.fallTex.offset.y -= dt * 1.6;
-    const near = (x, z, R) => Math.abs(x - cam.position.x) < R && Math.abs(z - cam.position.z) < R;
+    const near = cams ? (x, z, R) => cams.some((c) => Math.abs(x - c.position.x) < R && Math.abs(z - c.position.z) < R)
+      : (x, z, R) => Math.abs(x - cam.position.x) < R && Math.abs(z - cam.position.z) < R;
     for (const b of this.beacons) {
       if (!near(b.x, b.z, 300)) continue;
       b.rings.forEach((r, i) => (r.rotation.z += dt * (i % 2 ? -1 : 1) * (b.state === 'charging' ? 4 : b.state === 'done' ? 1.2 : 0.4)));

@@ -251,7 +251,9 @@ class Player {
 
     }
 
-    World.keepInside(this.pos, this.r);
+    // split screen: only players in the fight are kept in the sealed dome; everyone else is kept out
+    if (!Split.on || this.inFight) World.keepInside(this.pos, this.r);
+    else if (World.domeTrap) Split.keepOut(this.pos, this.r);
     if (this.swim) Sea.pressure(this, dt); else { this.depth = 0; this.crush = Math.max(0, (this.crush || 0) - dt * 2); }
     const gy = World.groundAt(this.pos.x, this.pos.z, this.pos.y);
     // fall damage: measured from the highest point of a free fall (gliding / jetpack reset it)
@@ -1624,7 +1626,7 @@ class Companion {
 
   pad() {
     const pads = World.chargePads;
-    const i = G.companions.indexOf(this);
+    const i = G.companions.indexOf(this) + Split.idx * 3;   // player 2's bots use the next pads along
     return pads.length ? pads[Math.max(0, i) % pads.length] : { x: G.player.pos.x, y: G.player.pos.y + 2, z: G.player.pos.z };
   }
 

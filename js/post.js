@@ -95,7 +95,8 @@ class PostFX {
     this.r.render(this.quadScene, this.quadCam);
   }
 
-  render(scene, camera, time) {
+  // vp: [x, y, w, h] in CSS pixels to draw into part of the screen (split screen)
+  render(scene, camera, time, vp) {
     const r = this.r;
     r.setRenderTarget(this.rtScene);
     r.render(scene, camera);
@@ -117,6 +118,8 @@ class PostFX {
     u.tB2.value = this.levels[2].a.texture;
     u.tB3.value = this.levels[3].a.texture;
     u.time.value = time % 100;
+    if (vp) { r.setViewport(vp[0], vp[1], vp[2], vp[3]); r.setScissor(vp[0], vp[1], vp[2], vp[3]); r.setScissorTest(true); }
     this.pass(this.compMat, null);
+    if (vp) { const s = r.getSize(this._sz || (this._sz = new THREE.Vector2())); r.setScissorTest(false); r.setViewport(0, 0, s.x, s.y); }
   }
 }

@@ -7,8 +7,12 @@
 // standard-layout button indices
 const PB = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 
-// Pick the right words for a prompt: controller, touch or keyboard.
-function ctl(kb, touch, pad) { return Pad.active ? pad : Touch.enabled ? touch : kb; }
+// Pick the right words for a prompt: controller, touch or keyboard (in split screen: whatever the
+// player whose turn it is plays with).
+function ctl(kb, touch, pad) {
+  if (Split.on) return Split.usesPad() ? pad : kb;
+  return Pad.active ? pad : Touch.enabled ? touch : kb;
+}
 
 const Pad = {
   connected: false,
@@ -16,10 +20,7 @@ const Pad = {
   DEAD: 0.18,               // stick dead zone
   LOOK_SPEED: 1500,         // right-stick turn rate at full tilt, in "mouse pixels" per second (× look sensitivity)
   CURSOR_SPEED: 1100,       // menu cursor speed at full tilt, px/s
-  prev: [],
-  held: new Set(),          // keys the pad is holding down in Input.keys
-  firing: false,
-  sprint: false,
+  states: new Map(),        // per controller: buttons last frame, keys it holds down, trigger & sprint state
   cx: 0, cy: 0,
   lastState: '',
   hoverEl: null,
@@ -30,7 +31,15 @@ const Pad = {
     this.toast = document.getElementById('pad-toast');
     this.cx = window.innerWidth / 2; this.cy = window.innerHeight / 2;
     window.addEventListener('gamepadconnected', (e) => this.say(`Controller connected — ${this.shortName(e.gamepad.id)}`));
-    window.addEventListener('gamepaddisconnected', () => {
+    window.addEventListener('gamepaddisconnected', (e) => {
+      if (Split.lobby) { Split.padGone(e.gamepad.index); return; }
+      const c = Split.on && Split.ctxForPad(e.gamepad.index);
+      if (c) {
+        this.release();
+        this.say(`Player ${Split.ctxs.indexOf(c) + 1}'s controller disconnected — reconnect it to carry on`);
+        if (G.state === 'playing') UI.pause();
+        return;
+      }
       if (this.pad()) return;
       this.release();
       this.connected = false;
@@ -69,18 +78,29 @@ const Pad = {
     return best;
   },
 
-  // let go of everything the pad is holding (disconnect, or switching between play and menus)
-  release() {
-    for (const k of this.held) Input.keys[k] = false;
-    this.held.clear();
-    if (this.firing) { Input.mouse.down = false; this.firing = false; }
-    this.sprint = false;
-    Input.pad = null;
+  st(key) {
+    let s = this.states.get(key);
+    if (!s) { s = { prev: [], held: new Set(), firing: false, sprint: false, I: null }; this.states.set(key, s); }
+    return s;
   },
 
-  hold(code, on) {
-    if (on && !this.held.has(code)) { this.held.add(code); Input.keys[code] = true; Input.pressed[code] = true; }
-    else if (!on && this.held.has(code)) { this.held.delete(code); Input.keys[code] = false; }
+  // let go of everything the pads are holding (disconnect, or switching between play and menus)
+  release() {
+    for (const s of this.states.values()) {
+      const I = s.I;
+      if (!I) continue;
+      for (const k of s.held) I.keys[k] = false;
+      s.held.clear();
+      if (s.firing) { I.mouse.down = false; s.firing = false; }
+      s.sprint = false;
+      I.pad = null;
+    }
+  },
+
+  hold(s, code, on) {
+    const I = s.I;
+    if (on && !s.held.has(code)) { s.held.add(code); I.keys[code] = true; I.pressed[code] = true; }
+    else if (!on && s.held.has(code)) { s.held.delete(code); I.keys[code] = false; }
   },
 
   stick(x, y) {
@@ -91,8 +111,10 @@ const Pad = {
   },
 
   rumble(strong, weak, ms) {
-    if (!this.active || this.rumbleCd > 0) return;
-    const g = this.pad();
+    if (this.rumbleCd > 0) return;
+    let g;
+    if (Split.on) g = Split.padOf(Split.idx);   // the controller of the player who was hit
+    else { if (!this.active) return; g = this.pad(); }
     const a = g && g.vibrationActuator;
     if (!a || !a.playEffect) return;
     this.rumbleCd = 0.08;
@@ -102,21 +124,11 @@ const Pad = {
   // called once per frame, before the game reads Input
   poll(dt) {
     this.rumbleCd -= dt;
-    const g = this.pad();
-    if (!g) { if (this.connected) { this.connected = false; this.release(); } return; }
-    if (!this.connected) { this.connected = true; this.prev = []; }
-
-    const bv = (i) => { const b = g.buttons[i]; return b ? (typeof b === 'object' ? b.value : b) : 0; };
-    const down = (i) => { const b = g.buttons[i]; return !!b && (b.pressed || bv(i) > 0.35); };
-    const now = []; for (let i = 0; i < g.buttons.length; i++) now[i] = down(i);
-    const hit = (i) => now[i] && !this.prev[i];
-    const ax = (i) => g.axes[i] || 0;
-    const L = this.stick(ax(0), ax(1)), R = this.stick(ax(2), ax(3));
-
-    if (now.some((b, i) => b && !this.prev[i]) || L[2] > 0 || R[2] > 0) {
-      this.setActive(true);
-      if (now.some(Boolean)) Sound.init();
-    }
+    // one pad normally; in split screen (and its lobby) every pad, each feeding its own player
+    const multi = Split.on || Split.lobby;
+    const list = multi ? this.pads() : [this.pad()].filter(Boolean);
+    if (!list.length) { if (this.connected) { this.connected = false; this.release(); } return; }
+    this.connected = true;
 
     const state = G.state;
     if (state !== this.lastState) {
@@ -125,41 +137,66 @@ const Pad = {
       if (state !== 'playing' && this.active) this.snapToFirst();
     }
 
-    if (state === 'playing') this.play(g, now, hit, L, R, dt);
-    else if (this.active) this.menu(g, now, hit, L, R, dt);
-    this.prev = now;
+    for (const g of list) {
+      const s = this.st(multi ? g.index : 'main');
+      const bv = (i) => { const b = g.buttons[i]; return b ? (typeof b === 'object' ? b.value : b) : 0; };
+      const down = (i) => { const b = g.buttons[i]; return !!b && (b.pressed || bv(i) > 0.35); };
+      const now = []; for (let i = 0; i < g.buttons.length; i++) now[i] = down(i);
+      const hit = (i) => now[i] && !s.prev[i];
+      const ax = (i) => g.axes[i] || 0;
+      const L = this.stick(ax(0), ax(1)), R = this.stick(ax(2), ax(3));
+
+      if (now.some((b, i) => b && !s.prev[i]) || L[2] > 0 || R[2] > 0) {
+        this.setActive(true);
+        if (now.some(Boolean)) Sound.init();
+      }
+
+      if (Split.lobby) Split.lobbyPad(g.index, hit);
+      else if (state === 'playing') {
+        const c = multi ? Split.ctxForPad(g.index) : null;
+        if (!multi) { s.I = Input; this.play(s, G.player, now, hit, L, R, dt); }
+        else if (c) { s.I = c.input; this.play(s, c.player, now, hit, L, R, dt); }
+      } else if (this.active) this.menu(g, now, hit, L, R, dt);
+      s.prev = now;
+    }
   },
 
-  play(g, now, hit, L, R, dt) {
-    const p = G.player;
+  // every connected controller
+  pads() {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    return [...list].filter((g) => g && g.connected);
+  },
+
+  play(s, p, now, hit, L, R, dt) {
+    const I = s.I;
     this.showCursor(false);
     // left stick moves; click it to sprint until you let the stick go
-    if (hit(PB.L3)) this.sprint = !this.sprint;
-    if (L[2] < 0.25) this.sprint = false;
-    Input.pad = { mx: L[0], my: L[1], sprint: this.sprint };
+    if (hit(PB.L3)) s.sprint = !s.sprint;
+    if (L[2] < 0.25) s.sprint = false;
+    I.pad = { mx: L[0], my: L[1], sprint: s.sprint };
     // right stick looks: a curve gives fine aim near the centre and fast turns at full tilt
     if (R[2] > 0) {
       const c = Math.pow(R[2], 1.8) / R[2];
-      Input.mouse.dx += R[0] * c * this.LOOK_SPEED * dt;
-      Input.mouse.dy += R[1] * c * this.LOOK_SPEED * 0.7 * dt;
+      I.mouse.dx += R[0] * c * this.LOOK_SPEED * dt;
+      I.mouse.dy += R[1] * c * this.LOOK_SPEED * 0.7 * dt;
     }
     // fire with the right trigger
     const fire = now[PB.RT];
-    if (fire !== this.firing) { this.firing = fire; Input.mouse.down = fire; }
+    if (fire !== s.firing) { s.firing = fire; I.mouse.down = fire; }
     const swimming = p && p.swim;
-    this.hold('Space', now[PB.A]);
-    this.hold('KeyC', swimming && now[PB.B]);
-    if (hit(PB.B) && !swimming) Input.pressed.KeyQ = true;
-    if (hit(PB.X)) Input.pressed[document.getElementById('dialog').classList.contains('show') ? 'Enter' : 'KeyE'] = true;
-    if (hit(PB.Y)) Input.pressed.KeyR = true;
-    if (hit(PB.LT)) Input.pressed.KeyG = true;
-    if (hit(PB.LB) || hit(PB.RB)) Input.wheel += hit(PB.RB) ? 1 : -1;
-    if (hit(PB.R3) || hit(PB.RIGHT)) Input.pressed.KeyV = true;
-    if (hit(PB.LEFT)) Input.pressed.KeyX = true;
-    if (hit(PB.UP)) Input.pressed.KeyJ = true;
-    if (hit(PB.DOWN)) Input.pressed.Tab = true;
-    if (hit(PB.BACK)) Input.pressed.KeyM = true;
-    if (hit(PB.START)) Input.pressed.Escape = true;
+    this.hold(s, 'Space', now[PB.A]);
+    this.hold(s, 'KeyC', swimming && now[PB.B]);
+    if (hit(PB.B) && !swimming) I.pressed.KeyQ = true;
+    if (hit(PB.X)) I.pressed[document.getElementById('dialog').classList.contains('show') ? 'Enter' : 'KeyE'] = true;
+    if (hit(PB.Y)) I.pressed.KeyR = true;
+    if (hit(PB.LT)) I.pressed.KeyG = true;
+    if (hit(PB.LB) || hit(PB.RB)) I.wheel += hit(PB.RB) ? 1 : -1;
+    if (hit(PB.R3) || hit(PB.RIGHT)) I.pressed.KeyV = true;
+    if (hit(PB.LEFT)) I.pressed.KeyX = true;
+    if (hit(PB.UP)) I.pressed.KeyJ = true;
+    if (hit(PB.DOWN)) I.pressed.Tab = true;
+    if (hit(PB.BACK)) I.pressed.KeyM = true;
+    if (hit(PB.START)) I.pressed.Escape = true;
   },
 
   // ───────── menus: on-screen cursor ─────────
