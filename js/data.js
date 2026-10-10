@@ -320,18 +320,18 @@ const BOTPART_REWARDS = ['bubble', 'tesla', 'rocket', 'laser', 'bomber', 'shield
 
 // Memory fragments play in the order you find them, so the story always reads in sequence.
 const LORE_LOGS = [
-  { from: 'WREN HALLOWAY · workshop note', text: 'Day one. The frame is welded, the servos answer, and the core I pulled from the crater is still warm. I don\'t know whose heart it was. I only know it would not stop beating.' },
-  { from: 'UNKNOWN · corrupted record', text: '…five of us were set to guard the valley… one to the ice, one to the peaks, one to the fire, one to the fields, one to the deep… and one above to lead us…' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'Every robot that hears the Static turns. Mine doesn\'t. Whatever is in that core is shouting louder than the signal.' },
-  { from: 'WARDEN RECORD · Brambleback', text: 'Field patrol log. A hum from the citadel today. The leader went up to the citadel to answer it. The leader did not come back down.' },
-  { from: 'UNKNOWN · corrupted record', text: 'THE CONDUCTOR IS ORDER. THE STATIC IS ORDER. WARDENS WILL SERVE ORDER. WARDENS WILL FORGET.' },
-  { from: 'WARDEN RECORD · Glacieros', text: 'I locked the cold away in the caves so the Static could not freeze my thoughts. It found me anyway. If you read this, the ice still remembers the way in.' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'The citadel lift at home base won\'t open for me. It wants five Warden keys and a heartbeat it recognises. Maybe that\'s why the core came to me.' },
-  { from: 'WARDEN RECORD · Colossus', text: 'Climb, little ones. Higher than the Static can reach. It is quiet near the peaks.' },
-  { from: 'UNKNOWN · memory shard', text: 'Bright light. A falling citadel. Someone tearing their own heart out and throwing it down, so the Conductor could not keep it.' },
-  { from: 'WARDEN RECORD · Infernus', text: 'The forge villages cooled my bridges once. Without them the fire spreads. Without them I burn alone.' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
-  { from: 'UNKNOWN · memory shard', text: 'The deep one beneath the coast still sings to keep the sea calm. Its song is getting quieter.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,211 A.T.', text: 'Day one. The frame is welded, the servos answer, and the core I pulled from the crater is still warm. I don\'t know whose heart it was. I only know it would not stop beating.' },
+  { from: 'UNKNOWN · corrupted record · year unreadable', text: '…the Makers are gone, and the valley is ours to keep… five of us were set to guard it… one to the ice, one to the peaks, one to the fire, one to the fields, one to the deep… and one above to lead us…' },
+  { from: 'WREN HALLOWAY · workshop note · 4,211 A.T.', text: 'Every robot that hears the Static turns. Mine doesn\'t. Whatever is in that core is shouting louder than the signal.' },
+  { from: 'WARDEN RECORD · Brambleback · 4,209 A.T.', text: 'Field patrol log. A hum from the citadel today. The leader went up to the citadel to answer it. The leader did not come back down.' },
+  { from: 'UNKNOWN · corrupted record · 4,209 A.T.', text: 'THE CONDUCTOR IS ORDER. THE STATIC IS ORDER. WARDENS WILL SERVE ORDER. WARDENS WILL FORGET.' },
+  { from: 'WARDEN RECORD · Glacieros · 4,210 A.T.', text: 'I locked the cold away in the caves so the Static could not freeze my thoughts. It found me anyway. If you read this, the ice still remembers the way in.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,212 A.T.', text: 'The citadel lift at home base won\'t open for me. It wants five Warden keys and a heartbeat it recognises. Maybe that\'s why the core came to me.' },
+  { from: 'WARDEN RECORD · Colossus · 4,210 A.T.', text: 'Climb, little ones. Higher than the Static can reach. It is quiet near the peaks.' },
+  { from: 'UNKNOWN · memory shard · 4,209 A.T.', text: 'Bright light. A falling citadel. Someone tearing their own heart out and throwing it down, so the Conductor could not keep it.' },
+  { from: 'WARDEN RECORD · Infernus · 4,211 A.T.', text: 'The forge villages cooled my bridges once. Without them the fire spreads. Without them I burn alone.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,212 A.T.', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
+  { from: 'UNKNOWN · memory shard · date unknown', text: 'The deep one beneath the coast was already old when the Makers last walked the shore. It still sings to keep the sea calm. Its song is getting quieter.' },
 ];
 
 // ───────────────────────── Home base rooms ─────────────────────────

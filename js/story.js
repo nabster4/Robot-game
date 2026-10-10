@@ -1,5 +1,6 @@
 'use strict';
-// The story: Rivet wakes on Wren Halloway's assembly table, learns the basics, and sets out to free the
+// The story (4,212 A.T., thousands of years after the Makers): Rivet wakes on the assembly table of Wren
+// Halloway, a caretaker robot, learns the basics, and sets out to free the
 // five Wardens from the Static. Quests are worked out from the game state (so saves can't get out of
 // sync), dialogue plays in a box above the hotbar, and the opening is a short in-engine scene.
 
@@ -9,14 +10,15 @@ const L = (text, who = WREN) => ({ who: who.name, color: who.color, text });
 const STORY = {
   opening: [
     L('…and power. Easy. Easy. There — your optics are coming up.'),
-    L("Can you hear me? Blink once if you— oh. You don't have eyelids. Never mind."),
+    L("Can you hear me? Flash your optics once if you— oh. I haven't fitted your shutters yet. Never mind."),
     L("You've been in pieces on this table for three weeks. Don't sit up too fast."),
-    L("Welcome to the world, Rivet. I'm Wren Halloway. I built you. Well… most of you."),
+    L("Welcome to the world, Rivet. I'm Wren Halloway, caretaker unit of Halloway Works. I built you. Well… most of you."),
+    L("Today is the 212th day of 4,212 A.T. — Anno Technologiae. Your very first date. Keep it somewhere safe."),
   ],
   talk: [
     L('Look at you, standing on your own two servos.'),
     L("Out there every machine has gone wild. There's a signal in the air. We call it the Static, and it turns anything with a circuit against us."),
-    L("Anything except you, it seems. Grab the Pulse Blaster from the rack by the door — I'll sleep better if you're armed."),
+    L("Anything except you, it seems. Grab the Pulse Blaster from the rack by the door — I'll rest my circuits easier if you're armed."),
   ],
   armed: [L("Now let's see if you can hit something. I've hung three practice drones out in the yard. Out the front door.")],
   targets: [L("Not bad at all! You shouldn't go out alone, though. Build a Gunner Drone at the workbench in here — I left scrap in storage.")],
@@ -341,7 +343,7 @@ const Story = {
       return q;
     }
     if (!B[4]) return Object.assign({ id: 'sky', title }, this.arenaStep(World.arenas.find((a) => a.i === 4)));
-    return { id: 'free', title, step: 'The Outlands are free — explore, and find every memory', done: true };
+    return { id: 'free', title, step: 'The ATlands are free — explore, and find every memory', done: true };
   },
   sides() {
     const S = this.S, rooms = (G.base.rooms) || {};

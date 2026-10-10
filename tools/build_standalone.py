@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Scrapforge-3D.html: the 3D explorer as ONE self-contained file.
+"""Build ATlands.html: the whole game as ONE self-contained file.
 
 Phones and tablets often can't load a page's neighbouring .css/.js files when an
 .html file is opened straight from the Downloads folder, so everything (styles,
@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT
-OUT = ROOT / 'Scrapforge-3D.html'
+OUT = ROOT / 'ATlands.html'
 
 html = (SRC / 'index.html').read_text()
 head_end = html.index('</head>')

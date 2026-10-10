@@ -1,4 +1,4 @@
-# Scrapforge: Outlands — Online Co-op Plan
+# ATlands — Online Co-op Plan
 
 Status: **planning only**. No game code has been changed. Line numbers refer to commit `c544663`.
 
@@ -51,7 +51,7 @@ Status: **planning only**. No game code has been changed. Line numbers refer to 
 | Story / quests | `story.js` `Story`, `Dialog`; `villages.js` `Villages` | Flags live in `G.progress.story` and `G.progress.villages`. One `Dialog` queue, plus an opening cutscene (`G.cine`) that takes over the camera. Several gameplay steps run on `setTimeout` (21 calls across 5 files, e.g. the boss-killed flow at game.js l.420–431 and `Story.ending`). |
 | Warden routes | `wardens.js` | Mirrors, the frost key, the summit and the lift. `update()` checks whether `G.player` has reached the summit, and `ride()` moves `G.player` and saves. |
 | World progress | `G.progress.world` | `beacons` and `secrets` are stored by **id**, but `caches` and `sprites` by **array index**, and `caves` by generation order. `fog`, `pins`, `mirrors`, `frostKey`, `summit` and `lift` are stored alongside. |
-| Saves | `game.js` `stateJSON` (l.494), `applyState` (l.503), `SAVE_VERSION = 3`, key `sf-outlands-save` | One JSON blob mixes the character (bar, storage, bucks, gear, up, comps, reserve, hp, vessels) with the world (progress, base). Dying calls `restoreSnapshot()`, which **rolls the inventory back** to the last save but keeps world progress. |
+| Saves | `game.js` `stateJSON` (l.494), `applyState` (l.503), `SAVE_VERSION = 3`, key `sf-outlands-save` (the old name is kept so existing saves keep loading) | One JSON blob mixes the character (bar, storage, bucks, gear, up, comps, reserve, hp, vessels) with the world (progress, base). Dying calls `restoreSnapshot()`, which **rolls the inventory back** to the last save but keeps world progress. |
 | UI | `ui.js` | Shops, the workshop, storage, the garage, the lab, the command room and the journal. All of them set `G.state='workshop'`, which pauses the game. The HUD, compass and radar are drawn around `G.player`. |
 | Input | `util.js` `Input`, `touch.js`, `gamepad.js` | Local only. Good: everything feeds one `Input` object. |
 | Camera / avatar | `game.js` `updateCamera` (l.1637), `updateAvatar` (l.1464) | One camera, one first-person weapon model and one articulated third-person mech `G.avatar`, animated procedurally from `G.player`'s state. |
@@ -132,7 +132,7 @@ Costs and free-tier limits change often, so check current numbers before committ
   1. Configure a free-tier TURN server as a fallback from the start of Phase 2.
   2. Write the code against a `Net.transport` interface (`send`, `onMessage`, `onOpen`, `onClose`). If TURN turns out to be unreliable, a ~100-line Cloudflare Durable Object relay can be added as a second transport without touching any game code.
 - **For development and automated tests:** a **`BroadcastChannel` transport** (two tabs on the same origin) needs no network at all. The existing Playwright harness can then drive host and guest pages in one browser. Serve the folder with `python3 -m http.server`, because `file://` pages have opaque origins.
-- **Join links** need a hosted copy (e.g. GitHub Pages, `…/index.html?join=K7Q2MX`). Room codes work everywhere, including the standalone `Scrapforge-3D.html` opened from Downloads. Test that WebRTC works from `file://` on Android Chrome and Samsung Internet. The claude.ai artifact copy may block outside connections, so treat GitHub Pages as the multiplayer URL.
+- **Join links** need a hosted copy (e.g. GitHub Pages, `…/index.html?join=K7Q2MX`). Room codes work everywhere, including the standalone `ATlands.html` opened from Downloads. Test that WebRTC works from `file://` on Android Chrome and Samsung Internet. The claude.ai artifact copy may block outside connections, so treat GitHub Pages as the multiplayer URL.
 
 ---
 
@@ -302,7 +302,7 @@ Only **state on top of them** travels: cache 42 is open, camp 17 is live, mirror
 
 | Do now | Why |
 | --- | --- |
-| **Random 6-character room codes** from an unambiguous alphabet (no 0/O/1/I), ~887 million combinations; the PeerJS id is `scrapforge-<code>`. A new code per session. | Stops strangers from guessing codes. |
+| **Random 6-character room codes** from an unambiguous alphabet (no 0/O/1/I), ~887 million combinations; the PeerJS id is `atlands-<code>`. A new code per session. | Stops strangers from guessing codes. |
 | **The host accepts joins** (an "Ash wants to join — Allow / Deny" prompt), with a 4-player cap | Friends-only, and simple |
 | **Version handshake:** protocol version, game build id and world fingerprint; mismatches are refused with a clear message | Prevents confusing desyncs |
 | **Message validation:** a whitelist of message types, a size cap (~4 KB), and a `Number.isFinite` check and range clamp on every number | A malformed message must never crash or poison the host's simulation (NaN positions, huge arrays) |

@@ -1,8 +1,10 @@
-# SCRAPFORGE: OUTLANDS
+# ATLANDS: SILENCE THE STATIC
 
-A 3D first-person robot adventure in one connected open world. You're **Rivet**, a robot newly built on a mechanic's table. Climb, glide and explore; salvage robots for parts; build a squad of companion bots; and free the five Wardens from the Static.
+**ATlands** is a 3D first-person robot adventure in one connected open world. You're **Rivet**, a robot newly built on a caretaker robot's assembly table. Climb, glide and explore; salvage robots for parts; build a squad of companion bots; and free the five Wardens from the Static.
 
-Open `index.html` in a modern browser (no build step), or use the single-file **`Scrapforge-3D.html`**.
+**The setting.** The humans who built the first machines, remembered now only as **the Makers**, have been gone for thousands of years. The world is entirely robots: villages, traders, guardians and wild machines. Robots count the years in **A.T.**, *Anno Technologiae* ("year of technology"), and the story opens in **4,212 A.T.**
+
+Open `index.html` in a modern browser (no build step), or use the single-file **`ATlands.html`**.
 
 ## The game
 
@@ -47,7 +49,7 @@ When all five are free, the **Sky Lift** at home base wakes up. It reads Rivet's
 
 Step inside an open dome and it seals behind you for a one-on-one fight. Each Warden has an enraged Overdrive phase.
 
-**Story.** A new game opens with Rivet waking on the assembly table of **Wren Halloway**, the mechanic who built it. A short tutorial follows:
+**Story.** A new game opens in 4,212 A.T. with Rivet waking on the assembly table of **Wren Halloway**, the caretaker and builder unit who runs Halloway Works and built Rivet. A short tutorial follows:
 1. look around
 2. talk to Wren
 3. take the Pulse Blaster from the rack
@@ -57,7 +59,7 @@ Step inside an open dome and it seals behind you for a one-on-one fight. Each Wa
 
 **Skip tutorial** (or the quest log) skips it.
 - **Dialogue** appears above the hotbar. It moves on by itself, or press `Enter` (tap it on touch) to hurry it.
-- Each **Warden** speaks as the Static leaves it. Wren has more to say each time you come home after freeing one. **Memory fragments** found in caves fill in the rest of the story, piece by piece.
+- Each **Warden** speaks as the Static leaves it. Wren has more to say each time you come home after freeing one. **Memory fragments** found in caves fill in the rest of the story, piece by piece. Each one is dated in A.T., and the oldest reach back toward the age of the Makers. The journal (`J`) shows the current year.
 
 **Quests.** The quest tracker (top left) shows the current main quest step, with a gold marker on the compass. The quest log (`J`, the pause menu, or tap the tracker on touch) lists:
 - the main quest chain: *Rise and Shine → The First Warden → The Wardens Remember → Above the Static*, with a step for each Warden's route
@@ -202,7 +204,7 @@ Touch controls turn on automatically.
 - Light aim assist is on. Performance mode is on by default: no shadows, lower resolution, shorter view distance and fewer props.
 - Add `?touch=1` or `?touch=0` to the URL to force touch controls on or off.
 
-**Easiest way to play on a phone or tablet:** download **`Scrapforge-3D.html`** from the repo root, then open it on the device with Chrome or Samsung Internet.
+**Easiest way to play on a phone or tablet:** download **`ATlands.html`** from the repo root, then open it on the device with Chrome or Samsung Internet.
 - It's one self-contained file (styles, game code and 3D library built in), so it works straight from the Downloads folder.
 - Opening `index.html` that way shows only unstyled text, because mobile browsers can't load the files beside it.
 - The first launch needs internet only for the fonts, and falls back to built-in fonts offline.

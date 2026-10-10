@@ -156,7 +156,7 @@ const UI = {
   },
 
   showGameOver() {
-    $('go-sector').textContent = G.region ? G.region.name : 'The Outlands';
+    $('go-sector').textContent = G.region ? G.region.name : 'The ATlands';
     $('go-stats').innerHTML = this.statsHTML(G.stats);
     this.show('gameover');
     this.huds((h) => h.classList.remove('show'));
@@ -202,7 +202,7 @@ const UI = {
       garage: ['GARAGE', 'Build gear from the parts in your storage and hotbar.'],
       lab: ['LAB', 'Research upgrades with rare parts. Replay the memories you have recovered.'],
       command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
-      journal: ['JOURNAL', 'Your quests and the memories you have recovered. Time is paused.'],
+      journal: ['JOURNAL · 4,212 A.T.', 'Your quests and the memories you have recovered. Time is paused.'],
     }[mode];
     $('ws-title').textContent = (Split.on ? `P${Split.idx + 1} · ` : '') + T[0];   // whose menu this is
     $('ws-sub').textContent = T[1];
@@ -501,7 +501,7 @@ const UI = {
       const n = Math.min(G.progress.story.logs, LORE_LOGS.length);
       mid = n ? `<div class="lore-list">${LORE_LOGS.slice(0, n).map((L, i) => `<div class="lore-item"><div class="lore-from"><b>${i + 1}</b> · ${L.from}</div><div class="lore-text">${L.text}</div></div>`).join('')}</div>`
         : '<div class="ws-note">No memories yet. Memory fragments glow purple at the far end of caves.</div>';
-      mid = `<div class="span-all">${mid}<div class="ws-note">${n} of ${LORE_LOGS.length} memories recovered.</div></div>`;
+      mid = `<div class="span-all">${mid}<div class="ws-note">${n} of ${LORE_LOGS.length} memories recovered. Dates are in A.T. — Anno Technologiae, the year of technology. It is now 4,212 A.T.</div></div>`;
     } else if (this.tab === 'quests') {
       const q = Story.main(), side = Story.sides();
       const row = (x, main) => `<div class="quest ${x.done ? 'done' : ''} ${main ? 'main' : ''}"><div class="q-title">${main ? 'MAIN · ' : ''}${x.title}${x.done ? ' ✓' : ''}</div><div class="q-step">${x.step}${x.prog ? ` <b>${x.prog[0]}/${x.prog[1]}</b>` : ''}</div></div>`;
@@ -840,7 +840,7 @@ const UI = {
       const d = Math.hypot(A.x - p.pos.x, A.z - p.pos.z) + A.i * 250;
       if (d < bd) { bd = d; best = A; }
     }
-    if (!best) return { text: beaten[4] ? 'The Outlands are free — explore, find every secret' : 'Explore the Outlands' };
+    if (!best) return { text: beaten[4] ? 'The ATlands are free — explore, find every secret' : 'Explore the ATlands' };
     const Z = ZONES[best.i], done = best.beacons.filter((b) => b.state === 'done').length;
     if (!best.sealed) return { A: best, text: `Enter ${Z.boss.name}'s dome (${Z.short})` };
     return { A: best, text: `${Z.boss.name}: power the ${Z.short.toLowerCase()} beacons (${done}/${best.beacons.length})` };

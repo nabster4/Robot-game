@@ -1,7 +1,7 @@
 {
-  "name": "Scrapforge: Outlands",
-  "short_name": "Scrapforge",
-  "description": "First-person robot salvage adventure: explore, destroy machines, craft a robot squad.",
+  "name": "ATlands: Silence the Static",
+  "short_name": "ATlands",
+  "description": "ATlands: a first-person robot adventure in a world of machines. Explore, silence the Static, build a robot squad.",
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "landscape",

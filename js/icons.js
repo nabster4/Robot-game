@@ -1,6 +1,6 @@
 'use strict';
 // 2D vector icons (parts, companions, upgrades) for the workshop and HUD.
-// Same art as the 2D Scrapforge game so both versions share a visual language.
+// Flat item icons, drawn once into images for the HUD and menus.
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();

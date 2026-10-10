@@ -857,7 +857,7 @@ const World = {
 
   buildBase(y0) {
     const S = new THREE.Group(); S.position.set(0, y0, 0); this.group.add(S);   // static structure (baked)
-    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, people (live)
+    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, Wren (live)
     this.baseD = D;
     const M = {
       panel: Mat.std('#e9eef3', { rough: 0.45, metal: 0.25 }),
@@ -990,8 +990,8 @@ const World = {
     const gun = buildViewModel(); setViewModelWeapon(gun, 'blaster', 1); gun.position.set(0, 1.3, 0.15); gun.rotation.set(0, Math.PI / 2, 0); gun.scale.setScalar(1.6); rack.add(gun);
     this.addCollider(-19.2, -3.6, 0.6, y0 + 2.2, 'wall');
     this.rack = { x: -18.2, z: -3.6, y: y0, gun };
-    // Wren
-    const wren = buildPersonModel({ skin: '#e2b48c', hair: '#b4532a', suit: '#3d5a78', trim: '#ffb347' });
+    // Wren, the caretaker unit
+    const wren = buildCaretakerModel({ plate: '#c9c2b2', suit: '#3d5a78', trim: '#ffb347', glow: '#ffb347' });
     wren.position.set(-13, 0, -8.6); wren.rotation.y = -Math.PI / 2; D.add(wren);
     this.wren = { x: -13, z: -8.6, y: y0, model: wren, yaw: -Math.PI / 2, home: { x: -13, z: -8.6 } };
     this.addCollider(-13, -8.6, 0.4, y0 + 1.8, 'wall');

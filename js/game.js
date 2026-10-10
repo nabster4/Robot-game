@@ -494,6 +494,7 @@ function newRun() {
 // Saves are versioned. Version 1 saves (separate biomes behind portals) keep the player's items,
 // upgrades, bots and Botbucks; the world itself is new.
 const SAVE_VERSION = 3;
+// the key keeps the game's old name on purpose: saves made before the rename to ATlands load as they are
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
   // the save is written from player 1's point of view (player 2's character is added as `p2`)
@@ -570,12 +571,12 @@ function continueGame() {
   enterWorld(false);
   if (G.reshaped) {
     G.reshaped = false;
-    setTimeout(() => UI.banner('THE OUTLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
+    setTimeout(() => UI.banner('THE ATLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
     saveGame();
   }
   if (G.migrated) {
     G.migrated = false;
-    setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the Outlands are now one connected world', '#3cf2ff', 5), 600);
+    setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the ATlands are now one connected world', '#3cf2ff', 5), 600);
     saveGame();
   }
 }

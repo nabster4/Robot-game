@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#05060a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2305060a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%233cf2ff' stroke-width='4'/><circle cx='32' cy='32' r='8' fill='%23ff8c42'/><path d='M32 6v10M32 48v10M6 32h10M48 32h10' stroke='%233cf2ff' stroke-width='4' stroke-linecap='round'/></svg>">
-<title>Scrapforge: Outlands</title>
-<meta name="description" content="3D robot adventure in one connected open world: wake on a mechanic's table, free the five Wardens, explore caves, build a robot squad.">
+<title>ATlands: Silence the Static</title>
+<meta name="description" content="ATlands: Silence the Static. A 3D robot adventure thousands of years after the Makers: wake on a caretaker robot's assembly table, free the five Wardens, explore caves, build a robot squad.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -901,10 +901,10 @@ body.split > #dialog { position: fixed; z-index: 7; bottom: 140px; width: min(60
 <div id="menu" class="overlay show">
   <div class="menu-inner">
     <div class="logo">
-      <span class="logo-top">SCRAP</span><span class="logo-bot">FORGE</span>
-      <span class="logo-sub">O U T L A N D S</span>
+      <span class="logo-top">AT</span><span class="logo-bot">LANDS</span>
+      <span class="logo-sub">SILENCE THE STATIC</span>
     </div>
-    <div class="tagline">One wild, connected world surrounds your home base. Climb its cliffs, explore its caves, free the five Wardens and build a robot squad of your own.</div>
+    <div class="tagline">4,212 A.T. The Makers are thousands of years gone, and the world belongs to robots, until a signal called the Static began turning them wild. Climb the cliffs, explore the caves, free the five Wardens and build a robot squad of your own.</div>
     <div class="menu-buttons">
       <button class="btn primary big" id="btn-continue">Continue</button>
       <button class="btn big" id="btn-start">New Expedition</button>
@@ -1571,18 +1571,18 @@ const BOTPART_REWARDS = ['bubble', 'tesla', 'rocket', 'laser', 'bomber', 'shield
 
 // Memory fragments play in the order you find them, so the story always reads in sequence.
 const LORE_LOGS = [
-  { from: 'WREN HALLOWAY · workshop note', text: 'Day one. The frame is welded, the servos answer, and the core I pulled from the crater is still warm. I don\'t know whose heart it was. I only know it would not stop beating.' },
-  { from: 'UNKNOWN · corrupted record', text: '…five of us were set to guard the valley… one to the ice, one to the peaks, one to the fire, one to the fields, one to the deep… and one above to lead us…' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'Every robot that hears the Static turns. Mine doesn\'t. Whatever is in that core is shouting louder than the signal.' },
-  { from: 'WARDEN RECORD · Brambleback', text: 'Field patrol log. A hum from the citadel today. The leader went up to the citadel to answer it. The leader did not come back down.' },
-  { from: 'UNKNOWN · corrupted record', text: 'THE CONDUCTOR IS ORDER. THE STATIC IS ORDER. WARDENS WILL SERVE ORDER. WARDENS WILL FORGET.' },
-  { from: 'WARDEN RECORD · Glacieros', text: 'I locked the cold away in the caves so the Static could not freeze my thoughts. It found me anyway. If you read this, the ice still remembers the way in.' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'The citadel lift at home base won\'t open for me. It wants five Warden keys and a heartbeat it recognises. Maybe that\'s why the core came to me.' },
-  { from: 'WARDEN RECORD · Colossus', text: 'Climb, little ones. Higher than the Static can reach. It is quiet near the peaks.' },
-  { from: 'UNKNOWN · memory shard', text: 'Bright light. A falling citadel. Someone tearing their own heart out and throwing it down, so the Conductor could not keep it.' },
-  { from: 'WARDEN RECORD · Infernus', text: 'The forge villages cooled my bridges once. Without them the fire spreads. Without them I burn alone.' },
-  { from: 'WREN HALLOWAY · workshop note', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
-  { from: 'UNKNOWN · memory shard', text: 'The deep one beneath the coast still sings to keep the sea calm. Its song is getting quieter.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,211 A.T.', text: 'Day one. The frame is welded, the servos answer, and the core I pulled from the crater is still warm. I don\'t know whose heart it was. I only know it would not stop beating.' },
+  { from: 'UNKNOWN · corrupted record · year unreadable', text: '…the Makers are gone, and the valley is ours to keep… five of us were set to guard it… one to the ice, one to the peaks, one to the fire, one to the fields, one to the deep… and one above to lead us…' },
+  { from: 'WREN HALLOWAY · workshop note · 4,211 A.T.', text: 'Every robot that hears the Static turns. Mine doesn\'t. Whatever is in that core is shouting louder than the signal.' },
+  { from: 'WARDEN RECORD · Brambleback · 4,209 A.T.', text: 'Field patrol log. A hum from the citadel today. The leader went up to the citadel to answer it. The leader did not come back down.' },
+  { from: 'UNKNOWN · corrupted record · 4,209 A.T.', text: 'THE CONDUCTOR IS ORDER. THE STATIC IS ORDER. WARDENS WILL SERVE ORDER. WARDENS WILL FORGET.' },
+  { from: 'WARDEN RECORD · Glacieros · 4,210 A.T.', text: 'I locked the cold away in the caves so the Static could not freeze my thoughts. It found me anyway. If you read this, the ice still remembers the way in.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,212 A.T.', text: 'The citadel lift at home base won\'t open for me. It wants five Warden keys and a heartbeat it recognises. Maybe that\'s why the core came to me.' },
+  { from: 'WARDEN RECORD · Colossus · 4,210 A.T.', text: 'Climb, little ones. Higher than the Static can reach. It is quiet near the peaks.' },
+  { from: 'UNKNOWN · memory shard · 4,209 A.T.', text: 'Bright light. A falling citadel. Someone tearing their own heart out and throwing it down, so the Conductor could not keep it.' },
+  { from: 'WARDEN RECORD · Infernus · 4,211 A.T.', text: 'The forge villages cooled my bridges once. Without them the fire spreads. Without them I burn alone.' },
+  { from: 'WREN HALLOWAY · workshop note · 4,212 A.T.', text: 'If you\'re reading these, Rivet — yes, I\'m talking to you — you were never just a scrap bot. You\'re carrying someone home.' },
+  { from: 'UNKNOWN · memory shard · date unknown', text: 'The deep one beneath the coast was already old when the Makers last walked the shore. It still sings to keep the sea calm. Its song is getting quieter.' },
 ];
 
 // ───────────────────────── Home base rooms ─────────────────────────
@@ -2078,7 +2078,7 @@ const Sound = (() => {
 <script>
 'use strict';
 // 2D vector icons (parts, companions, upgrades) for the workshop and HUD.
-// Same art as the 2D Scrapforge game so both versions share a visual language.
+// Flat item icons, drawn once into images for the HUD and menus.
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -3668,38 +3668,45 @@ function buildSecretModel(type) {
   return g;
 }
 
-// A low-poly person (Wren the mechanic). Faces +Z. userData: head, arms[2] for idle gestures.
-function buildPersonModel(o) {
+// Wren Halloway: a caretaker and builder unit, an old robot in work overalls with a tool belt, a lit visor
+// and a welding lens on its brow. Faces +Z. userData: head, arms[2] for idle gestures.
+function buildCaretakerModel(o) {
   const g = new THREE.Group();
-  const skin = Mat.std(o.skin, { rough: 0.8, metal: 0 }), suit = Mat.std(o.suit, { rough: 0.75, metal: 0.05 });
-  const dark = Mat.std('#2a2420', { rough: 0.8, metal: 0.1 }), hair = Mat.std(o.hair, { rough: 0.9, metal: 0 });
-  const trim = Mat.std(o.trim, { rough: 0.6, metal: 0.2 });
+  const plate = Mat.std(o.plate, { rough: 0.45, metal: 0.55 }), suit = Mat.std(o.suit, { rough: 0.75, metal: 0.05 });
+  const dark = Mat.std('#22262e', { rough: 0.5, metal: 0.7 }), joint = Mat.std('#14181e', { rough: 0.3, metal: 0.85 });
+  const trim = Mat.std(o.trim, { rough: 0.5, metal: 0.3 }), glow = Mat.glow(o.glow, 2.8);
   for (const s of [-1, 1]) {
-    mesh(Geo.box(0.16, 0.12, 0.28), dark, s * 0.11, 0.06, 0.04, g);          // boots
-    mesh(Geo.box(0.15, 0.8, 0.17), suit, s * 0.11, 0.52, 0, g);              // legs
+    mesh(Geo.box(0.17, 0.12, 0.3), dark, s * 0.11, 0.06, 0.04, g);           // feet
+    mesh(Geo.box(0.13, 0.42, 0.14), joint, s * 0.11, 0.33, 0, g);             // shins (bare struts)
+    mesh(Geo.sphere(0.075, 1), joint, s * 0.11, 0.56, 0, g);                  // knees
+    mesh(Geo.box(0.16, 0.36, 0.18), suit, s * 0.11, 0.76, 0, g);              // overall legs
   }
-  mesh(Geo.box(0.42, 0.6, 0.24), suit, 0, 1.2, 0, g);                         // torso (overalls)
-  mesh(Geo.box(0.44, 0.08, 0.26), Mat.std('#5a4030', { rough: 0.8 }), 0, 0.93, 0, g);   // tool belt
-  for (const k of [-0.12, 0.05, 0.16]) mesh(Geo.box(0.05, 0.12, 0.05), trim, k, 0.86, 0.14, g);
-  mesh(Geo.box(0.3, 0.2, 0.02), trim, 0, 1.3, 0.125, g);                     // bib pocket
+  mesh(Geo.box(0.44, 0.58, 0.26), plate, 0, 1.2, 0, g);                       // chest plating
+  mesh(Geo.box(0.46, 0.34, 0.28), suit, 0, 1.04, 0, g);                       // overalls
+  mesh(Geo.box(0.48, 0.08, 0.3), Mat.std('#5a4030', { rough: 0.8 }), 0, 0.9, 0, g);   // tool belt
+  for (const k of [-0.13, 0.04, 0.16]) mesh(Geo.box(0.05, 0.12, 0.05), trim, k, 0.83, 0.16, g);
+  mesh(Geo.box(0.12, 0.12, 0.02), glow, 0, 1.3, 0.135, g);                    // core light
+  mesh(Geo.box(0.3, 0.14, 0.02), trim, 0, 1.1, 0.145, g);                     // bib pocket
   const arms = [];
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group(); sh.position.set(s * 0.27, 1.45, 0); g.add(sh);
-    mesh(Geo.box(0.12, 0.34, 0.13), suit, 0, -0.16, 0, sh);
+    const sh = new THREE.Group(); sh.position.set(s * 0.29, 1.45, 0); g.add(sh);
+    mesh(Geo.sphere(0.08, 1), joint, 0, 0, 0, sh);
+    mesh(Geo.box(0.12, 0.32, 0.13), plate, 0, -0.17, 0, sh);
     const fore = new THREE.Group(); fore.position.y = -0.33; sh.add(fore);
-    mesh(Geo.box(0.1, 0.3, 0.11), skin, 0, -0.15, 0, fore);
-    mesh(Geo.box(0.11, 0.1, 0.12), Mat.std('#3a3a40', { rough: 0.7 }), 0, -0.33, 0, fore);   // glove
+    mesh(Geo.box(0.09, 0.28, 0.1), joint, 0, -0.14, 0, fore);
+    mesh(Geo.box(0.12, 0.09, 0.12), dark, 0, -0.32, 0, fore);                 // clamp hand
+    if (s > 0) mesh(Geo.cyl(0.02, 0.03, 0.14, 6), trim, 0, -0.42, 0.02, fore); // welding tip
     sh.rotation.z = s * 0.08;
     arms.push({ sh, fore });
   }
   const head = new THREE.Group(); head.position.y = 1.56; g.add(head);
-  mesh(Geo.box(0.1, 0.08, 0.1), skin, 0, 0.04, 0, head);                     // neck
-  mesh(Geo.box(0.26, 0.28, 0.26), skin, 0, 0.22, 0, head);
-  mesh(Geo.box(0.28, 0.1, 0.28), hair, 0, 0.38, -0.01, head);                 // hair
-  mesh(Geo.box(0.28, 0.2, 0.08), hair, 0, 0.26, -0.13, head);
-  mesh(Geo.sphere(0.09, 1), hair, 0, 0.42, -0.16, head);                      // bun
-  for (const s of [-1, 1]) mesh(Geo.box(0.05, 0.035, 0.02), Mat.std('#1a1a1a'), s * 0.06, 0.24, 0.135, head);   // eyes
-  // goggles pushed up on the forehead
+  mesh(Geo.cyl(0.05, 0.06, 0.1, 8), joint, 0, 0.04, 0, head);                // neck
+  mesh(Geo.box(0.28, 0.26, 0.26), plate, 0, 0.22, 0, head);
+  mesh(Geo.box(0.24, 0.09, 0.03), dark, 0, 0.23, 0.13, head);                 // visor
+  for (const s of [-1, 1]) mesh(Geo.box(0.06, 0.035, 0.02), glow, s * 0.06, 0.23, 0.146, head);   // optics
+  mesh(Geo.box(0.04, 0.16, 0.04), dark, -0.1, 0.42, -0.04, head);             // antenna
+  mesh(Geo.sphere(0.035, 1), glow, -0.1, 0.51, -0.04, head);
+  // a welding lens pushed up on the brow
   mesh(Geo.box(0.3, 0.05, 0.05), dark, 0, 0.33, 0.12, head);
   for (const s of [-1, 1]) mesh(Geo.cyl(0.05, 0.05, 0.04, 10), Mat.std('#5aa8d8', { rough: 0.2, metal: 0.6, emissive: '#2a6a9a', ei: 0.5 }), s * 0.07, 0.33, 0.15, head).rotation.x = Math.PI / 2;
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
@@ -4748,7 +4755,7 @@ const World = {
 
   buildBase(y0) {
     const S = new THREE.Group(); S.position.set(0, y0, 0); this.group.add(S);   // static structure (baked)
-    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, people (live)
+    const D = new THREE.Group(); D.position.set(0, y0, 0); this.group.add(D);   // lights, holograms, Wren (live)
     this.baseD = D;
     const M = {
       panel: Mat.std('#e9eef3', { rough: 0.45, metal: 0.25 }),
@@ -4881,8 +4888,8 @@ const World = {
     const gun = buildViewModel(); setViewModelWeapon(gun, 'blaster', 1); gun.position.set(0, 1.3, 0.15); gun.rotation.set(0, Math.PI / 2, 0); gun.scale.setScalar(1.6); rack.add(gun);
     this.addCollider(-19.2, -3.6, 0.6, y0 + 2.2, 'wall');
     this.rack = { x: -18.2, z: -3.6, y: y0, gun };
-    // Wren
-    const wren = buildPersonModel({ skin: '#e2b48c', hair: '#b4532a', suit: '#3d5a78', trim: '#ffb347' });
+    // Wren, the caretaker unit
+    const wren = buildCaretakerModel({ plate: '#c9c2b2', suit: '#3d5a78', trim: '#ffb347', glow: '#ffb347' });
     wren.position.set(-13, 0, -8.6); wren.rotation.y = -Math.PI / 2; D.add(wren);
     this.wren = { x: -13, z: -8.6, y: y0, model: wren, yaw: -Math.PI / 2, home: { x: -13, z: -8.6 } };
     this.addCollider(-13, -8.6, 0.4, y0 + 1.8, 'wall');
@@ -9660,7 +9667,7 @@ const UI = {
   },
 
   showGameOver() {
-    $('go-sector').textContent = G.region ? G.region.name : 'The Outlands';
+    $('go-sector').textContent = G.region ? G.region.name : 'The ATlands';
     $('go-stats').innerHTML = this.statsHTML(G.stats);
     this.show('gameover');
     this.huds((h) => h.classList.remove('show'));
@@ -9706,7 +9713,7 @@ const UI = {
       garage: ['GARAGE', 'Build gear from the parts in your storage and hotbar.'],
       lab: ['LAB', 'Research upgrades with rare parts. Replay the memories you have recovered.'],
       command: ['COMMAND ROOM', 'Quests, quick travel to powered beacons, and your recovered memories.'],
-      journal: ['JOURNAL', 'Your quests and the memories you have recovered. Time is paused.'],
+      journal: ['JOURNAL · 4,212 A.T.', 'Your quests and the memories you have recovered. Time is paused.'],
     }[mode];
     $('ws-title').textContent = (Split.on ? `P${Split.idx + 1} · ` : '') + T[0];   // whose menu this is
     $('ws-sub').textContent = T[1];
@@ -10005,7 +10012,7 @@ const UI = {
       const n = Math.min(G.progress.story.logs, LORE_LOGS.length);
       mid = n ? `<div class="lore-list">${LORE_LOGS.slice(0, n).map((L, i) => `<div class="lore-item"><div class="lore-from"><b>${i + 1}</b> · ${L.from}</div><div class="lore-text">${L.text}</div></div>`).join('')}</div>`
         : '<div class="ws-note">No memories yet. Memory fragments glow purple at the far end of caves.</div>';
-      mid = `<div class="span-all">${mid}<div class="ws-note">${n} of ${LORE_LOGS.length} memories recovered.</div></div>`;
+      mid = `<div class="span-all">${mid}<div class="ws-note">${n} of ${LORE_LOGS.length} memories recovered. Dates are in A.T. — Anno Technologiae, the year of technology. It is now 4,212 A.T.</div></div>`;
     } else if (this.tab === 'quests') {
       const q = Story.main(), side = Story.sides();
       const row = (x, main) => `<div class="quest ${x.done ? 'done' : ''} ${main ? 'main' : ''}"><div class="q-title">${main ? 'MAIN · ' : ''}${x.title}${x.done ? ' ✓' : ''}</div><div class="q-step">${x.step}${x.prog ? ` <b>${x.prog[0]}/${x.prog[1]}</b>` : ''}</div></div>`;
@@ -10344,7 +10351,7 @@ const UI = {
       const d = Math.hypot(A.x - p.pos.x, A.z - p.pos.z) + A.i * 250;
       if (d < bd) { bd = d; best = A; }
     }
-    if (!best) return { text: beaten[4] ? 'The Outlands are free — explore, find every secret' : 'Explore the Outlands' };
+    if (!best) return { text: beaten[4] ? 'The ATlands are free — explore, find every secret' : 'Explore the ATlands' };
     const Z = ZONES[best.i], done = best.beacons.filter((b) => b.state === 'done').length;
     if (!best.sealed) return { A: best, text: `Enter ${Z.boss.name}'s dome (${Z.short})` };
     return { A: best, text: `${Z.boss.name}: power the ${Z.short.toLowerCase()} beacons (${done}/${best.beacons.length})` };
@@ -10496,7 +10503,8 @@ const UI = {
 </script>
 <script>
 'use strict';
-// The story: Rivet wakes on Wren Halloway's assembly table, learns the basics, and sets out to free the
+// The story (4,212 A.T., thousands of years after the Makers): Rivet wakes on the assembly table of Wren
+// Halloway, a caretaker robot, learns the basics, and sets out to free the
 // five Wardens from the Static. Quests are worked out from the game state (so saves can't get out of
 // sync), dialogue plays in a box above the hotbar, and the opening is a short in-engine scene.
 
@@ -10506,14 +10514,15 @@ const L = (text, who = WREN) => ({ who: who.name, color: who.color, text });
 const STORY = {
   opening: [
     L('…and power. Easy. Easy. There — your optics are coming up.'),
-    L("Can you hear me? Blink once if you— oh. You don't have eyelids. Never mind."),
+    L("Can you hear me? Flash your optics once if you— oh. I haven't fitted your shutters yet. Never mind."),
     L("You've been in pieces on this table for three weeks. Don't sit up too fast."),
-    L("Welcome to the world, Rivet. I'm Wren Halloway. I built you. Well… most of you."),
+    L("Welcome to the world, Rivet. I'm Wren Halloway, caretaker unit of Halloway Works. I built you. Well… most of you."),
+    L("Today is the 212th day of 4,212 A.T. — Anno Technologiae. Your very first date. Keep it somewhere safe."),
   ],
   talk: [
     L('Look at you, standing on your own two servos.'),
     L("Out there every machine has gone wild. There's a signal in the air. We call it the Static, and it turns anything with a circuit against us."),
-    L("Anything except you, it seems. Grab the Pulse Blaster from the rack by the door — I'll sleep better if you're armed."),
+    L("Anything except you, it seems. Grab the Pulse Blaster from the rack by the door — I'll rest my circuits easier if you're armed."),
   ],
   armed: [L("Now let's see if you can hit something. I've hung three practice drones out in the yard. Out the front door.")],
   targets: [L("Not bad at all! You shouldn't go out alone, though. Build a Gunner Drone at the workbench in here — I left scrap in storage.")],
@@ -10838,7 +10847,7 @@ const Story = {
       return q;
     }
     if (!B[4]) return Object.assign({ id: 'sky', title }, this.arenaStep(World.arenas.find((a) => a.i === 4)));
-    return { id: 'free', title, step: 'The Outlands are free — explore, and find every memory', done: true };
+    return { id: 'free', title, step: 'The ATlands are free — explore, and find every memory', done: true };
   },
   sides() {
     const S = this.S, rooms = (G.base.rooms) || {};
@@ -11827,6 +11836,7 @@ function newRun() {
 // Saves are versioned. Version 1 saves (separate biomes behind portals) keep the player's items,
 // upgrades, bots and Botbucks; the world itself is new.
 const SAVE_VERSION = 3;
+// the key keeps the game's old name on purpose: saves made before the rename to ATlands load as they are
 const SAVE_KEY = 'sf-outlands-save';
 function stateJSON() {
   // the save is written from player 1's point of view (player 2's character is added as `p2`)
@@ -11903,12 +11913,12 @@ function continueGame() {
   enterWorld(false);
   if (G.reshaped) {
     G.reshaped = false;
-    setTimeout(() => UI.banner('THE OUTLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
+    setTimeout(() => UI.banner('THE ATLANDS HAVE SHIFTED', 'Villages, the sea and new paths to the Wardens — your gear, bots and freed Wardens are all kept', '#3cf2ff', 5.5), 600);
     saveGame();
   }
   if (G.migrated) {
     G.migrated = false;
-    setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the Outlands are now one connected world', '#3cf2ff', 5), 600);
+    setTimeout(() => UI.banner('A NEW WORLD', 'Your gear, bots and Botbucks came with you — the ATlands are now one connected world', '#3cf2ff', 5), 600);
     saveGame();
   }
 }
